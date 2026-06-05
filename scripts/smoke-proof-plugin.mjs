@@ -34,6 +34,18 @@ try {
   const applicationHelp = run(process.execPath, [proofDevBin, "slipway", "application", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationHelp.stdout, "Read Slipway Application state");
 
+  const applicationListHelp = run(process.execPath, [proofDevBin, "slipway", "application", "list", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationListHelp.stdout, "List readable Slipway Applications");
+
+  const applicationBackfillIdentitiesHelp = run(process.execPath, [proofDevBin, "slipway", "application", "backfill-identities", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationBackfillIdentitiesHelp.stdout, "Backfill Slipway Application identity fields");
+  assertIncludes(applicationBackfillIdentitiesHelp.stdout, "--yes");
+
+  const applicationDeleteHelp = run(process.execPath, [proofDevBin, "slipway", "application", "delete", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationDeleteHelp.stdout, "Tombstone a Slipway Application");
+  assertIncludes(applicationDeleteHelp.stdout, "--force");
+  assertIncludes(applicationDeleteHelp.stdout, "--yes");
+
   const applicationImportHelp = run(process.execPath, [proofDevBin, "slipway", "application", "import", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationImportHelp.stdout, "Import a Slipway Application policy");
   assertIncludes(applicationImportHelp.stdout, "--github");

@@ -6,7 +6,10 @@ import path from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  runSlipwayApplicationBackfillIdentities,
+  runSlipwayApplicationDelete,
   runSlipwayApplicationImport,
+  runSlipwayApplicationList,
   runSlipwayApplicationLockboxGrantStatus,
   runSlipwayApplicationPlans,
   runSlipwayApplicationStatus,
@@ -77,6 +80,272 @@ describe("proof-cli Slipway runner", () => {
     const saved = await readFile(sessionFile, "utf8");
     assert.equal(saved.includes(token), true);
     assert.equal(saved.includes("octo-agent"), true);
+  });
+
+  it("lists Applications with the stored session bearer without printing it", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_list_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; authorization?: string }> = [];
+    const out = writer();
+    const code = await runSlipwayApplicationList({
+      config: sessionFile,
+      json: true
+    }, {
+      fetchImpl: async (url, init) => {
+        requests.push({
+          url: String(url),
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization
+        });
+        return jsonResponse({
+          ok: true,
+          count: 2,
+          applications: [{
+            applicationUid: "app-1111111111111111",
+            applicationName: "alpha",
+            applicationId: "alpha",
+            ownerAddress: "5owner-alpha",
+            status: "active",
+            replicas: 1,
+            source: { repository: "proof-computer/alpha" },
+            artifact: { status: "ready" },
+            duplicateLegacyId: true
+          }, {
+            applicationUid: "app-2222222222222222",
+            applicationName: "beta",
+            applicationId: "beta",
+            ownerAddress: "5owner-beta",
+            status: "draft",
+            replicas: 0,
+            source: { repository: "proof-computer/beta" },
+            artifact: { status: "missing" },
+            deletedAtMs: 123,
+            deletedBy: "5owner-beta",
+            deleteReason: "test cleanup"
+          }]
+        });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications",
+      authorization: `Bearer ${token}`
+    }]);
+    assert.equal(out.text.includes(token), false);
+    const parsed = JSON.parse(out.text) as {
+      ok: boolean;
+      count: number;
+      applications: Array<{ applicationUid: string; applicationName: string; applicationId: string; ownerAddress: string; artifact: { status: string }; duplicateLegacyId?: boolean; deletedAtMs?: number; deleteReason?: string }>;
+    };
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.count, 2);
+    assert.equal(parsed.applications[0]?.applicationUid, "app-1111111111111111");
+    assert.equal(parsed.applications[0]?.applicationName, "alpha");
+    assert.equal(parsed.applications[0]?.applicationId, "alpha");
+    assert.equal(parsed.applications[0]?.ownerAddress, "5owner-alpha");
+    assert.equal(parsed.applications[0]?.duplicateLegacyId, true);
+    assert.equal(parsed.applications[1]?.artifact.status, "missing");
+    assert.equal(parsed.applications[1]?.deletedAtMs, 123);
+    assert.equal(parsed.applications[1]?.deleteReason, "test cleanup");
+  });
+
+  it("dry-runs Application identity backfill with the stored session bearer without printing it", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_backfill_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    const code = await runSlipwayApplicationBackfillIdentities({
+      config: sessionFile,
+      json: true
+    }, {
+      fetchImpl: async (url, init) => {
+        requests.push({
+          url: String(url),
+          method: init?.method,
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
+        });
+        return jsonResponse({
+          ok: true,
+          dryRun: true,
+          changed: true,
+          scanned: 1,
+          changedCount: 1,
+          changes: [{
+            ownerAddress: "5owner",
+            applicationId: "alpha",
+            applicationUid: "app-1111111111111111",
+            applicationName: "alpha",
+            reasons: ["missing_applicationUid", "missing_applicationName"]
+          }]
+        });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications/backfill-identities",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: { confirm: false }
+    }]);
+    assert.equal(out.text.includes(token), false);
+    const parsed = JSON.parse(out.text) as { ok: boolean; dryRun: boolean; changes: Array<{ applicationUid: string; applicationName: string }> };
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.dryRun, true);
+    assert.equal(parsed.changes[0]?.applicationUid, "app-1111111111111111");
+    assert.equal(parsed.changes[0]?.applicationName, "alpha");
+  });
+
+  it("dry-runs Application delete with the stored session bearer without printing it", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_delete_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    const code = await runSlipwayApplicationDelete({
+      applicationRef: "alpha",
+      owner: "5owner",
+      reason: "cleanup",
+      config: sessionFile,
+      json: true
+    }, {
+      fetchImpl: async (url, init) => {
+        requests.push({
+          url: String(url),
+          method: init?.method,
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
+        });
+        return jsonResponse({
+          ok: true,
+          dryRun: true,
+          deleted: false,
+          force: false,
+          application: {
+            applicationUid: "app-1111111111111111",
+            applicationName: "alpha",
+            applicationId: "legacy-alpha",
+            ownerAddress: "5owner",
+            status: "active"
+          },
+          blockers: [{
+            code: "application_active",
+            message: "Application status is active"
+          }]
+        });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications/alpha?owner=5owner",
+      method: "DELETE",
+      authorization: `Bearer ${token}`,
+      body: {
+        confirm: false,
+        force: false,
+        reason: "cleanup"
+      }
+    }]);
+    assert.equal(out.text.includes(token), false);
+    const parsed = JSON.parse(out.text) as { ok: boolean; dryRun: boolean; application: { applicationUid: string; applicationName: string }; blockers: Array<{ code: string }> };
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.dryRun, true);
+    assert.equal(parsed.application.applicationUid, "app-1111111111111111");
+    assert.equal(parsed.application.applicationName, "alpha");
+    assert.equal(parsed.blockers[0]?.code, "application_active");
+  });
+
+  it("renders ambiguous Application delete candidates without printing the bearer token", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_ambiguous_delete_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    const code = await runSlipwayApplicationDelete({
+      applicationRef: "shared",
+      config: sessionFile
+    }, {
+      fetchImpl: async (url, init) => {
+        requests.push({
+          url: String(url),
+          method: init?.method,
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
+        });
+        return jsonResponse({
+          ok: false,
+          error: "ambiguous_application",
+          reason: "Legacy applicationId shared is ambiguous",
+          candidates: [{
+            applicationUid: "app-1111111111111111",
+            applicationName: "shared-a",
+            applicationId: "shared",
+            ownerAddress: "5owner-a",
+            status: "disabled",
+            repository: "proof-computer/shared"
+          }, {
+            applicationUid: "app-2222222222222222",
+            applicationName: "shared-b",
+            applicationId: "shared",
+            ownerAddress: "5owner-b",
+            status: "disabled",
+            repository: "proof-computer/shared"
+          }]
+        }, 409);
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 1);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications/shared",
+      method: "DELETE",
+      authorization: `Bearer ${token}`,
+      body: {
+        confirm: false,
+        force: false
+      }
+    }]);
+    assert.equal(out.text.includes(token), false);
+    assert.match(out.text, /SLIPWAY_APPLICATION_AMBIGUOUS/u);
+    assert.match(out.text, /shared-a \(legacy shared\)/u);
+    assert.match(out.text, /owner 5owner-a/u);
+    assert.match(out.text, /Use an Application uid\/name/u);
   });
 
   it("reads Application status with the stored session bearer without printing it", async () => {

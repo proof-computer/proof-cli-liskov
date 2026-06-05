@@ -27,13 +27,17 @@ USAGE
   $ ${bin} slipway application <command> [options]
 
 COMMANDS
+  backfill-identities [--yes]
+  delete APP_REF [--owner OWNER] [--reason TEXT] [--force] [--yes]
   import --github owner/repo:path@ref [--server-fetch] [--publish]
   import --file PATH [--publish]
+  list
   status APPLICATION_ID
   plans APPLICATION_ID
   lockbox grant-status APPLICATION_ID
 
 DESCRIPTION
-  Read-only Application commands use the local proof slipway session created
-  by \`${bin} slipway login\`.`);
+  Application commands use the local proof slipway session created by
+  \`${bin} slipway login\`. Delete creates a Slipway tombstone; it does not
+  stop Acurast jobs, revoke Lockbox grants, or drain routes.`);
 }

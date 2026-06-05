@@ -29,6 +29,7 @@ USAGE
 COMMANDS
   login
   application import --github owner/repo:path@ref [--server-fetch] [--publish]
+  application list
   application status APPLICATION_ID
   application plans APPLICATION_ID
   application lockbox grant-status APPLICATION_ID

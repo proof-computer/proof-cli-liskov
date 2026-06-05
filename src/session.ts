@@ -38,6 +38,30 @@ export interface SlipwayApplicationStatusInput {
   json?: boolean;
 }
 
+export interface SlipwayApplicationListInput {
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationDeleteInput {
+  applicationRef: string;
+  owner?: string;
+  reason?: string;
+  force?: boolean;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationBackfillIdentitiesInput {
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationPlansInput {
   applicationId: string;
   slipwayUrl?: string;
@@ -122,15 +146,46 @@ interface PublicSlipwayCliLogin {
   pollIntervalMs?: number;
 }
 
+interface PublicSlipwayApplicationSummary {
+  applicationUid?: string;
+  applicationName?: string;
+  applicationId?: string;
+  ownerAddress?: string;
+  displayName?: string;
+  status?: string;
+  createdAtMs?: number;
+  updatedAtMs?: number;
+  deletedAtMs?: number;
+  deletedBy?: string;
+  deleteReason?: string;
+  replicas?: number;
+  serviceCount?: number;
+  source?: { repository?: string };
+  artifact?: { status?: string };
+  activePolicy?: { policyVersionId?: string; status?: string };
+  activePolicyVersionId?: string;
+  activePolicyDigest?: string;
+  duplicateLegacyId?: boolean;
+}
+
+interface PublicSlipwayApplicationRefCandidate {
+  applicationUid?: string;
+  applicationName?: string;
+  applicationId?: string;
+  ownerAddress?: string;
+  status?: string;
+  repository?: string;
+}
+
+interface SlipwayApplicationDeleteBlocker {
+  code?: string;
+  message?: string;
+  count?: number;
+}
+
 interface SlipwayApplicationStatusResponse {
   ok?: boolean;
-  application?: {
-    applicationId?: string;
-    status?: string;
-    serviceCount?: number;
-    replicas?: number;
-    source?: { repository?: string };
-  };
+  application?: PublicSlipwayApplicationSummary;
   activePolicy?: {
     policyVersionId?: string;
     status?: string;
@@ -143,6 +198,48 @@ interface SlipwayApplicationStatusResponse {
     scheduledReplicas?: number;
     missingReplicas?: number;
   };
+  error?: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+interface SlipwayApplicationListResponse {
+  ok?: boolean;
+  count?: number;
+  applications?: PublicSlipwayApplicationSummary[];
+  error?: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+interface SlipwayApplicationDeleteResponse {
+  ok?: boolean;
+  dryRun?: boolean;
+  deleted?: boolean;
+  force?: boolean;
+  application?: PublicSlipwayApplicationSummary;
+  blockers?: SlipwayApplicationDeleteBlocker[];
+  error?: string;
+  reason?: string;
+  candidates?: PublicSlipwayApplicationRefCandidate[];
+  [key: string]: unknown;
+}
+
+interface SlipwayApplicationBackfillIdentitiesResponse {
+  ok?: boolean;
+  dryRun?: boolean;
+  changed?: boolean;
+  scanned?: number;
+  changedCount?: number;
+  changes?: Array<{
+    ownerAddress?: string;
+    applicationId?: string;
+    applicationUid?: string;
+    applicationName?: string;
+    previousApplicationUid?: string;
+    previousApplicationName?: string;
+    reasons?: string[];
+  }>;
   error?: string;
   reason?: string;
   [key: string]: unknown;
@@ -443,6 +540,130 @@ export async function runSlipwayApplicationStatus(input: SlipwayApplicationStatu
     input.json,
     body,
     formatApplicationStatus(body, input.applicationId)
+  );
+  return 0;
+}
+
+export async function runSlipwayApplicationList(input: SlipwayApplicationListInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayRequest<SlipwayApplicationListResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: "/api/applications",
+    requestErrorCode: "SLIPWAY_APPLICATION_LIST_FAILED",
+    notFoundMessage: "No Slipway CLI session is stored locally.",
+    fetchFailedMessage: "could not list Slipway Applications"
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const body = request.body;
+  if (body?.ok !== true || !Array.isArray(body.applications)) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_LIST_FAILED";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      reason: body?.reason ?? body?.error,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, `Error (${error}): Slipway could not list Applications.`);
+    return 1;
+  }
+
+  writeStructuredOrHuman(
+    options,
+    input.json,
+    body,
+    formatApplicationList(body)
+  );
+  return 0;
+}
+
+export async function runSlipwayApplicationBackfillIdentities(input: SlipwayApplicationBackfillIdentitiesInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayJsonRequest<SlipwayApplicationBackfillIdentitiesResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: "/api/applications/backfill-identities",
+    body: {
+      confirm: input.yes === true
+    },
+    requestErrorCode: "SLIPWAY_APPLICATION_BACKFILL_IDENTITIES_FAILED",
+    notFoundMessage: "No Slipway CLI session is stored locally.",
+    fetchFailedMessage: "could not backfill Slipway Application identities"
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const body = request.body;
+  if (body?.ok !== true || !Array.isArray(body.changes)) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_BACKFILL_IDENTITIES_FAILED";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      reason: body?.reason ?? body?.error,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, `Error (${error}): Slipway could not backfill Application identities.`);
+    return 1;
+  }
+
+  writeStructuredOrHuman(
+    options,
+    input.json,
+    body,
+    formatApplicationBackfillIdentities(body)
+  );
+  return 0;
+}
+
+export async function runSlipwayApplicationDelete(input: SlipwayApplicationDeleteInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayJsonRequest<SlipwayApplicationDeleteResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "DELETE",
+    path: applicationDeletePath(input.applicationRef, input.owner),
+    body: {
+      confirm: input.yes === true,
+      force: input.force === true,
+      reason: input.reason
+    },
+    requestErrorCode: "SLIPWAY_APPLICATION_DELETE_FAILED",
+    notFoundMessage: "No Slipway CLI session is stored locally.",
+    fetchFailedMessage: "could not delete Slipway Application"
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const body = request.body;
+  if (body?.ok !== true || !body.application) {
+    const ambiguous = body?.error === "ambiguous_application" && Array.isArray(body.candidates);
+    const error = request.response.status === 401
+      ? "SLIPWAY_SESSION_UNAUTHORIZED"
+      : ambiguous
+        ? "SLIPWAY_APPLICATION_AMBIGUOUS"
+        : "SLIPWAY_APPLICATION_DELETE_FAILED";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      reason: body?.reason ?? body?.error,
+      applicationRef: input.applicationRef,
+      candidates: body?.candidates,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, ambiguous
+      ? formatApplicationAmbiguity(input.applicationRef, body!.candidates!)
+      : `Error (${error}): Slipway could not delete Application ${input.applicationRef}.`);
+    return 1;
+  }
+
+  writeStructuredOrHuman(
+    options,
+    input.json,
+    body,
+    formatApplicationDelete(body)
   );
   return 0;
 }
@@ -748,7 +969,7 @@ async function authenticatedSlipwayJsonRequest<T>(
     config?: string;
     slipwayUrl?: string;
     json?: boolean;
-    method: "POST";
+    method: "DELETE" | "POST";
     path: string;
     body: unknown;
     requestErrorCode: string;
@@ -944,13 +1165,20 @@ async function fetchGithubPolicyJson(fetchImpl: typeof fetch, input: SlipwayGith
   return JSON.parse(await response.text());
 }
 
+function applicationDeletePath(applicationRef: string, owner: string | undefined): string {
+  const pathValue = `/api/applications/${encodeURIComponent(applicationRef)}`;
+  if (!owner || !owner.trim()) return pathValue;
+  const query = new URLSearchParams({ owner: owner.trim() });
+  return `${pathValue}?${query.toString()}`;
+}
+
 function defaultSleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function formatApplicationStatus(body: SlipwayApplicationStatusResponse, fallbackApplicationId: string): string {
   const app = body.application;
-  const applicationId = app?.applicationId ?? fallbackApplicationId;
+  const applicationId = formatApplicationLabel(app, fallbackApplicationId);
   const status = app?.status ?? body.activePolicy?.status ?? "unknown";
   const desired = typeof body.desired?.replicas === "number" ? body.desired.replicas : app?.replicas;
   const active = body.observed?.activeReplicas;
@@ -962,7 +1190,101 @@ function formatApplicationStatus(body: SlipwayApplicationStatusResponse, fallbac
   ].filter((item): item is string => item !== undefined).join(", ");
   const policy = body.activePolicy?.policyVersionId ? `; policy ${body.activePolicy.policyVersionId}` : "";
   const repository = app?.source?.repository ? `; repo ${app.source.repository}` : "";
-  return `${applicationId}: ${status}${replicaSummary ? ` (${replicaSummary})` : ""}${policy}${repository}`;
+  const deleted = typeof app?.deletedAtMs === "number" ? `; deleted ${new Date(app.deletedAtMs).toISOString()}` : "";
+  return `${applicationId}: ${status}${replicaSummary ? ` (${replicaSummary})` : ""}${policy}${repository}${deleted}`;
+}
+
+function formatApplicationList(body: SlipwayApplicationListResponse): string {
+  const applications = body.applications ?? [];
+  const count = typeof body.count === "number" ? body.count : applications.length;
+  if (applications.length === 0) return "No Slipway Applications found.";
+  const lines = [`${count} Slipway Application(s):`];
+  for (const application of applications) {
+    const primary = application.applicationName ?? application.applicationUid ?? application.applicationId ?? "unknown";
+    const applicationId = formatApplicationLabel(application);
+    const policyVersionId = application.activePolicy?.policyVersionId ?? application.activePolicyVersionId;
+    const status = application.status ?? application.activePolicy?.status ?? "unknown";
+    const details = [
+      typeof application.replicas === "number" ? `${application.replicas} replica(s)` : undefined,
+      application.artifact?.status ? `artifact ${application.artifact.status}` : undefined,
+      policyVersionId ? `policy ${policyVersionId}` : undefined,
+      application.source?.repository ? `repo ${application.source.repository}` : undefined,
+      application.ownerAddress ? `owner ${application.ownerAddress}` : undefined,
+      application.applicationUid && application.applicationUid !== primary ? `uid ${application.applicationUid}` : undefined,
+      application.duplicateLegacyId ? "duplicate legacy id" : undefined,
+      typeof application.deletedAtMs === "number" ? `deleted ${new Date(application.deletedAtMs).toISOString()}` : undefined
+    ].filter((item): item is string => item !== undefined);
+    lines.push(`- ${applicationId}: ${status}${details.length > 0 ? ` (${details.join(", ")})` : ""}`);
+  }
+  return lines.join("\n");
+}
+
+function formatApplicationBackfillIdentities(body: SlipwayApplicationBackfillIdentitiesResponse): string {
+  const changedCount = typeof body.changedCount === "number" ? body.changedCount : body.changes?.length ?? 0;
+  const scanned = typeof body.scanned === "number" ? body.scanned : "unknown";
+  const prefix = body.dryRun === true ? "Dry run" : "Backfilled";
+  const lines = [`${prefix}: ${changedCount} Application identity change(s) across ${scanned} scanned Application(s).`];
+  for (const change of body.changes ?? []) {
+    const reasons = Array.isArray(change.reasons) && change.reasons.length > 0 ? ` [${change.reasons.join(", ")}]` : "";
+    const label = formatApplicationLabel({
+      applicationName: change.applicationName,
+      applicationUid: change.applicationUid,
+      applicationId: change.applicationId
+    }, change.applicationId);
+    lines.push(`- ${label}${reasons}`);
+  }
+  return lines.join("\n");
+}
+
+function formatApplicationDelete(body: SlipwayApplicationDeleteResponse): string {
+  const target = formatApplicationLabel(body.application);
+  const blockers = body.blockers ?? [];
+  const header = body.dryRun === true
+    ? `Dry run: ${target} would be tombstoned.`
+    : body.deleted === true
+      ? `Deleted ${target}.`
+      : `${target} is already deleted.`;
+  const lines = [header];
+  if (blockers.length > 0) {
+    lines.push(`Blockers: ${blockers.map(formatDeleteBlocker).join("; ")}`);
+    if (body.dryRun === true && body.force !== true) {
+      lines.push("Use --force --yes to tombstone despite these blockers.");
+    }
+  }
+  return lines.join("\n");
+}
+
+function formatApplicationAmbiguity(applicationRef: string, candidates: PublicSlipwayApplicationRefCandidate[]): string {
+  const lines = [
+    `Error (SLIPWAY_APPLICATION_AMBIGUOUS): Application ref ${applicationRef} matched multiple readable Applications.`,
+    "Candidates:"
+  ];
+  for (const candidate of candidates) {
+    const label = formatApplicationLabel(candidate);
+    const details = [
+      candidate.ownerAddress ? `owner ${candidate.ownerAddress}` : undefined,
+      candidate.repository ? `repo ${candidate.repository}` : undefined,
+      candidate.status ? `status ${candidate.status}` : undefined
+    ].filter((item): item is string => item !== undefined);
+    lines.push(`- ${label}${details.length > 0 ? ` (${details.join(", ")})` : ""}`);
+  }
+  lines.push("Use an Application uid/name, or pass --owner OWNER with the legacy id.");
+  return lines.join("\n");
+}
+
+function formatDeleteBlocker(blocker: SlipwayApplicationDeleteBlocker): string {
+  const label = blocker.code ?? "unknown";
+  const count = typeof blocker.count === "number" ? ` (${blocker.count})` : "";
+  return `${label}${count}`;
+}
+
+function formatApplicationLabel(
+  application: Pick<PublicSlipwayApplicationSummary, "applicationUid" | "applicationName" | "applicationId"> | undefined,
+  fallbackApplicationId = "unknown"
+): string {
+  const primary = application?.applicationName ?? application?.applicationUid ?? application?.applicationId ?? fallbackApplicationId;
+  const legacy = application?.applicationId;
+  return legacy && legacy !== primary ? `${primary} (legacy ${legacy})` : primary;
 }
 
 function formatLockboxGrantStatus(body: SlipwayApplicationLockboxGrantStatusResponse, fallbackApplicationId: string): string {
