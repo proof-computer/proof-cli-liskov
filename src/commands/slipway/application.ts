@@ -34,7 +34,14 @@ COMMANDS
   list
   status APPLICATION_ID
   plans APPLICATION_ID
+  deployment import APP_REF --sequence N --origin ADDRESS --yes
+  lockbox setup-pr APP_REF --yes
+  lockbox dispatch APP_REF --yes
+  lockbox grant ensure APP_REF --yes
+  lockbox grant verify APP_REF GRANT_ID --yes
+  lockbox grant status APP_REF
   lockbox grant-status APPLICATION_ID
+  blackbox configure APP_REF --yes
 
 DESCRIPTION
   Application commands use the local proof slipway session created by

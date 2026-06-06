@@ -7,12 +7,28 @@ import { describe, it } from "node:test";
 
 import {
   runSlipwayApplicationBackfillIdentities,
+  runSlipwayApplicationBlackboxConfigure,
   runSlipwayApplicationDelete,
+  runSlipwayApplicationDeploymentImport,
   runSlipwayApplicationImport,
   runSlipwayApplicationList,
+  runSlipwayApplicationLockboxDispatch,
+  runSlipwayApplicationLockboxGrantEnsure,
   runSlipwayApplicationLockboxGrantStatus,
+  runSlipwayApplicationLockboxGrantVerify,
+  runSlipwayApplicationLockboxSetupPr,
   runSlipwayApplicationPlans,
   runSlipwayApplicationStatus,
+  runSlipwayCustodyAccountEnsure,
+  runSlipwayCustodyChildRecover,
+  runSlipwayCustodyEnvironmentUpload,
+  runSlipwayCustodyExecutionDiagnose,
+  runSlipwayCustodyExecutionList,
+  runSlipwayCustodyExecutionObserve,
+  runSlipwayCustodyExecutionRecover,
+  runSlipwayCustodyExecutionSubmit,
+  runSlipwayCustodyMachineCatalog,
+  runSlipwayCustodyPreflight,
   runSlipwayLogin,
   runSlipwayLogout,
   runSlipwayWhoami,
@@ -517,6 +533,449 @@ describe("proof-cli Slipway runner", () => {
     assert.equal(parsed.statuses[0]?.requests.acceptedCount, 2);
   });
 
+  it("runs Application mutation commands through confirmed Slipway API requests", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_application_mutation_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const cases = [
+      {
+        name: "deployment import",
+        run: () => runSlipwayApplicationDeploymentImport({
+          applicationRef: "alpha",
+          sequence: 77,
+          origin: "5origin",
+          deploymentId: "deploy-77",
+          replicaIndex: 1,
+          processor: "processor-1",
+          gatewayId: "gateway-1",
+          endpointHostname: "alpha.example.test",
+          config: sessionFile,
+          json: true,
+          yes: true
+        }, sharedOptions()),
+        expected: {
+          url: "https://slipway.test/api/applications/alpha/deployments/imports",
+          method: "POST",
+          body: {
+            acurastJobRef: {
+              origin: { acurast: "5origin" },
+              sequence: 77,
+              canonicalJobId: JSON.stringify([{ acurast: "5origin" }, 77])
+            },
+            deploymentId: "deploy-77",
+            replicaIndex: 1,
+            processorId: "processor-1",
+            gatewayId: "gateway-1",
+            endpointHostname: "alpha.example.test"
+          }
+        }
+      },
+      {
+        name: "lockbox setup PR",
+        run: () => runSlipwayApplicationLockboxSetupPr({
+          applicationRef: "alpha",
+          baseRef: "main",
+          config: sessionFile,
+          json: true,
+          yes: true
+        }, sharedOptions()),
+        expected: {
+          url: "https://slipway.test/api/applications/alpha/lockbox/workflow-pr",
+          method: "POST",
+          body: { baseRef: "main" }
+        }
+      },
+      {
+        name: "lockbox dispatch",
+        run: () => runSlipwayApplicationLockboxDispatch({
+          applicationRef: "alpha",
+          ref: "refs/heads/main",
+          config: sessionFile,
+          json: true,
+          yes: true
+        }, sharedOptions()),
+        expected: {
+          url: "https://slipway.test/api/applications/alpha/lockbox/workflow-dispatch",
+          method: "POST",
+          body: { ref: "refs/heads/main" }
+        }
+      },
+      {
+        name: "lockbox grant ensure",
+        run: () => runSlipwayApplicationLockboxGrantEnsure({
+          applicationRef: "alpha",
+          config: sessionFile,
+          json: true,
+          yes: true
+        }, sharedOptions()),
+        expected: {
+          url: "https://slipway.test/api/applications/alpha/lockbox/grants",
+          method: "POST",
+          body: {}
+        }
+      },
+      {
+        name: "lockbox grant verify",
+        run: () => runSlipwayApplicationLockboxGrantVerify({
+          applicationRef: "alpha",
+          grantId: "grant-1",
+          config: sessionFile,
+          json: true,
+          yes: true
+        }, sharedOptions()),
+        expected: {
+          url: "https://slipway.test/api/applications/alpha/lockbox/grants/grant-1/verify",
+          method: "POST",
+          body: {}
+        }
+      },
+      {
+        name: "blackbox configure",
+        run: () => runSlipwayApplicationBlackboxConfigure({
+          applicationRef: "alpha",
+          config: sessionFile,
+          json: true,
+          yes: true
+        }, sharedOptions()),
+        expected: {
+          url: "https://slipway.test/api/applications/alpha/blackbox/configurations",
+          method: "POST",
+          body: {}
+        }
+      }
+    ];
+
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    function sharedOptions() {
+      return {
+        fetchImpl: async (url: URL | RequestInfo, init?: RequestInit) => {
+          requests.push({
+            url: String(url),
+            method: init?.method,
+            authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+            body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
+          });
+          return jsonResponse({ ok: true, child: { childSessionId: "child-1" }, grant: { grantId: "grant-1" }, configuration: { configurationId: "blackbox-1" } });
+        },
+        stdout: out.write
+      };
+    }
+
+    for (const item of cases) {
+      const code = await item.run();
+      assert.equal(code, 0, item.name);
+    }
+
+    assert.deepEqual(requests, cases.map((item) => ({
+      ...item.expected,
+      authorization: `Bearer ${token}`
+    })));
+    assert.equal(out.text.includes(token), false);
+  });
+
+  it("fails mutating Application commands before network I/O without --yes", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "slipway_no_yes_token",
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const out = writer();
+    const options = {
+      fetchImpl: async () => {
+        throw new Error("network should not be called");
+      },
+      stdout: out.write
+    };
+    const commands = [
+      runSlipwayApplicationDeploymentImport({ applicationRef: "alpha", sequence: 1, origin: "5origin", config: sessionFile, json: true }, options),
+      runSlipwayApplicationLockboxSetupPr({ applicationRef: "alpha", config: sessionFile, json: true }, options),
+      runSlipwayApplicationLockboxDispatch({ applicationRef: "alpha", config: sessionFile, json: true }, options),
+      runSlipwayApplicationLockboxGrantEnsure({ applicationRef: "alpha", config: sessionFile, json: true }, options),
+      runSlipwayApplicationLockboxGrantVerify({ applicationRef: "alpha", grantId: "grant-1", config: sessionFile, json: true }, options),
+      runSlipwayApplicationBlackboxConfigure({ applicationRef: "alpha", config: sessionFile, json: true }, options)
+    ];
+    const codes = await Promise.all(commands);
+    assert.deepEqual(codes, [1, 1, 1, 1, 1, 1]);
+    assert.match(out.text, /CONFIRMATION_REQUIRED/u);
+  });
+
+  it("runs live custody commands through saved bearer sessions", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_custody_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    const options = {
+      fetchImpl: async (url: URL | RequestInfo, init?: RequestInit) => {
+        requests.push({
+          url: String(url),
+          method: init?.method ?? "GET",
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
+        });
+        return jsonResponse({
+          ok: true,
+          account: { accountRef: "live-custody:acurast:test", chain: "acurast", address: "5hot" },
+          attempts: [{ executionId: "exec-1", status: "submitted" }],
+          attempt: { executionId: "exec-1", status: "observed" },
+          child: { childSessionId: "child-1", status: "proposal_expired" },
+          actionPlan: { count: 1, items: [{ planItemId: "plan-1" }] },
+          classification: "verified_ready",
+          classes: [{ class: "phone-v1" }]
+        });
+      },
+      stdout: out.write
+    };
+
+    assert.equal(await runSlipwayCustodyAccountEnsure({ applicationRef: "alpha", chain: "acurast", config: sessionFile, json: true, yes: true }, options), 0);
+    assert.equal(await runSlipwayCustodyPreflight({ applicationRef: "alpha", config: sessionFile, json: true }, options), 0);
+    assert.equal(await runSlipwayCustodyExecutionList({ applicationRef: "alpha", config: sessionFile, json: true }, options), 0);
+    assert.equal(await runSlipwayCustodyExecutionObserve({ applicationRef: "alpha", executionId: "exec-1", config: sessionFile, json: true }, options), 0);
+    assert.equal(await runSlipwayCustodyExecutionDiagnose({ applicationRef: "alpha", executionId: "exec-1", network: "testnet", config: sessionFile, json: true }, options), 0);
+    assert.equal(await runSlipwayCustodyExecutionRecover({ applicationRef: "alpha", executionId: "exec-1", reason: "operator reviewed", config: sessionFile, json: true, yes: true }, options), 0);
+    assert.equal(await runSlipwayCustodyChildRecover({ applicationRef: "alpha", childSessionId: "child-1", reason: "operator reviewed", config: sessionFile, json: true, yes: true }, options), 0);
+    assert.equal(await runSlipwayCustodyMachineCatalog({ network: "testnet", config: sessionFile, json: true }, options), 0);
+
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications/alpha/live-custody/account",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: { chain: "acurast" }
+    }, {
+      url: "https://slipway.test/api/applications/alpha/live-custody/preflight",
+      method: "GET",
+      authorization: `Bearer ${token}`,
+      body: undefined
+    }, {
+      url: "https://slipway.test/api/applications/alpha/live-custody/executions",
+      method: "GET",
+      authorization: `Bearer ${token}`,
+      body: undefined
+    }, {
+      url: "https://slipway.test/api/applications/alpha/live-custody/executions/exec-1/observe",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: {}
+    }, {
+      url: "https://slipway.test/api/applications/alpha/live-custody/executions/exec-1/diagnosis?network=canary",
+      method: "GET",
+      authorization: `Bearer ${token}`,
+      body: undefined
+    }, {
+      url: "https://slipway.test/api/applications/alpha/live-custody/executions/exec-1/recover",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: { yesRecover: true, acknowledgement: "operator-reviewed", reason: "operator reviewed" }
+    }, {
+      url: "https://slipway.test/api/applications/alpha/live-custody/child-sessions/child-1/recover",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: { yesRecover: true, acknowledgement: "operator-reviewed", reason: "operator reviewed" }
+    }, {
+      url: "https://slipway.test/api/live-custody/machine-catalog?network=canary",
+      method: "GET",
+      authorization: `Bearer ${token}`,
+      body: undefined
+    }]);
+    assert.equal(out.text.includes(token), false);
+  });
+
+  it("fails spend and custody mutation commands before network I/O without confirmations", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "slipway_custody_no_yes_token",
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const out = writer();
+    const options = {
+      fetchImpl: async () => {
+        throw new Error("network should not be called");
+      },
+      stdout: out.write
+    };
+    assert.equal(await runSlipwayCustodyAccountEnsure({ applicationRef: "alpha", chain: "acurast", config: sessionFile, json: true }, options), 1);
+    assert.equal(await runSlipwayCustodyExecutionSubmit({
+      applicationRef: "alpha",
+      planItemId: "plan-1",
+      idempotencyKey: "key-1",
+      config: sessionFile,
+      json: true,
+      yes: true
+    }, options), 1);
+    assert.equal(await runSlipwayCustodyExecutionRecover({ applicationRef: "alpha", executionId: "exec-1", reason: "review", config: sessionFile, json: true }, options), 1);
+    assert.equal(await runSlipwayCustodyChildRecover({ applicationRef: "alpha", childSessionId: "child-1", reason: "review", config: sessionFile, json: true }, options), 1);
+    assert.match(out.text, /--yes/u);
+    assert.match(out.text, /--yes-spend/u);
+  });
+
+  it("builds encrypted environment handoffs without printing local secret values", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const secretsFile = path.join(dir, ".env");
+    const token = "slipway_environment_secret_token_do_not_print";
+    const secretValue = "local-secret-value-do-not-print";
+    await writeFile(secretsFile, `SECRET_VALUE=${secretValue}\n`, "utf8");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    const handoff = encryptedHandoff();
+    const options = {
+      environmentHandoffBuilder: async (input) => {
+        assert.equal(input.action.actionId, "set-env-1");
+        assert.deepEqual(input.variables, [{ key: "SECRET_VALUE", value: secretValue }]);
+        return handoff;
+      },
+      fetchImpl: async (url: URL | RequestInfo, init?: RequestInit) => {
+        requests.push({
+          url: String(url),
+          method: init?.method ?? "GET",
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
+        });
+        if (String(url).endsWith("/api/applications/alpha/action-plan")) {
+          return jsonResponse({ ok: true, items: [setEnvironmentPlanItem()] });
+        }
+        if (String(url).endsWith("/api/applications/alpha")) {
+          return jsonResponse({
+            ok: true,
+            application: { applicationId: "alpha", status: "active" },
+            activePolicy: {
+              policyDigest: "policy-digest-1",
+              environment: {
+                variables: [{ name: "SECRET_VALUE", source: "secret", required: true }]
+              }
+            }
+          });
+        }
+        return jsonResponse({ ok: true, handoff: { handoffKey: "handoff-1" } });
+      },
+      stdout: out.write
+    };
+
+    const code = await runSlipwayCustodyEnvironmentUpload({
+      applicationRef: "alpha",
+      secretsFile,
+      config: sessionFile,
+      json: true,
+      yes: true
+    }, options);
+
+    assert.equal(code, 0);
+    assert.deepEqual(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`), [
+      "GET /api/applications/alpha/action-plan",
+      "GET /api/applications/alpha",
+      "POST /api/applications/alpha/live-custody/environment-handoffs"
+    ]);
+    assert.equal(requests[2]?.authorization, `Bearer ${token}`);
+    assert.deepEqual(requests[2]?.body, { environmentHandoff: handoff });
+    assert.equal(out.text.includes(token), false);
+    assert.equal(out.text.includes(secretValue), false);
+  });
+
+  it("submits execution plans with encrypted environment handoffs and spend confirmation", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const secretsFile = path.join(dir, ".env");
+    const token = "slipway_submit_secret_token_do_not_print";
+    const secretValue = "submit-secret-value-do-not-print";
+    await writeFile(secretsFile, `SECRET_VALUE=${secretValue}\n`, "utf8");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const handoff = encryptedHandoff();
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    const code = await runSlipwayCustodyExecutionSubmit({
+      applicationRef: "alpha",
+      planItemId: "set-env-1",
+      idempotencyKey: "idempotency-1",
+      secretsFile,
+      config: sessionFile,
+      json: true,
+      yes: true,
+      yesSpend: true
+    }, {
+      environmentHandoffBuilder: async (input) => {
+        assert.equal(input.action.actionId, "set-env-1");
+        assert.deepEqual(input.variables, [{ key: "SECRET_VALUE", value: secretValue }]);
+        return handoff;
+      },
+      fetchImpl: async (url, init) => {
+        requests.push({
+          url: String(url),
+          method: init?.method ?? "GET",
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
+        });
+        if (String(url).endsWith("/api/applications/alpha/action-plan")) {
+          return jsonResponse({ ok: true, items: [setEnvironmentPlanItem()] });
+        }
+        if (String(url).endsWith("/api/applications/alpha")) {
+          return jsonResponse({
+            ok: true,
+            application: { applicationId: "alpha", status: "active" },
+            activePolicy: {
+              policyDigest: "policy-digest-1",
+              environment: {
+                variables: [{ name: "SECRET_VALUE", source: "secret", required: true }]
+              }
+            }
+          });
+        }
+        return jsonResponse({ ok: true, attempt: { executionId: "exec-1", status: "submitted" } });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.deepEqual(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`), [
+      "GET /api/applications/alpha/action-plan",
+      "GET /api/applications/alpha",
+      "POST /api/applications/alpha/live-custody/executions"
+    ]);
+    assert.deepEqual(requests[2]?.body, {
+      planItemId: "set-env-1",
+      idempotencyKey: "idempotency-1",
+      yesSpend: true,
+      acknowledgement: "yes-spend",
+      environmentHandoff: handoff
+    });
+    assert.equal(requests[2]?.authorization, `Bearer ${token}`);
+    assert.equal(out.text.includes(token), false);
+    assert.equal(out.text.includes(secretValue), false);
+  });
+
   it("imports a GitHub Application policy through server fetch without printing the bearer token", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
@@ -867,6 +1326,64 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: { "content-type": "application/json" }
   });
+}
+
+function setEnvironmentPlanItem(): Record<string, unknown> {
+  const origin = { acurast: "5origin" };
+  return {
+    planItemId: "set-env-1",
+    kind: "acurast.setEnvironment",
+    applicationId: "alpha",
+    policyDigest: "policy-digest-1",
+    callSummary: {
+      applicationId: "alpha",
+      serviceId: "web",
+      role: "web",
+      policyDigest: "policy-digest-1",
+      childSessionId: "child-1",
+      jobId: "job-1",
+      deploymentId: "deployment-1",
+      acurastJobRef: {
+        origin,
+        sequence: 1,
+        canonicalJobId: JSON.stringify([origin, 1])
+      },
+      expectedProcessors: ["processor-1"],
+      envNames: ["SECRET_VALUE"],
+      variables: [{ name: "SECRET_VALUE", source: "secret", required: true }]
+    }
+  };
+}
+
+function encryptedHandoff(): Record<string, unknown> {
+  const origin = { acurast: "5origin" };
+  return {
+    domain: "proof.slipway.acurast-environment-handoff.v1",
+    actionId: "set-env-1",
+    applicationId: "alpha",
+    policyDigest: "policy-digest-1",
+    childSessionId: "child-1",
+    jobId: "job-1",
+    deploymentId: "deployment-1",
+    acurastJobRef: {
+      origin,
+      sequence: 1,
+      canonicalJobId: JSON.stringify([origin, 1])
+    },
+    envNames: ["SECRET_VALUE"],
+    assignments: [{
+      processor: "processor-1",
+      publicKey: "client-public-key",
+      variables: [{
+        key: "SECRET_VALUE",
+        encryptedValue: {
+          iv: "iv",
+          ciphertext: "ciphertext",
+          authTag: "auth-tag"
+        }
+      }]
+    }]
+  };
 }
 
 function sha256(value: string): string {

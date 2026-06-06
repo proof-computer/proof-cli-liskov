@@ -26,6 +26,7 @@ try {
 
   const help = run(process.execPath, [proofDevBin, "slipway", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(help.stdout, "Slipway application deployment commands");
+  assertIncludes(help.stdout, "slipway custody");
 
   const loginHelp = run(process.execPath, [proofDevBin, "slipway", "login", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(loginHelp.stdout, "Start Slipway CLI login");
@@ -33,6 +34,8 @@ try {
 
   const applicationHelp = run(process.execPath, [proofDevBin, "slipway", "application", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationHelp.stdout, "Read Slipway Application state");
+  assertIncludes(applicationHelp.stdout, "slipway application deployment");
+  assertIncludes(applicationHelp.stdout, "slipway application blackbox");
 
   const applicationListHelp = run(process.execPath, [proofDevBin, "slipway", "application", "list", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationListHelp.stdout, "List readable Slipway Applications");
@@ -61,10 +64,31 @@ try {
 
   const applicationLockboxHelp = run(process.execPath, [proofDevBin, "slipway", "application", "lockbox", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationLockboxHelp.stdout, "Read Slipway Application Lockbox state");
+  assertIncludes(applicationLockboxHelp.stdout, "grant status");
 
   const applicationLockboxGrantStatusHelp = run(process.execPath, [proofDevBin, "slipway", "application", "lockbox", "grant-status", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationLockboxGrantStatusHelp.stdout, "Read Slipway Application Lockbox grant status");
   assertIncludes(applicationLockboxGrantStatusHelp.stdout, "APPLICATION_ID");
+
+  const applicationLockboxGrantStatusNativeHelp = run(process.execPath, [proofDevBin, "slipway", "application", "lockbox", "grant", "status", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationLockboxGrantStatusNativeHelp.stdout, "Read Slipway Application Lockbox grant status");
+  assertIncludes(applicationLockboxGrantStatusNativeHelp.stdout, "APP_REF");
+
+  const applicationDeploymentImportHelp = run(process.execPath, [proofDevBin, "slipway", "application", "deployment", "import", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationDeploymentImportHelp.stdout, "Import an existing Acurast deployment");
+  assertIncludes(applicationDeploymentImportHelp.stdout, "--origin");
+  assertIncludes(applicationDeploymentImportHelp.stdout, "--yes");
+
+  const custodyHelp = run(process.execPath, [proofDevBin, "slipway", "custody", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(custodyHelp.stdout, "Operate Slipway live custody");
+  assertIncludes(custodyHelp.stdout, "slipway custody execution");
+
+  const custodySubmitHelp = run(process.execPath, [proofDevBin, "slipway", "custody", "execution", "submit", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(custodySubmitHelp.stdout, "Submit a live custody execution");
+  assertIncludes(custodySubmitHelp.stdout, "--yes-spend");
+
+  const custodyMachineCatalogHelp = run(process.execPath, [proofDevBin, "slipway", "custody", "machine", "catalog", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(custodyMachineCatalogHelp.stdout, "Read Acurast machine-class catalog");
 
   const whoamiHelp = run(process.execPath, [proofDevBin, "slipway", "whoami", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(whoamiHelp.stdout, "Read the current Slipway CLI session");

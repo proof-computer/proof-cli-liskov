@@ -26,6 +26,7 @@
     "node": ">=22"
   },
   "dependencies": {
+    "@acurast/sdk": "1.2.1",
     "@oclif/core": "^4.11.3"
   },
   "devDependencies": {

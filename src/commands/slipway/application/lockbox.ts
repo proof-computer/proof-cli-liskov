@@ -27,9 +27,15 @@ USAGE
   $ ${bin} slipway application lockbox <command> [options]
 
 COMMANDS
+  setup-pr APP_REF --yes
+  dispatch APP_REF --yes
+  grant ensure APP_REF --yes
+  grant verify APP_REF GRANT_ID --yes
+  grant status APP_REF
   grant-status APPLICATION_ID
 
 DESCRIPTION
-  Read-only Lockbox commands use the local proof slipway session created by
-  \`${bin} slipway login\`.`);
+  Lockbox commands use the local proof slipway session created by
+  \`${bin} slipway login\`. The grant-status command remains a compatibility
+  alias for grant status.`);
 }

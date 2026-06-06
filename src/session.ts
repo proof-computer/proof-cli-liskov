@@ -9,11 +9,66 @@ export const DEFAULT_SLIPWAY_URL = "https://slipway.proof.computer";
 export interface SlipwayCliOptions {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
+  environmentHandoffBuilder?: (input: SlipwayEnvironmentHandoffBuildInput) => Promise<SlipwayEncryptedEnvironmentHandoff>;
   openBrowser?: (url: string) => boolean | Promise<boolean>;
   sleepMs?: (ms: number) => Promise<void>;
   stdout?: (line: string) => void;
   stderr?: (line: string) => void;
   nowMs?: () => number;
+}
+
+export interface SlipwayEnvironmentHandoffBuildInput {
+  action: SlipwaySetEnvironmentAction;
+  variables: readonly { key: string; value: string }[];
+  network: "mainnet" | "canary";
+  rpcUrl: string;
+  timeoutMs: number;
+  pollMs: number;
+}
+
+export interface SlipwayEncryptedEnvironmentHandoff {
+  domain: "proof.slipway.acurast-environment-handoff.v1";
+  actionId: string;
+  applicationId: string;
+  policyDigest: string;
+  childSessionId: string;
+  jobId: string;
+  deploymentId?: string;
+  acurastJobRef: { origin: unknown; sequence: number; canonicalJobId: string };
+  envNames: string[];
+  assignments: Array<{
+    processor: string;
+    publicKey: string;
+    variables: Array<{
+      key: string;
+      encryptedValue: { iv: string; ciphertext: string; authTag: string };
+    }>;
+  }>;
+}
+
+interface SlipwayEnvironmentVariableAction {
+  name: string;
+  required: boolean;
+  source: "local" | "literal" | "secret" | "switchboard" | "localAction";
+  value?: string;
+  secretId?: string;
+  bundleId?: string;
+}
+
+export interface SlipwaySetEnvironmentAction {
+  actionId: string;
+  kind: "acurast.setEnvironment";
+  applicationId: string;
+  serviceId: string;
+  role: string;
+  policyDigest: string;
+  childSessionId: string;
+  jobId: string;
+  deploymentId?: string;
+  acurastJobRef: { origin: unknown; sequence: number; canonicalJobId: string };
+  expectedProcessors: string[];
+  envNames: string[];
+  variables: SlipwayEnvironmentVariableAction[];
 }
 
 export interface SlipwayLoginInput {
@@ -76,6 +131,64 @@ export interface SlipwayApplicationLockboxGrantStatusInput {
   json?: boolean;
 }
 
+export interface SlipwayApplicationDeploymentImportInput {
+  applicationRef: string;
+  sequence: number;
+  origin: string;
+  deploymentId?: string;
+  replicaIndex?: number;
+  processor?: string;
+  gatewayId?: string;
+  endpointHostname?: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationLockboxSetupPrInput {
+  applicationRef: string;
+  baseRef?: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationLockboxDispatchInput {
+  applicationRef: string;
+  ref?: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationLockboxGrantEnsureInput {
+  applicationRef: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationLockboxGrantVerifyInput {
+  applicationRef: string;
+  grantId: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationBlackboxConfigureInput {
+  applicationRef: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationImportInput {
   file?: string;
   github?: string;
@@ -87,6 +200,102 @@ export interface SlipwayApplicationImportInput {
 }
 
 export interface SlipwayLogoutInput {
+  config?: string;
+  json?: boolean;
+}
+
+export type SlipwayAcurastNetworkFlag = "mainnet" | "testnet" | "canary";
+
+export interface SlipwayCustodyAccountEnsureInput {
+  applicationRef: string;
+  chain: "acurast";
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayCustodyPreflightInput {
+  applicationRef: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayCustodyEnvironmentUploadInput {
+  applicationRef: string;
+  secretsFile: string;
+  repoDir?: string;
+  network?: SlipwayAcurastNetworkFlag;
+  rpcUrl?: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayCustodyExecutionListInput {
+  applicationRef: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayCustodyExecutionSubmitInput {
+  applicationRef: string;
+  planItemId: string;
+  idempotencyKey: string;
+  yes?: boolean;
+  yesSpend?: boolean;
+  secretsFile?: string;
+  repoDir?: string;
+  network?: SlipwayAcurastNetworkFlag;
+  rpcUrl?: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayCustodyExecutionObserveInput {
+  applicationRef: string;
+  executionId: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayCustodyExecutionDiagnoseInput {
+  applicationRef: string;
+  executionId: string;
+  network?: SlipwayAcurastNetworkFlag;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayCustodyExecutionRecoverInput {
+  applicationRef: string;
+  executionId: string;
+  reason: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayCustodyChildRecoverInput {
+  applicationRef: string;
+  childSessionId: string;
+  reason: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayCustodyMachineCatalogInput {
+  network?: SlipwayAcurastNetworkFlag;
+  slipwayUrl?: string;
   config?: string;
   json?: boolean;
 }
@@ -280,12 +489,29 @@ interface SlipwayApplicationLockboxGrantStatusResponse {
   [key: string]: unknown;
 }
 
+interface SlipwayActionPlanResponse {
+  ok?: boolean;
+  applicationId?: string;
+  count?: number;
+  items?: unknown[];
+  error?: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
 interface SlipwayApplicationImportResponse {
   ok?: boolean;
   count?: number;
   applicationCount?: number;
   serviceCount?: number;
   policies?: unknown[];
+  error?: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+interface SlipwayLiveCustodyCommandResponse {
+  ok?: boolean;
   error?: string;
   reason?: string;
   [key: string]: unknown;
@@ -740,6 +966,136 @@ export async function runSlipwayApplicationLockboxGrantStatus(input: SlipwayAppl
   return 0;
 }
 
+export async function runSlipwayApplicationDeploymentImport(input: SlipwayApplicationDeploymentImportInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_DEPLOYMENT_IMPORT_CONFIRMATION_REQUIRED", "deployment import");
+  if (!Number.isSafeInteger(input.sequence) || input.sequence < 0) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_DEPLOYMENT_IMPORT_SEQUENCE_INVALID",
+      message: "--sequence must be a non-negative integer."
+    }, "Error (SLIPWAY_APPLICATION_DEPLOYMENT_IMPORT_SEQUENCE_INVALID): --sequence must be a non-negative integer.");
+    return 1;
+  }
+  const origin = { acurast: input.origin };
+  const result = await runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/deployments/imports`,
+    body: {
+      acurastJobRef: {
+        origin,
+        sequence: input.sequence,
+        canonicalJobId: JSON.stringify([origin, input.sequence])
+      },
+      deploymentId: input.deploymentId,
+      replicaIndex: input.replicaIndex,
+      processorId: input.processor,
+      gatewayId: input.gatewayId,
+      endpointHostname: input.endpointHostname
+    },
+    errorCode: "SLIPWAY_APPLICATION_DEPLOYMENT_IMPORT_FAILED",
+    fetchFailedMessage: "could not import Slipway Application deployment",
+    human: (body) => {
+      const child = objectRecord(objectRecord(body).child);
+      return `Imported deployment ${input.deploymentId ?? String(input.sequence)} for ${input.applicationRef}; child ${stringValue(child.childSessionId) ?? "recorded"}.`;
+    }
+  }, options);
+  return result;
+}
+
+export async function runSlipwayApplicationLockboxSetupPr(input: SlipwayApplicationLockboxSetupPrInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_LOCKBOX_SETUP_PR_CONFIRMATION_REQUIRED", "Lockbox setup PR");
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/lockbox/workflow-pr`,
+    body: { baseRef: input.baseRef },
+    errorCode: "SLIPWAY_APPLICATION_LOCKBOX_SETUP_PR_FAILED",
+    fetchFailedMessage: "could not create Slipway Lockbox setup PR",
+    human: (body) => {
+      const setup = objectRecord(objectRecord(body).setup);
+      const pullRequest = objectRecord(setup.pullRequest);
+      return `Lockbox setup PR ${stringValue(pullRequest.url) ?? stringValue(setup.status) ?? "ready"} for ${input.applicationRef}.`;
+    }
+  }, options);
+}
+
+export async function runSlipwayApplicationLockboxDispatch(input: SlipwayApplicationLockboxDispatchInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_LOCKBOX_DISPATCH_CONFIRMATION_REQUIRED", "Lockbox workflow dispatch");
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/lockbox/workflow-dispatch`,
+    body: { ref: input.ref },
+    errorCode: "SLIPWAY_APPLICATION_LOCKBOX_DISPATCH_FAILED",
+    fetchFailedMessage: "could not dispatch Slipway Lockbox workflow",
+    human: (body) => {
+      const dispatch = objectRecord(objectRecord(body).dispatch);
+      return `Lockbox dispatch ${stringValue(dispatch.dispatchId) ?? "submitted"} ${stringValue(dispatch.status) ?? "ready"} for ${input.applicationRef}.`;
+    }
+  }, options);
+}
+
+export async function runSlipwayApplicationLockboxGrantEnsure(input: SlipwayApplicationLockboxGrantEnsureInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_LOCKBOX_GRANT_ENSURE_CONFIRMATION_REQUIRED", "Lockbox grant ensure");
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/lockbox/grants`,
+    body: {},
+    errorCode: "SLIPWAY_APPLICATION_LOCKBOX_GRANT_ENSURE_FAILED",
+    fetchFailedMessage: "could not ensure Slipway Lockbox grant",
+    human: (body) => {
+      const grant = objectRecord(objectRecord(body).grant);
+      return `Lockbox grant ${stringValue(grant.grantId) ?? "recorded"} ${stringValue(grant.status) ?? "ready"} for ${input.applicationRef}.`;
+    }
+  }, options);
+}
+
+export async function runSlipwayApplicationLockboxGrantVerify(input: SlipwayApplicationLockboxGrantVerifyInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_LOCKBOX_GRANT_VERIFY_CONFIRMATION_REQUIRED", "Lockbox grant verify");
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/lockbox/grants/${encodeURIComponent(input.grantId)}/verify`,
+    body: {},
+    errorCode: "SLIPWAY_APPLICATION_LOCKBOX_GRANT_VERIFY_FAILED",
+    fetchFailedMessage: "could not verify Slipway Lockbox grant",
+    human: (body) => {
+      const grant = objectRecord(objectRecord(body).grant);
+      return `Lockbox grant ${stringValue(grant.grantId) ?? input.grantId} ${stringValue(grant.status) ?? "verified"} for ${input.applicationRef}.`;
+    }
+  }, options);
+}
+
+export async function runSlipwayApplicationBlackboxConfigure(input: SlipwayApplicationBlackboxConfigureInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_BLACKBOX_CONFIGURE_CONFIRMATION_REQUIRED", "Blackbox configuration");
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/blackbox/configurations`,
+    body: {},
+    errorCode: "SLIPWAY_APPLICATION_BLACKBOX_CONFIGURE_FAILED",
+    fetchFailedMessage: "could not configure Slipway Blackbox",
+    human: (body) => {
+      const configuration = objectRecord(objectRecord(body).configuration);
+      return `Blackbox configuration ${stringValue(configuration.configurationId) ?? "recorded"} for ${input.applicationRef}.`;
+    }
+  }, options);
+}
+
 export async function runSlipwayApplicationImport(input: SlipwayApplicationImportInput, options: SlipwayCliOptions = {}): Promise<number> {
   if (!input.file && !input.github) {
     writeStructuredOrHuman(options, input.json, {
@@ -857,6 +1213,249 @@ export async function runSlipwayApplicationImport(input: SlipwayApplicationImpor
     `Imported ${String(responseBody.count ?? responseBody.applicationCount ?? 0)} application(s), ${String(responseBody.serviceCount ?? 0)} service(s).`
   );
   return 0;
+}
+
+export async function runSlipwayCustodyAccountEnsure(input: SlipwayCustodyAccountEnsureInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_CUSTODY_ACCOUNT_ENSURE_CONFIRMATION_REQUIRED", "custody account ensure");
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/account`,
+    body: { chain: input.chain },
+    errorCode: "SLIPWAY_CUSTODY_ACCOUNT_ENSURE_FAILED",
+    fetchFailedMessage: "could not ensure Slipway live custody account",
+    human: (body) => {
+      const account = objectRecord(objectRecord(body).account);
+      return `${input.applicationRef} ${stringValue(account.chain) ?? input.chain} custody account ${stringValue(account.address) ?? stringValue(account.accountRef) ?? "ready"}.`;
+    }
+  }, options);
+}
+
+export async function runSlipwayCustodyPreflight(input: SlipwayCustodyPreflightInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayRequest<SlipwayLiveCustodyCommandResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/preflight`,
+    requestErrorCode: "SLIPWAY_CUSTODY_PREFLIGHT_FAILED",
+    notFoundMessage: "No Slipway CLI session is stored locally.",
+    fetchFailedMessage: "could not read Slipway live custody preflight"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  return writeCommandResponse({
+    body: request.body,
+    response: request.response,
+    errorCode: "SLIPWAY_CUSTODY_PREFLIGHT_FAILED",
+    json: input.json,
+    human: (body) => {
+      const actionPlan = objectRecord(objectRecord(body).actionPlan);
+      const count = numberValue(actionPlan.count) ?? arrayValue(actionPlan.items).length;
+      return `${count} live custody plan item(s) for ${input.applicationRef}.`;
+    },
+    options
+  });
+}
+
+export async function runSlipwayCustodyEnvironmentUpload(input: SlipwayCustodyEnvironmentUploadInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_CUSTODY_ENVIRONMENT_UPLOAD_CONFIRMATION_REQUIRED", "custody environment upload");
+  const prepared = await prepareEnvironmentHandoffs(input, options);
+  if (!prepared.ok) return prepared.exitCode;
+  const uploads: unknown[] = [];
+  for (const handoff of prepared.handoffs) {
+    const request = await authenticatedSlipwayJsonRequest<SlipwayLiveCustodyCommandResponse>({
+      config: input.config,
+      slipwayUrl: input.slipwayUrl,
+      json: input.json,
+      method: "POST",
+      path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/environment-handoffs`,
+      body: { environmentHandoff: handoff },
+      requestErrorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_UPLOAD_FAILED",
+      notFoundMessage: "No Slipway CLI session is stored locally.",
+      fetchFailedMessage: "could not upload Slipway live custody environment handoff"
+    }, options);
+    if (!request.ok) return request.exitCode;
+    if (request.body?.ok !== true) {
+      return writeCommandResponse({
+        body: request.body,
+        response: request.response,
+        errorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_UPLOAD_FAILED",
+        json: input.json,
+        human: () => `Error (SLIPWAY_CUSTODY_ENVIRONMENT_UPLOAD_FAILED): Slipway could not upload environment handoff for ${input.applicationRef}.`,
+        options
+      });
+    }
+    uploads.push(request.body);
+  }
+  writeStructuredOrHuman(options, input.json, {
+    ok: true,
+    applicationId: input.applicationRef,
+    count: uploads.length,
+    uploads
+  }, `Uploaded ${uploads.length} live custody environment handoff(s) for ${input.applicationRef}.`);
+  return 0;
+}
+
+export async function runSlipwayCustodyExecutionList(input: SlipwayCustodyExecutionListInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayRequest<SlipwayLiveCustodyCommandResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions`,
+    requestErrorCode: "SLIPWAY_CUSTODY_EXECUTION_LIST_FAILED",
+    notFoundMessage: "No Slipway CLI session is stored locally.",
+    fetchFailedMessage: "could not list Slipway live custody executions"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  return writeCommandResponse({
+    body: request.body,
+    response: request.response,
+    errorCode: "SLIPWAY_CUSTODY_EXECUTION_LIST_FAILED",
+    json: input.json,
+    human: (body) => `${arrayValue(objectRecord(body).attempts).length} live custody execution(s) for ${input.applicationRef}.`,
+    options
+  });
+}
+
+export async function runSlipwayCustodyExecutionSubmit(input: SlipwayCustodyExecutionSubmitInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_CUSTODY_EXECUTION_SUBMIT_CONFIRMATION_REQUIRED", "custody execution submit");
+  if (!input.yesSpend) return writeConfirmationRequired(options, input.json, "SLIPWAY_CUSTODY_EXECUTION_SUBMIT_SPEND_CONFIRMATION_REQUIRED", "custody execution submit spend", "--yes-spend");
+  const body: Record<string, unknown> = {
+    planItemId: input.planItemId,
+    idempotencyKey: input.idempotencyKey,
+    yesSpend: true,
+    acknowledgement: "yes-spend"
+  };
+  if (input.secretsFile) {
+    const prepared = await prepareEnvironmentHandoffs({
+      applicationRef: input.applicationRef,
+      secretsFile: input.secretsFile,
+      repoDir: input.repoDir,
+      network: input.network,
+      rpcUrl: input.rpcUrl,
+      config: input.config,
+      slipwayUrl: input.slipwayUrl,
+      json: input.json
+    }, options, input.planItemId);
+    if (!prepared.ok) return prepared.exitCode;
+    if (prepared.handoffs.length > 0) body.environmentHandoff = prepared.handoffs[0];
+  }
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions`,
+    body,
+    errorCode: "SLIPWAY_CUSTODY_EXECUTION_SUBMIT_FAILED",
+    fetchFailedMessage: "could not submit Slipway live custody execution",
+    human: (responseBody) => {
+      const attempt = objectRecord(objectRecord(responseBody).attempt);
+      return `Submitted live custody execution ${stringValue(attempt.executionId) ?? input.planItemId} ${stringValue(attempt.status) ?? ""}`.trim();
+    }
+  }, options);
+}
+
+export async function runSlipwayCustodyExecutionObserve(input: SlipwayCustodyExecutionObserveInput, options: SlipwayCliOptions = {}): Promise<number> {
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions/${encodeURIComponent(input.executionId)}/observe`,
+    body: {},
+    errorCode: "SLIPWAY_CUSTODY_EXECUTION_OBSERVE_FAILED",
+    fetchFailedMessage: "could not observe Slipway live custody execution",
+    human: (body) => {
+      const attempt = objectRecord(objectRecord(body).attempt);
+      return `Observed live custody execution ${stringValue(attempt.executionId) ?? input.executionId}: ${stringValue(attempt.status) ?? "updated"}.`;
+    }
+  }, options);
+}
+
+export async function runSlipwayCustodyExecutionDiagnose(input: SlipwayCustodyExecutionDiagnoseInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const query = new URLSearchParams();
+  if (input.network) query.set("network", normalizeNetworkFlag(input.network));
+  const suffix = query.toString();
+  const request = await authenticatedSlipwayRequest<SlipwayLiveCustodyCommandResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions/${encodeURIComponent(input.executionId)}/diagnosis${suffix ? `?${suffix}` : ""}`,
+    requestErrorCode: "SLIPWAY_CUSTODY_EXECUTION_DIAGNOSE_FAILED",
+    notFoundMessage: "No Slipway CLI session is stored locally.",
+    fetchFailedMessage: "could not diagnose Slipway live custody execution"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  return writeCommandResponse({
+    body: request.body,
+    response: request.response,
+    errorCode: "SLIPWAY_CUSTODY_EXECUTION_DIAGNOSE_FAILED",
+    json: input.json,
+    human: (body) => `${input.applicationRef} ${input.executionId} Acurast job diagnosis: ${stringValue(objectRecord(body).classification) ?? "unknown"}.`,
+    options
+  });
+}
+
+export async function runSlipwayCustodyExecutionRecover(input: SlipwayCustodyExecutionRecoverInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_CUSTODY_EXECUTION_RECOVER_CONFIRMATION_REQUIRED", "custody execution recover");
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions/${encodeURIComponent(input.executionId)}/recover`,
+    body: { yesRecover: true, acknowledgement: "operator-reviewed", reason: input.reason },
+    errorCode: "SLIPWAY_CUSTODY_EXECUTION_RECOVER_FAILED",
+    fetchFailedMessage: "could not recover Slipway live custody execution",
+    human: (body) => {
+      const attempt = objectRecord(objectRecord(body).attempt);
+      return `Recovered live custody execution ${stringValue(attempt.executionId) ?? input.executionId}: ${stringValue(attempt.status) ?? "reviewed"}.`;
+    }
+  }, options);
+}
+
+export async function runSlipwayCustodyChildRecover(input: SlipwayCustodyChildRecoverInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_CUSTODY_CHILD_RECOVER_CONFIRMATION_REQUIRED", "custody child recover");
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/child-sessions/${encodeURIComponent(input.childSessionId)}/recover`,
+    body: { yesRecover: true, acknowledgement: "operator-reviewed", reason: input.reason },
+    errorCode: "SLIPWAY_CUSTODY_CHILD_RECOVER_FAILED",
+    fetchFailedMessage: "could not recover Slipway live custody child",
+    human: (body) => {
+      const child = objectRecord(objectRecord(body).child);
+      return `Recovered child ${stringValue(child.childSessionId) ?? input.childSessionId}: ${stringValue(child.status) ?? "reviewed"}.`;
+    }
+  }, options);
+}
+
+export async function runSlipwayCustodyMachineCatalog(input: SlipwayCustodyMachineCatalogInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const query = new URLSearchParams();
+  if (input.network) query.set("network", normalizeNetworkFlag(input.network));
+  const suffix = query.toString();
+  const request = await authenticatedSlipwayRequest<SlipwayLiveCustodyCommandResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/live-custody/machine-catalog${suffix ? `?${suffix}` : ""}`,
+    requestErrorCode: "SLIPWAY_CUSTODY_MACHINE_CATALOG_FAILED",
+    notFoundMessage: "No Slipway CLI session is stored locally.",
+    fetchFailedMessage: "could not read Slipway Acurast machine catalog"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  return writeCommandResponse({
+    body: request.body,
+    response: request.response,
+    errorCode: "SLIPWAY_CUSTODY_MACHINE_CATALOG_FAILED",
+    json: input.json,
+    human: (body) => `${arrayValue(objectRecord(body).classes).length} Acurast machine class(es).`,
+    options
+  });
 }
 
 export async function runSlipwayLogout(input: SlipwayLogoutInput, options: SlipwayCliOptions = {}): Promise<number> {
@@ -1033,6 +1632,456 @@ async function authenticatedSlipwayJsonRequest<T>(
   };
 }
 
+async function runSlipwayJsonCommand(
+  input: {
+    config?: string;
+    slipwayUrl?: string;
+    json?: boolean;
+    method: "DELETE" | "POST";
+    path: string;
+    body: unknown;
+    errorCode: string;
+    fetchFailedMessage: string;
+    human: (body: unknown) => string;
+  },
+  options: SlipwayCliOptions
+): Promise<number> {
+  const request = await authenticatedSlipwayJsonRequest<SlipwayLiveCustodyCommandResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: input.method,
+    path: input.path,
+    body: withoutUndefinedDeep(input.body),
+    requestErrorCode: input.errorCode,
+    notFoundMessage: "No Slipway CLI session is stored locally.",
+    fetchFailedMessage: input.fetchFailedMessage
+  }, options);
+  if (!request.ok) return request.exitCode;
+  return writeCommandResponse({
+    body: request.body,
+    response: request.response,
+    errorCode: input.errorCode,
+    json: input.json,
+    human: input.human,
+    options
+  });
+}
+
+function writeCommandResponse(input: {
+  body: SlipwayLiveCustodyCommandResponse | undefined;
+  response: Response;
+  errorCode: string;
+  json?: boolean;
+  human: (body: unknown) => string;
+  options: SlipwayCliOptions;
+}): number {
+  if (!input.response.ok || input.body?.ok === false) {
+    const error = input.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : input.errorCode;
+    writeStructuredOrHuman(input.options, input.json, {
+      ok: false,
+      error,
+      status: input.response.status,
+      reason: input.body?.reason ?? input.body?.error
+    }, `Error (${error}): Slipway request failed.`);
+    return 1;
+  }
+  writeStructuredOrHuman(input.options, input.json, input.body, input.human(input.body));
+  return 0;
+}
+
+function writeConfirmationRequired(
+  options: SlipwayCliOptions,
+  json: boolean | undefined,
+  error: string,
+  action: string,
+  flag = "--yes"
+): number {
+  writeStructuredOrHuman(options, json, {
+    ok: false,
+    error,
+    message: `${action} requires ${flag}.`
+  }, `Error (${error}): ${action} requires ${flag}.`);
+  return 1;
+}
+
+async function prepareEnvironmentHandoffs(
+  input: Pick<SlipwayCustodyEnvironmentUploadInput, "applicationRef" | "config" | "json" | "network" | "repoDir" | "rpcUrl" | "secretsFile" | "slipwayUrl">,
+  options: SlipwayCliOptions,
+  onlyPlanItemId?: string
+): Promise<{ ok: true; handoffs: SlipwayEncryptedEnvironmentHandoff[] } | { ok: false; exitCode: number }> {
+  const actionPlan = await authenticatedSlipwayRequest<SlipwayActionPlanResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/action-plan`,
+    requestErrorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_PLAN_FAILED",
+    notFoundMessage: "No Slipway CLI session is stored locally.",
+    fetchFailedMessage: "could not read Slipway live custody action plan"
+  }, options);
+  if (!actionPlan.ok) return { ok: false, exitCode: actionPlan.exitCode };
+  if (!actionPlan.response.ok || actionPlan.body?.ok === false) {
+    return {
+      ok: false,
+      exitCode: writeCommandResponse({
+        body: actionPlan.body,
+        response: actionPlan.response,
+        errorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_PLAN_FAILED",
+        json: input.json,
+        human: () => `Error (SLIPWAY_CUSTODY_ENVIRONMENT_PLAN_FAILED): Slipway could not read action plan for ${input.applicationRef}.`,
+        options
+      })
+    };
+  }
+
+  const policyContext = await loadPolicyContext(input, options);
+  if (!policyContext.ok) return { ok: false, exitCode: policyContext.exitCode };
+
+  let secrets: Record<string, string>;
+  try {
+    secrets = parseDotenv(await readFile(path.resolve(input.secretsFile), "utf8"));
+  } catch (error) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_CUSTODY_ENVIRONMENT_SECRETS_FILE_FAILED",
+      message: errorMessage(error),
+      file: path.resolve(input.secretsFile)
+    }, `Error (SLIPWAY_CUSTODY_ENVIRONMENT_SECRETS_FILE_FAILED): could not read ${path.resolve(input.secretsFile)}.`);
+    return { ok: false, exitCode: 1 };
+  }
+
+  const actions = arrayValue(actionPlan.body?.items)
+    .map((item) => setEnvironmentActionFromPlanItem(item, policyContext.policy))
+    .filter((action): action is SlipwaySetEnvironmentAction => action !== undefined)
+    .filter((action) => onlyPlanItemId === undefined || action.actionId === onlyPlanItemId);
+  if (actions.length === 0) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_CUSTODY_ENVIRONMENT_UPLOAD_NO_ACTIONS",
+      message: onlyPlanItemId
+        ? `No acurast.setEnvironment plan item matched ${onlyPlanItemId}.`
+        : "No acurast.setEnvironment plan items are available."
+    }, `Error (SLIPWAY_CUSTODY_ENVIRONMENT_UPLOAD_NO_ACTIONS): no acurast.setEnvironment plan item is available for ${input.applicationRef}.`);
+    return { ok: false, exitCode: 1 };
+  }
+
+  const submitMaterials = await loadSubmitMaterials({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    actions
+  }, options);
+  if (!submitMaterials.ok) return { ok: false, exitCode: submitMaterials.exitCode };
+
+  const network = normalizeNetworkFlag(input.network);
+  const rpcUrl = input.rpcUrl ?? defaultAcurastRpcUrl(network);
+  const handoffs: SlipwayEncryptedEnvironmentHandoff[] = [];
+  for (const action of actions) {
+    const variables = environmentVariablesForAction(action, secrets, submitMaterials.values.get(action.actionId) ?? {});
+    if (variables.missingRequired.length > 0) {
+      writeStructuredOrHuman(options, input.json, {
+        ok: false,
+        error: "SLIPWAY_CUSTODY_ENVIRONMENT_VALUES_MISSING",
+        missingRequired: variables.missingRequired
+      }, `Error (SLIPWAY_CUSTODY_ENVIRONMENT_VALUES_MISSING): missing required value(s): ${variables.missingRequired.map((item) => item.name).join(", ")}.`);
+      return { ok: false, exitCode: 1 };
+    }
+    try {
+      auditEnvironmentVariables(variables.variables, action.actionId);
+      const builder = options.environmentHandoffBuilder ?? buildEncryptedEnvironmentHandoffWithSdk;
+      const handoff = await builder({
+        action,
+        variables: variables.variables,
+        network,
+        rpcUrl,
+        timeoutMs: 240_000,
+        pollMs: 10_000
+      });
+      assertEnvironmentHandoffHasNoPlaintext(handoff, variables.variables, action.actionId);
+      handoffs.push(handoff);
+    } catch (error) {
+      writeStructuredOrHuman(options, input.json, {
+        ok: false,
+        error: "SLIPWAY_CUSTODY_ENVIRONMENT_HANDOFF_FAILED",
+        message: errorMessage(error),
+        actionId: action.actionId
+      }, `Error (SLIPWAY_CUSTODY_ENVIRONMENT_HANDOFF_FAILED): could not build encrypted handoff for ${action.actionId}.`);
+      return { ok: false, exitCode: 1 };
+    }
+  }
+  return { ok: true, handoffs };
+}
+
+async function loadPolicyContext(
+  input: Pick<SlipwayCustodyEnvironmentUploadInput, "applicationRef" | "config" | "json" | "slipwayUrl">,
+  options: SlipwayCliOptions
+): Promise<{ ok: true; policy: { policyDigest?: string; environmentVariables: SlipwayEnvironmentVariableAction[] } } | { ok: false; exitCode: number }> {
+  const request = await authenticatedSlipwayRequest<SlipwayApplicationStatusResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}`,
+    requestErrorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_POLICY_FAILED",
+    notFoundMessage: "No Slipway CLI session is stored locally.",
+    fetchFailedMessage: "could not read Slipway Application policy"
+  }, options);
+  if (!request.ok) return { ok: false, exitCode: request.exitCode };
+  if (!request.response.ok || request.body?.ok === false) {
+    return {
+      ok: false,
+      exitCode: writeCommandResponse({
+        body: request.body,
+        response: request.response,
+        errorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_POLICY_FAILED",
+        json: input.json,
+        human: () => `Error (SLIPWAY_CUSTODY_ENVIRONMENT_POLICY_FAILED): Slipway could not read Application ${input.applicationRef}.`,
+        options
+      })
+    };
+  }
+  const activePolicy = objectRecord(request.body?.activePolicy);
+  return {
+    ok: true,
+    policy: {
+      policyDigest: stringValue(activePolicy.policyDigest),
+      environmentVariables: envVariablesValue(objectRecord(activePolicy.environment).variables)
+    }
+  };
+}
+
+async function loadSubmitMaterials(
+  input: {
+    config?: string;
+    slipwayUrl?: string;
+    json?: boolean;
+    actions: readonly SlipwaySetEnvironmentAction[];
+  },
+  options: SlipwayCliOptions
+): Promise<{ ok: true; values: Map<string, Record<string, string>> } | { ok: false; exitCode: number }> {
+  const values = new Map<string, Record<string, string>>();
+  for (const action of input.actions) {
+    if (!action.variables.some((variable) => variable.source === "switchboard" || variable.source === "localAction")) continue;
+    const request = await authenticatedSlipwayRequest<{ ok?: boolean; values?: unknown[]; error?: string; reason?: string }>({
+      config: input.config,
+      slipwayUrl: input.slipwayUrl,
+      json: input.json,
+      path: `/api/actions/${encodeURIComponent(action.actionId)}/submit-material`,
+      requestErrorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_SUBMIT_MATERIAL_FAILED",
+      notFoundMessage: "No Slipway CLI session is stored locally.",
+      fetchFailedMessage: "could not read Slipway submit material"
+    }, options);
+    if (!request.ok) return { ok: false, exitCode: request.exitCode };
+    if (!request.response.ok || request.body?.ok === false) {
+      return {
+        ok: false,
+        exitCode: writeCommandResponse({
+          body: request.body,
+          response: request.response,
+          errorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_SUBMIT_MATERIAL_FAILED",
+          json: input.json,
+          human: () => `Error (SLIPWAY_CUSTODY_ENVIRONMENT_SUBMIT_MATERIAL_FAILED): Slipway could not read submit material for ${action.actionId}.`,
+          options
+        })
+      };
+    }
+    const mapped: Record<string, string> = {};
+    for (const item of request.body?.values ?? []) {
+      const record = objectRecord(item);
+      const key = stringValue(record.key);
+      const value = typeof record.value === "string" ? record.value : undefined;
+      if (key && value !== undefined) mapped[key] = value;
+    }
+    values.set(action.actionId, mapped);
+  }
+  return { ok: true, values };
+}
+
+function setEnvironmentActionFromPlanItem(
+  item: unknown,
+  policy: { policyDigest?: string; environmentVariables: SlipwayEnvironmentVariableAction[] }
+): SlipwaySetEnvironmentAction | undefined {
+  const record = objectRecord(item);
+  if (stringValue(record.kind) !== "acurast.setEnvironment") return undefined;
+  const summary = objectRecord(record.callSummary);
+  const actionId = stringValue(record.planItemId);
+  const applicationId = stringValue(record.applicationId) ?? stringValue(summary.applicationId);
+  const policyDigest = stringValue(record.policyDigest) ?? stringValue(summary.policyDigest) ?? policy.policyDigest;
+  const childSessionId = stringValue(summary.childSessionId);
+  const jobId = stringValue(summary.jobId);
+  const acurastJobRef = acurastJobRefValue(summary.acurastJobRef);
+  if (!actionId || !applicationId || !policyDigest || !childSessionId || !jobId || !acurastJobRef) return undefined;
+  const actionVariables = envVariablesValue(summary.variables);
+  return {
+    actionId,
+    kind: "acurast.setEnvironment",
+    applicationId,
+    serviceId: stringValue(summary.serviceId) ?? applicationId,
+    role: stringValue(summary.role) ?? stringValue(summary.serviceId) ?? applicationId,
+    policyDigest,
+    childSessionId,
+    jobId,
+    deploymentId: stringValue(summary.deploymentId),
+    acurastJobRef,
+    expectedProcessors: stringArrayValue(summary.expectedProcessors),
+    envNames: stringArrayValue(summary.envNames),
+    variables: mergePolicyEnvironmentVariables(actionVariables, policy.environmentVariables)
+  };
+}
+
+function environmentVariablesForAction(
+  action: SlipwaySetEnvironmentAction,
+  secrets: Record<string, string>,
+  submitMaterials: Record<string, string>
+): { variables: Array<{ key: string; value: string }>; missingRequired: Array<{ name: string; source: string }> } {
+  const variables: Array<{ key: string; value: string }> = [];
+  const missingRequired: Array<{ name: string; source: string }> = [];
+  for (const variable of action.variables) {
+    const value = variable.source === "literal"
+      ? variable.value
+      : variable.source === "switchboard" || variable.source === "localAction"
+        ? submitMaterials[variable.name]
+        : secrets[variable.name] ?? (variable.secretId ? secrets[variable.secretId] : undefined);
+    if (value === undefined) {
+      if (variable.required) missingRequired.push({ name: variable.name, source: variable.source });
+      continue;
+    }
+    variables.push({ key: variable.name, value });
+  }
+  return { variables, missingRequired };
+}
+
+async function buildEncryptedEnvironmentHandoffWithSdk(input: SlipwayEnvironmentHandoffBuildInput): Promise<SlipwayEncryptedEnvironmentHandoff> {
+  const sdk = await import("@acurast/sdk/chain");
+  const acurast = new sdk.AcurastService(input.rpcUrl);
+  try {
+    const jobId = [input.action.acurastJobRef.origin, input.action.acurastJobRef.sequence] as [unknown, number];
+    const assignments = await waitForEnvironmentAssignments(acurast, {
+      jobId,
+      expectedProcessors: input.action.expectedProcessors,
+      timeoutMs: input.timeoutMs,
+      pollMs: input.pollMs
+    });
+    const jobEnvironmentService = new sdk.JobEnvironmentService({ acurastService: acurast });
+    const encryptedAssignments: SlipwayEncryptedEnvironmentHandoff["assignments"] = [];
+    for (const assignment of assignments) {
+      const processorEncryptionKey = sdk.getProcessorEncryptionKey(assignment as never);
+      if (!processorEncryptionKey) continue;
+      const sharedKey = await jobEnvironmentService.generateSharedKey(processorEncryptionKey.publicKey, processorEncryptionKey.curve);
+      const publicKey = jobEnvironmentService.getPublicKey(processorEncryptionKey.curve);
+      if (!publicKey) continue;
+      encryptedAssignments.push({
+        processor: assignment.processor,
+        publicKey,
+        variables: input.variables.map((variable) => ({
+          key: variable.key,
+          encryptedValue: jobEnvironmentService.encrypt(variable.value, sharedKey)
+        }))
+      });
+    }
+    if (encryptedAssignments.length === 0) {
+      throw new Error(`No assignment encryption keys are ready for job ${input.action.jobId}`);
+    }
+    return {
+      domain: "proof.slipway.acurast-environment-handoff.v1",
+      actionId: input.action.actionId,
+      applicationId: input.action.applicationId,
+      policyDigest: input.action.policyDigest,
+      childSessionId: input.action.childSessionId,
+      jobId: input.action.jobId,
+      deploymentId: input.action.deploymentId,
+      acurastJobRef: input.action.acurastJobRef,
+      envNames: input.variables.map((variable) => variable.key).sort(),
+      assignments: encryptedAssignments
+    };
+  } finally {
+    await acurast.disconnect();
+  }
+}
+
+async function waitForEnvironmentAssignments(
+  acurast: {
+    assignedProcessors(jobIds: [unknown, number][]): Promise<Map<string, [[unknown, number], string[]]>>;
+    jobAssignments(keys: [string, [unknown, number]][]): Promise<Array<{ processor: string; assignment: { pubKeys: Array<Record<string, unknown>> } }>>;
+  },
+  input: {
+    jobId: [unknown, number];
+    expectedProcessors: readonly string[];
+    timeoutMs: number;
+    pollMs: number;
+  }
+): Promise<Array<{ processor: string; assignment: { pubKeys: Array<Record<string, unknown>> } }>> {
+  const deadline = Date.now() + input.timeoutMs;
+  const expected = new Set(input.expectedProcessors);
+  let lastReady = 0;
+  for (;;) {
+    const assigned = await acurast.assignedProcessors([input.jobId]);
+    const keys = [...assigned.values()].flatMap(([jobId, processors]) =>
+      processors
+        .filter((processor) => expected.size === 0 || expected.has(processor))
+        .map((processor) => [processor, jobId] as [string, [unknown, number]])
+    );
+    const assignments = keys.length > 0 ? await acurast.jobAssignments(keys) : [];
+    const ready = assignments.filter((assignment) => assignment.assignment.pubKeys.some((key) =>
+      typeof key.SECP256r1Encryption === "string" ||
+      typeof key.SECP256r1 === "string" ||
+      typeof key.secp256r1Encryption === "string" ||
+      typeof key.secp256r1 === "string" ||
+      typeof key.encryption === "string"
+    ));
+    lastReady = ready.length;
+    if (ready.length > 0 && (expected.size === 0 || [...expected].every((processor) => ready.some((assignment) => assignment.processor === processor)))) {
+      return ready;
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(`Timed out waiting for Acurast assignment encryption keys for job ${JSON.stringify(input.jobId)} (${lastReady}/${expected.size || "any"} ready).`);
+    }
+    await defaultSleep(Math.max(100, Math.min(input.pollMs, deadline - Date.now())));
+  }
+}
+
+function assertEnvironmentHandoffHasNoPlaintext(
+  handoff: SlipwayEncryptedEnvironmentHandoff,
+  variables: readonly { key: string; value: string }[],
+  actionId: string
+): void {
+  const serialized = JSON.stringify(handoff);
+  for (const variable of variables) {
+    if (variable.value.length === 0 || PUBLIC_LOCKBOX_BOOTSTRAP_ENVIRONMENT_VARIABLES.has(variable.key)) continue;
+    const encodedValue = JSON.stringify(variable.value);
+    if (serialized.includes(encodedValue) || (variable.value.length >= 8 && serialized.includes(variable.value))) {
+      throw new Error(`Refusing to submit encrypted handoff for ${actionId}: plaintext value for ${variable.key} is present in payload`);
+    }
+  }
+}
+
+const PUBLIC_LOCKBOX_BOOTSTRAP_ENVIRONMENT_VARIABLES = new Set([
+  "PROOF_LOCKBOX_URL",
+  "PROOF_LOCKBOX_APPLICATION_ID",
+  "PROOF_LOCKBOX_GRANT_ID",
+  "PROOF_LOCKBOX_POLICY_DIGEST",
+  "PROOF_LOCKBOX_DEPLOYMENT_ID",
+  "PROOF_LOCKBOX_SECRET_IDS",
+  "PROOF_LOCKBOX_REQUESTED_SECRET_IDS",
+  "PROOF_LOCKBOX_FILE_BASE_DIR"
+]);
+
+function auditEnvironmentVariables(variables: readonly { key: string; value: string }[], actionId: string): void {
+  const violations: string[] = [];
+  if (variables.length > 10) violations.push(`count ${variables.length} > max 10`);
+  for (const variable of variables) {
+    const keyBytes = Buffer.byteLength(variable.key, "utf8");
+    if (keyBytes > 32) violations.push(`key ${variable.key} is ${keyBytes} bytes > max 32`);
+    const valueBytes = Buffer.byteLength(variable.value, "utf8");
+    if (valueBytes > 996) violations.push(`value for ${variable.key} is ${valueBytes} bytes > plaintext max 996`);
+  }
+  if (violations.length > 0) {
+    throw new Error([
+      `Refusing to submit setEnvironments for ${actionId}: payload exceeds Acurast runtime caps.`,
+      ...violations.map((violation) => `  - ${violation}`)
+    ].join("\n"));
+  }
+}
+
 async function readSlipwaySession(sessionFile: string): Promise<SlipwaySessionFile | undefined> {
   try {
     const parsed = JSON.parse(await readFile(sessionFile, "utf8")) as Partial<SlipwaySessionFile>;
@@ -1145,6 +2194,28 @@ function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
 }
 
+function numberValue(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function arrayValue(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function stringArrayValue(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.length > 0)
+    : [];
+}
+
+function booleanValue(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
 function parseGithubSpec(value: string): SlipwayGithubPolicySpec {
   const match = /^([^:]+\/[^:]+):(.+)@([^@]+)$/u.exec(value.trim());
   if (!match) throw new Error("--github must be owner/repo:path@ref");
@@ -1170,6 +2241,104 @@ function applicationDeletePath(applicationRef: string, owner: string | undefined
   if (!owner || !owner.trim()) return pathValue;
   const query = new URLSearchParams({ owner: owner.trim() });
   return `${pathValue}?${query.toString()}`;
+}
+
+function normalizeNetworkFlag(value: SlipwayAcurastNetworkFlag | undefined): "mainnet" | "canary" {
+  if (value === undefined || value === "mainnet") return "mainnet";
+  if (value === "testnet" || value === "canary") return "canary";
+  throw new Error(`Unsupported Acurast network: ${String(value)}`);
+}
+
+function defaultAcurastRpcUrl(network: "mainnet" | "canary"): string {
+  return network === "mainnet"
+    ? "wss://archive.mainnet.acurast.com"
+    : "wss://canarynet-ws-1.acurast-h-server-2.papers.tech";
+}
+
+function parseDotenv(text: string): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const rawLine of text.split(/\r?\n/u)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(key)) continue;
+    values[key] = parseDotenvValue(line.slice(eq + 1).trim());
+  }
+  return values;
+}
+
+function parseDotenvValue(value: string): string {
+  if (
+    (value.startsWith("\"") && value.endsWith("\"")) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    const inner = value.slice(1, -1);
+    return value.startsWith("\"") ? inner.replace(/\\n/gu, "\n").replace(/\\"/gu, "\"").replace(/\\\\/gu, "\\") : inner;
+  }
+  const comment = /(^|[^\\])#/u.exec(value);
+  return (comment?.index === undefined ? value : value.slice(0, comment.index + comment[1]!.length)).trim().replace(/\\#/gu, "#");
+}
+
+function envVariablesValue(value: unknown): SlipwayEnvironmentVariableAction[] {
+  return arrayValue(value).flatMap((item) => {
+    const record = objectRecord(item);
+    const name = stringValue(record.name) ?? stringValue(record.key);
+    const source = stringValue(record.source);
+    if (!name) return [];
+    const normalizedSource = source === "literal" || source === "secret" || source === "switchboard" || source === "localAction" || source === "local"
+      ? source
+      : "local";
+    return [{
+      name,
+      required: booleanValue(record.required) ?? true,
+      source: normalizedSource,
+      value: typeof record.value === "string" ? record.value : undefined,
+      secretId: stringValue(record.secretId),
+      bundleId: stringValue(record.bundleId)
+    }];
+  });
+}
+
+function mergePolicyEnvironmentVariables(
+  actionVariables: readonly SlipwayEnvironmentVariableAction[],
+  policyVariables: readonly SlipwayEnvironmentVariableAction[]
+): SlipwayEnvironmentVariableAction[] {
+  const policyByName = new Map(policyVariables.map((variable) => [variable.name, variable]));
+  return actionVariables.map((variable) => {
+    const policyVariable = policyByName.get(variable.name);
+    if (!policyVariable) return variable;
+    return {
+      ...variable,
+      required: variable.required || policyVariable.required,
+      value: variable.value ?? (variable.source === "literal" ? policyVariable.value : undefined),
+      secretId: variable.secretId ?? policyVariable.secretId,
+      bundleId: variable.bundleId ?? policyVariable.bundleId
+    };
+  });
+}
+
+function acurastJobRefValue(value: unknown): { origin: unknown; sequence: number; canonicalJobId: string } | undefined {
+  const record = objectRecord(value);
+  const sequence = numberValue(record.sequence);
+  const origin = record.origin;
+  if (origin === undefined || sequence === undefined || !Number.isSafeInteger(sequence) || sequence < 0) return undefined;
+  return {
+    origin,
+    sequence,
+    canonicalJobId: stringValue(record.canonicalJobId) ?? JSON.stringify([origin, sequence])
+  };
+}
+
+function withoutUndefinedDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutUndefinedDeep);
+  if (!value || typeof value !== "object") return value;
+  const result: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (item !== undefined) result[key] = withoutUndefinedDeep(item);
+  }
+  return result;
 }
 
 function defaultSleep(ms: number): Promise<void> {
