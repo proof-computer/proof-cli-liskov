@@ -30,6 +30,8 @@ COMMANDS
   login
   application import --github owner/repo:path@ref [--server-fetch] [--publish]
   application list
+  application pause APP_REF --yes
+  application resume APP_REF --yes
   application status APPLICATION_ID
   application plans APPLICATION_ID
   application deployment import APP_REF --sequence N --origin ADDRESS --yes

@@ -32,6 +32,8 @@ COMMANDS
   import --github owner/repo:path@ref [--server-fetch] [--publish]
   import --file PATH [--publish]
   list
+  pause APP_REF [--owner OWNER] [--reason TEXT] [--yes]
+  resume APP_REF [--owner OWNER] [--reason TEXT] [--yes]
   status APPLICATION_ID
   plans APPLICATION_ID
   deployment import APP_REF --sequence N --origin ADDRESS --yes
@@ -45,6 +47,7 @@ COMMANDS
 
 DESCRIPTION
   Application commands use the local proof slipway session created by
-  \`${bin} slipway login\`. Delete creates a Slipway tombstone; it does not
-  stop Acurast jobs, revoke Lockbox grants, or drain routes.`);
+  \`${bin} slipway login\`. Pause stops new planning/executor work without
+  stopping Acurast jobs, revoking Lockbox grants, or draining routes. Delete
+  creates a Slipway tombstone.`);
 }

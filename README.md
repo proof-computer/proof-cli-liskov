@@ -9,6 +9,8 @@ proof slipway application import --github proof-computer/docs:.slipway/applicati
 proof slipway application list
 proof slipway application status proof-docs
 proof slipway application plans proof-docs --json
+proof slipway application pause proof-docs --reason "funding pending" --yes
+proof slipway application resume proof-docs --reason "funded" --yes
 proof slipway application deployment import proof-docs --sequence 701 --origin 5... --yes
 proof slipway application lockbox setup-pr proof-docs --yes
 proof slipway application lockbox dispatch proof-docs --yes
@@ -43,9 +45,15 @@ Application deletion is a logical Slipway tombstone. It removes the Application
 from normal management/read surfaces but does not stop Acurast jobs, revoke
 Lockbox grants, drain routes, or spend.
 
-Mutating Application and custody commands require `--yes`. Live execution submit
-also requires `--yes-spend`. The plugin does not expose the old direct manual
-Acurast spend fallback; diagnostics and machine catalog reads stay server-side.
+Pause and resume stop or restart only new Slipway planning/executor work; they
+do not stop existing Acurast jobs, revoke Lockbox grants, drain routes, or
+spend.
+
+Pause, resume, delete, and identity backfill dry-run by default and require
+`--yes` to mutate. Other mutating Application and custody commands require
+`--yes`; live execution submit also requires `--yes-spend`. The plugin does
+not expose the old direct manual Acurast spend fallback; diagnostics and
+machine catalog reads stay server-side.
 
 ## Development
 

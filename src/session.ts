@@ -110,6 +110,17 @@ export interface SlipwayApplicationDeleteInput {
   json?: boolean;
 }
 
+export interface SlipwayApplicationStatusTransitionInput {
+  applicationRef: string;
+  status: "active" | "paused";
+  owner?: string;
+  reason?: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationBackfillIdentitiesInput {
   yes?: boolean;
   slipwayUrl?: string;
@@ -428,6 +439,19 @@ interface SlipwayApplicationDeleteResponse {
   force?: boolean;
   application?: PublicSlipwayApplicationSummary;
   blockers?: SlipwayApplicationDeleteBlocker[];
+  error?: string;
+  reason?: string;
+  candidates?: PublicSlipwayApplicationRefCandidate[];
+  [key: string]: unknown;
+}
+
+interface SlipwayApplicationStatusTransitionResponse {
+  ok?: boolean;
+  dryRun?: boolean;
+  changed?: boolean;
+  previousStatus?: string;
+  status?: "active" | "paused";
+  application?: PublicSlipwayApplicationSummary;
   error?: string;
   reason?: string;
   candidates?: PublicSlipwayApplicationRefCandidate[];
@@ -890,6 +914,56 @@ export async function runSlipwayApplicationDelete(input: SlipwayApplicationDelet
     input.json,
     body,
     formatApplicationDelete(body)
+  );
+  return 0;
+}
+
+export async function runSlipwayApplicationStatusTransition(input: SlipwayApplicationStatusTransitionInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayJsonRequest<SlipwayApplicationStatusTransitionResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: applicationStatusPath(input.applicationRef, input.owner),
+    body: {
+      status: input.status,
+      confirm: input.yes === true,
+      reason: input.reason
+    },
+    requestErrorCode: "SLIPWAY_APPLICATION_STATUS_FAILED",
+    notFoundMessage: "No Slipway CLI session is stored locally.",
+    fetchFailedMessage: "could not update Slipway Application status"
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const body = request.body;
+  if (body?.ok !== true || !body.application) {
+    const ambiguous = body?.error === "ambiguous_application" && Array.isArray(body.candidates);
+    const error = request.response.status === 401
+      ? "SLIPWAY_SESSION_UNAUTHORIZED"
+      : ambiguous
+        ? "SLIPWAY_APPLICATION_AMBIGUOUS"
+        : "SLIPWAY_APPLICATION_STATUS_FAILED";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      reason: body?.reason ?? body?.error,
+      applicationRef: input.applicationRef,
+      candidates: body?.candidates,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, ambiguous
+      ? formatApplicationAmbiguity(input.applicationRef, body!.candidates!)
+      : `Error (${error}): Slipway could not update Application ${input.applicationRef} status.`);
+    return 1;
+  }
+
+  writeStructuredOrHuman(
+    options,
+    input.json,
+    body,
+    formatApplicationStatusTransition(body)
   );
   return 0;
 }
@@ -2243,6 +2317,13 @@ function applicationDeletePath(applicationRef: string, owner: string | undefined
   return `${pathValue}?${query.toString()}`;
 }
 
+function applicationStatusPath(applicationRef: string, owner: string | undefined): string {
+  const pathValue = `/api/applications/${encodeURIComponent(applicationRef)}/status`;
+  if (!owner || !owner.trim()) return pathValue;
+  const query = new URLSearchParams({ owner: owner.trim() });
+  return `${pathValue}?${query.toString()}`;
+}
+
 function normalizeNetworkFlag(value: SlipwayAcurastNetworkFlag | undefined): "mainnet" | "canary" {
   if (value === undefined || value === "mainnet") return "mainnet";
   if (value === "testnet" || value === "canary") return "canary";
@@ -2421,6 +2502,21 @@ function formatApplicationDelete(body: SlipwayApplicationDeleteResponse): string
     }
   }
   return lines.join("\n");
+}
+
+function formatApplicationStatusTransition(body: SlipwayApplicationStatusTransitionResponse): string {
+  const target = formatApplicationLabel(body.application);
+  const status = body.status === "active" ? "active" : "paused";
+  const verb = status === "active" ? "resumed" : "paused";
+  const already = status === "active" ? "already active" : "already paused";
+  if (body.dryRun === true) {
+    return body.changed === false
+      ? `Dry run: ${target} is ${already}.`
+      : `Dry run: ${target} would be ${verb}.`;
+  }
+  return body.changed === false
+    ? `${target} is ${already}.`
+    : `${verb[0]!.toUpperCase()}${verb.slice(1)} ${target}.`;
 }
 
 function formatApplicationAmbiguity(applicationRef: string, candidates: PublicSlipwayApplicationRefCandidate[]): string {

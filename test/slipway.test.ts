@@ -19,6 +19,7 @@ import {
   runSlipwayApplicationLockboxSetupPr,
   runSlipwayApplicationPlans,
   runSlipwayApplicationStatus,
+  runSlipwayApplicationStatusTransition,
   runSlipwayCustodyAccountEnsure,
   runSlipwayCustodyChildRecover,
   runSlipwayCustodyEnvironmentUpload,
@@ -362,6 +363,99 @@ describe("proof-cli Slipway runner", () => {
     assert.match(out.text, /shared-a \(legacy shared\)/u);
     assert.match(out.text, /owner 5owner-a/u);
     assert.match(out.text, /Use an Application uid\/name/u);
+  });
+
+  it("pauses and resumes Applications through the status endpoint without printing the bearer token", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_status_transition_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    const options = {
+      fetchImpl: async (url: URL | RequestInfo, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { status?: string; confirm?: boolean; reason?: string };
+        requests.push({
+          url: String(url),
+          method: init?.method,
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body
+        });
+        return jsonResponse({
+          ok: true,
+          dryRun: body.confirm !== true,
+          changed: true,
+          previousStatus: body.status === "paused" ? "active" : "paused",
+          status: body.status,
+          application: {
+            applicationUid: "app-1111111111111111",
+            applicationName: "alpha",
+            applicationId: "legacy-alpha",
+            ownerAddress: "5owner",
+            status: body.status,
+            pausedBy: body.status === "paused" ? "github:12345" : undefined,
+            pauseReason: body.status === "paused" ? body.reason : undefined,
+            resumedBy: body.status === "active" ? "github:12345" : undefined,
+            resumeReason: body.status === "active" ? body.reason : undefined
+          }
+        });
+      },
+      stdout: out.write
+    };
+
+    const pauseCode = await runSlipwayApplicationStatusTransition({
+      applicationRef: "alpha",
+      owner: "5owner",
+      status: "paused",
+      reason: "funding pending",
+      config: sessionFile,
+      json: true
+    }, options);
+    const resumeCode = await runSlipwayApplicationStatusTransition({
+      applicationRef: "alpha",
+      status: "active",
+      reason: "funded",
+      yes: true,
+      config: sessionFile,
+      json: true
+    }, options);
+
+    assert.equal(pauseCode, 0);
+    assert.equal(resumeCode, 0);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications/alpha/status?owner=5owner",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: {
+        status: "paused",
+        confirm: false,
+        reason: "funding pending"
+      }
+    }, {
+      url: "https://slipway.test/api/applications/alpha/status",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: {
+        status: "active",
+        confirm: true,
+        reason: "funded"
+      }
+    }]);
+    assert.equal(out.text.includes(token), false);
+    const outputs = out.text.trim().split(/\n(?=\{)/u).map((line) => JSON.parse(line) as { ok: boolean; status: string; dryRun: boolean; application: { pauseReason?: string; resumeReason?: string } });
+    assert.equal(outputs[0]?.ok, true);
+    assert.equal(outputs[0]?.status, "paused");
+    assert.equal(outputs[0]?.dryRun, true);
+    assert.equal(outputs[0]?.application.pauseReason, "funding pending");
+    assert.equal(outputs[1]?.status, "active");
+    assert.equal(outputs[1]?.dryRun, false);
+    assert.equal(outputs[1]?.application.resumeReason, "funded");
   });
 
   it("reads Application status with the stored session bearer without printing it", async () => {

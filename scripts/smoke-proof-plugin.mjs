@@ -49,6 +49,16 @@ try {
   assertIncludes(applicationDeleteHelp.stdout, "--force");
   assertIncludes(applicationDeleteHelp.stdout, "--yes");
 
+  const applicationPauseHelp = run(process.execPath, [proofDevBin, "slipway", "application", "pause", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationPauseHelp.stdout, "Pause new Slipway work");
+  assertIncludes(applicationPauseHelp.stdout, "--reason");
+  assertIncludes(applicationPauseHelp.stdout, "--yes");
+
+  const applicationResumeHelp = run(process.execPath, [proofDevBin, "slipway", "application", "resume", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationResumeHelp.stdout, "Resume new Slipway work");
+  assertIncludes(applicationResumeHelp.stdout, "--reason");
+  assertIncludes(applicationResumeHelp.stdout, "--yes");
+
   const applicationImportHelp = run(process.execPath, [proofDevBin, "slipway", "application", "import", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationImportHelp.stdout, "Import a Slipway Application policy");
   assertIncludes(applicationImportHelp.stdout, "--github");
