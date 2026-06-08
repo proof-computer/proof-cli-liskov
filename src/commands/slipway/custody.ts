@@ -34,6 +34,8 @@ COMMANDS
   preflight APP_REF
   environment upload APP_REF --secrets-file PATH --yes
   execution list APP_REF
+  execution run-one APP_REF --execution-id ID --expect-kind KIND --expect-policy-digest DIGEST --yes
+  execution run-one APP_REF --plan-item-id ID --idempotency-key KEY --expect-kind KIND --expect-policy-digest DIGEST --yes-spend --yes
   execution submit APP_REF --plan-item-id ID --idempotency-key KEY --yes-spend --yes
   execution observe APP_REF --execution-id ID
   execution diagnose APP_REF --execution-id ID

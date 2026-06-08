@@ -45,6 +45,8 @@ COMMANDS
   custody preflight APP_REF
   custody environment upload APP_REF --secrets-file PATH --yes
   custody execution list APP_REF
+  custody execution run-one APP_REF --execution-id ID --expect-kind KIND --expect-policy-digest DIGEST --yes
+  custody execution run-one APP_REF --plan-item-id ID --idempotency-key KEY --expect-kind KIND --expect-policy-digest DIGEST --yes-spend --yes
   custody execution submit APP_REF --plan-item-id ID --idempotency-key KEY --yes-spend --yes
   custody execution observe APP_REF --execution-id ID
   custody execution diagnose APP_REF --execution-id ID

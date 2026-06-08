@@ -275,6 +275,25 @@ export interface SlipwayCustodyExecutionObserveInput {
   json?: boolean;
 }
 
+export interface SlipwayCustodyExecutionRunOneInput {
+  applicationRef: string;
+  executionId?: string;
+  planItemId?: string;
+  idempotencyKey?: string;
+  expectKind: string;
+  expectPolicyDigest: string;
+  expectDeploymentId?: string;
+  yes?: boolean;
+  yesSpend?: boolean;
+  secretsFile?: string;
+  repoDir?: string;
+  network?: SlipwayAcurastNetworkFlag;
+  rpcUrl?: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayCustodyExecutionDiagnoseInput {
   applicationRef: string;
   executionId: string;
@@ -1448,6 +1467,87 @@ export async function runSlipwayCustodyExecutionObserve(input: SlipwayCustodyExe
   }, options);
 }
 
+export async function runSlipwayCustodyExecutionRunOne(input: SlipwayCustodyExecutionRunOneInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_CONFIRMATION_REQUIRED", "custody execution run-one");
+  const observeMode = input.executionId !== undefined;
+  const submitMode = input.planItemId !== undefined || input.idempotencyKey !== undefined;
+  if (observeMode === submitMode) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_MODE_REQUIRED",
+      message: "custody execution run-one requires either --execution-id or --plan-item-id with --idempotency-key."
+    }, "Error (SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_MODE_REQUIRED): provide either --execution-id or --plan-item-id with --idempotency-key.");
+    return 1;
+  }
+  const body: Record<string, unknown> = {
+    expectedKind: input.expectKind,
+    expectedPolicyDigest: input.expectPolicyDigest,
+    expectedDeploymentId: input.expectDeploymentId,
+    yes: true,
+    acknowledgement: "run-one"
+  };
+  if (observeMode) {
+    body.executionId = input.executionId;
+  } else {
+    if (!input.planItemId || !input.idempotencyKey) {
+      writeStructuredOrHuman(options, input.json, {
+        ok: false,
+        error: "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_SUBMIT_ID_REQUIRED",
+        message: "custody execution run-one submit requires --plan-item-id and --idempotency-key."
+      }, "Error (SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_SUBMIT_ID_REQUIRED): submit mode requires --plan-item-id and --idempotency-key.");
+      return 1;
+    }
+    if (!input.yesSpend) return writeConfirmationRequired(options, input.json, "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_SPEND_CONFIRMATION_REQUIRED", "custody execution run-one spend", "--yes-spend");
+    body.planItemId = input.planItemId;
+    body.idempotencyKey = input.idempotencyKey;
+    body.yesSpend = true;
+    body.spendAcknowledgement = "yes-spend";
+    if (input.secretsFile) {
+      if (input.expectKind !== "acurast.setEnvironment") {
+        writeStructuredOrHuman(options, input.json, {
+          ok: false,
+          error: "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_SECRETS_UNSUPPORTED",
+          message: "--secrets-file is only supported for acurast.setEnvironment run-one submit."
+        }, "Error (SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_SECRETS_UNSUPPORTED): --secrets-file is only supported for acurast.setEnvironment submit.");
+        return 1;
+      }
+      const prepared = await prepareEnvironmentHandoffs({
+        applicationRef: input.applicationRef,
+        secretsFile: input.secretsFile,
+        repoDir: input.repoDir,
+        network: input.network,
+        rpcUrl: input.rpcUrl,
+        config: input.config,
+        slipwayUrl: input.slipwayUrl,
+        json: input.json
+      }, options, input.planItemId);
+      if (!prepared.ok) return prepared.exitCode;
+      if (prepared.handoffs.length > 0) body.environmentHandoff = prepared.handoffs[0];
+    }
+  }
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions/run-one`,
+    body,
+    errorCode: "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_FAILED",
+    fetchFailedMessage: "could not run one Slipway live custody execution",
+    human: (responseBody) => {
+      const bodyRecord = objectRecord(responseBody);
+      const attempt = objectRecord(bodyRecord.attempt);
+      const receipt = objectRecord(attempt.receipt);
+      const executionId = stringValue(attempt.executionId) ?? input.executionId ?? input.planItemId ?? "unknown";
+      const status = stringValue(attempt.status) ?? "updated";
+      const deploymentId = stringValue(receipt.deploymentId);
+      const outcome = stringValue(bodyRecord.waiting) ?? (bodyRecord.recovered === true ? "recovered" : stringValue(bodyRecord.mode) ?? (bodyRecord.replayed === true ? "replayed" : "run"));
+      const deployment = deploymentId ? ` deployment ${deploymentId}` : "";
+      return `Run-one ${executionId}: ${status}${deployment} (${outcome}).`;
+    }
+  }, options);
+}
+
 export async function runSlipwayCustodyExecutionDiagnose(input: SlipwayCustodyExecutionDiagnoseInput, options: SlipwayCliOptions = {}): Promise<number> {
   const query = new URLSearchParams();
   if (input.network) query.set("network", normalizeNetworkFlag(input.network));
@@ -1467,9 +1567,34 @@ export async function runSlipwayCustodyExecutionDiagnose(input: SlipwayCustodyEx
     response: request.response,
     errorCode: "SLIPWAY_CUSTODY_EXECUTION_DIAGNOSE_FAILED",
     json: input.json,
-    human: (body) => `${input.applicationRef} ${input.executionId} Acurast job diagnosis: ${stringValue(objectRecord(body).classification) ?? "unknown"}.`,
+    human: (body) => formatSlipwayAcurastDiagnosisHuman(input.applicationRef, input.executionId, body),
     options
   });
+}
+
+function formatSlipwayAcurastDiagnosisHuman(applicationRef: string, executionId: string, body: unknown): string {
+  const record = objectRecord(body);
+  const classification = stringValue(record.classification) ?? "unknown";
+  const dossier = objectRecord(record.dossier);
+  const evaluator = objectRecord(dossier.evaluator);
+  const assignmentRows = objectRecord(record.assignmentRows);
+  const attempt = objectRecord(record.attempt);
+  const deploymentId = stringValue(attempt.deploymentId);
+  const parts = [`${applicationRef} ${executionId} Acurast job diagnosis: ${classification}.`];
+  const dossierClassification = stringValue(evaluator.classification);
+  const replacementRisk = stringValue(evaluator.replacementRisk);
+  if (dossierClassification || replacementRisk) {
+    parts.push(`Dossier: ${dossierClassification ?? "unclassified"}${replacementRisk ? `, replacement risk ${replacementRisk}` : ""}.`);
+  }
+  const assignedProcessorsCount = numberValue(assignmentRows.assignedProcessorsCount);
+  const storedMatchesCount = numberValue(assignmentRows.storedMatchesCount);
+  const storedMatchesWithRequiredKeys = numberValue(assignmentRows.storedMatchesWithRequiredKeys);
+  if (deploymentId || assignedProcessorsCount !== undefined || storedMatchesCount !== undefined || storedMatchesWithRequiredKeys !== undefined) {
+    parts.push(`Deployment ${deploymentId ?? "unknown"} assignment rows: assigned ${assignedProcessorsCount ?? "?"}, stored matches ${storedMatchesCount ?? "?"}, required keys ${storedMatchesWithRequiredKeys ?? "?"}.`);
+  }
+  const recommendation = stringValue(evaluator.recommendation);
+  if (recommendation) parts.push(`Recommendation: ${recommendation}.`);
+  return parts.join(" ");
 }
 
 export async function runSlipwayCustodyExecutionRecover(input: SlipwayCustodyExecutionRecoverInput, options: SlipwayCliOptions = {}): Promise<number> {
