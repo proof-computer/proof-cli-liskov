@@ -1241,6 +1241,161 @@ describe("proof-cli Slipway runner", () => {
     assert.equal(out.text.includes(secretValue), false);
   });
 
+  it("uses explicit local values as fallback for server-held environment variables", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const secretsFile = path.join(dir, ".env");
+    const token = "slipway_run_one_fallback_token_do_not_print";
+    const secretValue = "run-one-secret-value-do-not-print";
+    const bootstrapValue = "{\"v\":1,\"u\":\"https://slipway.test\",\"a\":\"alpha\",\"p\":\"policy-digest-1\",\"d\":\"777\"}";
+    await writeFile(secretsFile, `SECRET_VALUE=${secretValue}\nPROOF_SLIPWAY_BOOTSTRAP=${bootstrapValue}\n`, "utf8");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const handoff = encryptedHandoff();
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    const variables = [
+      { name: "SECRET_VALUE", source: "secret", required: true },
+      { name: "PROOF_SLIPWAY_BOOTSTRAP", source: "switchboard", required: true }
+    ];
+    const code = await runSlipwayCustodyExecutionRunOne({
+      applicationRef: "alpha",
+      planItemId: "set-env-1",
+      idempotencyKey: "idempotency-1",
+      expectKind: "acurast.setEnvironment",
+      expectPolicyDigest: "policy-digest-1",
+      expectDeploymentId: "777",
+      secretsFile,
+      config: sessionFile,
+      json: true,
+      yes: true,
+      yesSpend: true
+    }, {
+      environmentHandoffBuilder: async (input) => {
+        assert.equal(input.action.actionId, "set-env-1");
+        assert.deepEqual(input.variables, [
+          { key: "SECRET_VALUE", value: secretValue },
+          { key: "PROOF_SLIPWAY_BOOTSTRAP", value: bootstrapValue }
+        ]);
+        return handoff;
+      },
+      fetchImpl: async (url, init) => {
+        requests.push({
+          url: String(url),
+          method: init?.method ?? "GET",
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
+        });
+        if (String(url).endsWith("/api/applications/alpha/action-plan")) {
+          return jsonResponse({ ok: true, items: [setEnvironmentPlanItem(variables)] });
+        }
+        if (String(url).endsWith("/api/actions/set-env-1/submit-material")) {
+          return jsonResponse({ ok: true, values: [] });
+        }
+        if (String(url).endsWith("/api/applications/alpha")) {
+          return jsonResponse({
+            ok: true,
+            application: { applicationId: "alpha", status: "active" },
+            activePolicy: {
+              policyDigest: "policy-digest-1",
+              environment: { variables }
+            }
+          });
+        }
+        return jsonResponse({ ok: true, mode: "submit", attempt: { executionId: "exec-1", status: "submitted", receipt: { deploymentId: "777" } } });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.deepEqual(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`), [
+      "GET /api/applications/alpha/action-plan",
+      "GET /api/applications/alpha",
+      "GET /api/actions/set-env-1/submit-material",
+      "POST /api/applications/alpha/live-custody/executions/run-one"
+    ]);
+    assert.deepEqual(requests[3]?.body, {
+      expectedKind: "acurast.setEnvironment",
+      expectedPolicyDigest: "policy-digest-1",
+      expectedDeploymentId: "777",
+      yes: true,
+      acknowledgement: "run-one",
+      planItemId: "set-env-1",
+      idempotencyKey: "idempotency-1",
+      yesSpend: true,
+      spendAcknowledgement: "yes-spend",
+      environmentHandoff: handoff
+    });
+    assert.equal(requests[3]?.authorization, `Bearer ${token}`);
+    assert.equal(out.text.includes(token), false);
+    assert.equal(out.text.includes(secretValue), false);
+    assert.equal(out.text.includes(bootstrapValue), false);
+  });
+
+  it("lets the server build environment handoffs without a local secrets file", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_run_one_server_held_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    const code = await runSlipwayCustodyExecutionRunOne({
+      applicationRef: "alpha",
+      planItemId: "set-env-1",
+      idempotencyKey: "idempotency-1",
+      expectKind: "acurast.setEnvironment",
+      expectPolicyDigest: "policy-digest-1",
+      expectDeploymentId: "777",
+      config: sessionFile,
+      json: true,
+      yes: true,
+      yesSpend: true
+    }, {
+      environmentHandoffBuilder: async () => {
+        throw new Error("client should not build a server-held handoff without --secrets-file");
+      },
+      fetchImpl: async (url, init) => {
+        requests.push({
+          url: String(url),
+          method: init?.method ?? "GET",
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
+        });
+        return jsonResponse({ ok: true, mode: "submit", attempt: { executionId: "exec-1", status: "submitted", receipt: { deploymentId: "777" } } });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.deepEqual(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`), [
+      "POST /api/applications/alpha/live-custody/executions/run-one"
+    ]);
+    assert.deepEqual(requests[0]?.body, {
+      expectedKind: "acurast.setEnvironment",
+      expectedPolicyDigest: "policy-digest-1",
+      expectedDeploymentId: "777",
+      yes: true,
+      acknowledgement: "run-one",
+      planItemId: "set-env-1",
+      idempotencyKey: "idempotency-1",
+      yesSpend: true,
+      spendAcknowledgement: "yes-spend"
+    });
+    assert.equal(requests[0]?.authorization, `Bearer ${token}`);
+    assert.equal(out.text.includes(token), false);
+  });
+
   it("imports a GitHub Application policy through server fetch without printing the bearer token", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
@@ -1593,7 +1748,9 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-function setEnvironmentPlanItem(): Record<string, unknown> {
+function setEnvironmentPlanItem(
+  variables: Array<{ name: string; source: string; required: boolean }> = [{ name: "SECRET_VALUE", source: "secret", required: true }]
+): Record<string, unknown> {
   const origin = { acurast: "5origin" };
   return {
     planItemId: "set-env-1",
@@ -1614,8 +1771,8 @@ function setEnvironmentPlanItem(): Record<string, unknown> {
         canonicalJobId: JSON.stringify([origin, 1])
       },
       expectedProcessors: ["processor-1"],
-      envNames: ["SECRET_VALUE"],
-      variables: [{ name: "SECRET_VALUE", source: "secret", required: true }]
+      envNames: variables.map((variable) => variable.name),
+      variables
     }
   };
 }

@@ -1502,7 +1502,7 @@ export async function runSlipwayCustodyExecutionRunOne(input: SlipwayCustodyExec
     body.idempotencyKey = input.idempotencyKey;
     body.yesSpend = true;
     body.spendAcknowledgement = "yes-spend";
-    if (input.secretsFile) {
+    if (input.secretsFile !== undefined) {
       if (input.expectKind !== "acurast.setEnvironment") {
         writeStructuredOrHuman(options, input.json, {
           ok: false,
@@ -1936,17 +1936,19 @@ async function prepareEnvironmentHandoffs(
   const policyContext = await loadPolicyContext(input, options);
   if (!policyContext.ok) return { ok: false, exitCode: policyContext.exitCode };
 
-  let secrets: Record<string, string>;
-  try {
-    secrets = parseDotenv(await readFile(path.resolve(input.secretsFile), "utf8"));
-  } catch (error) {
-    writeStructuredOrHuman(options, input.json, {
-      ok: false,
-      error: "SLIPWAY_CUSTODY_ENVIRONMENT_SECRETS_FILE_FAILED",
-      message: errorMessage(error),
-      file: path.resolve(input.secretsFile)
-    }, `Error (SLIPWAY_CUSTODY_ENVIRONMENT_SECRETS_FILE_FAILED): could not read ${path.resolve(input.secretsFile)}.`);
-    return { ok: false, exitCode: 1 };
+  let secrets: Record<string, string> = {};
+  if (input.secretsFile !== undefined) {
+    try {
+      secrets = parseDotenv(await readFile(path.resolve(input.secretsFile), "utf8"));
+    } catch (error) {
+      writeStructuredOrHuman(options, input.json, {
+        ok: false,
+        error: "SLIPWAY_CUSTODY_ENVIRONMENT_SECRETS_FILE_FAILED",
+        message: errorMessage(error),
+        file: path.resolve(input.secretsFile)
+      }, `Error (SLIPWAY_CUSTODY_ENVIRONMENT_SECRETS_FILE_FAILED): could not read ${path.resolve(input.secretsFile)}.`);
+      return { ok: false, exitCode: 1 };
+    }
   }
 
   const actions = arrayValue(actionPlan.body?.items)
@@ -2135,11 +2137,12 @@ function environmentVariablesForAction(
   const variables: Array<{ key: string; value: string }> = [];
   const missingRequired: Array<{ name: string; source: string }> = [];
   for (const variable of action.variables) {
+    const localValue = secrets[variable.name] ?? (variable.secretId ? secrets[variable.secretId] : undefined);
     const value = variable.source === "literal"
       ? variable.value
       : variable.source === "switchboard" || variable.source === "localAction"
-        ? submitMaterials[variable.name]
-        : secrets[variable.name] ?? (variable.secretId ? secrets[variable.secretId] : undefined);
+        ? submitMaterials[variable.name] ?? localValue
+        : localValue;
     if (value === undefined) {
       if (variable.required) missingRequired.push({ name: variable.name, source: variable.source });
       continue;
