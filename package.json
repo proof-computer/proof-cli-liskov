@@ -1,6 +1,6 @@
 {
   "name": "@proof-computer/proof-cli-liskov",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Liskov plugin for the PROOF command line interface.",
   "private": false,
   "type": "module",

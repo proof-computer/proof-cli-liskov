@@ -4,7 +4,7 @@ import { mkdir, readFile, rm, writeFile, chmod } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 
-export const DEFAULT_SLIPWAY_URL = "https://slipway.proof.computer";
+export const DEFAULT_SLIPWAY_URL = "https://liskov.proof.computer";
 
 export interface SlipwayCliOptions {
   env?: NodeJS.ProcessEnv;
