@@ -74,6 +74,7 @@ describe("proof-cli Liskov runner", () => {
     const workflow = await readFile(output, "utf8");
     assert.match(workflow, /^name: 'Upload Runtime'$/mu);
     assert.match(workflow, /^"on":$/mu);
+    assert.match(workflow, /description: 'Optional sha256 digest, with or without sha256: prefix'/u);
     assert.match(workflow, /id-token: write/u);
     assert.match(workflow, /LISKOV_URL: 'https:\/\/liskov\.test'/u);
     assert.match(workflow, /LISKOV_APPLICATION_REF: 'proof-docs'/u);
