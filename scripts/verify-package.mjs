@@ -6,42 +6,42 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const packageJson = JSON.parse(await readFile(path.join(repoRoot, "package.json"), "utf8"));
 
 const requiredArtifacts = [
-  "dist/commands/slipway.js",
-  "dist/commands/slipway/application.js",
-  "dist/commands/slipway/application/blackbox.js",
-  "dist/commands/slipway/application/blackbox/configure.js",
-  "dist/commands/slipway/application/deployment.js",
-  "dist/commands/slipway/application/deployment/import.js",
-  "dist/commands/slipway/application/import.js",
-  "dist/commands/slipway/application/lockbox.js",
-  "dist/commands/slipway/application/lockbox/dispatch.js",
-  "dist/commands/slipway/application/lockbox/grant.js",
-  "dist/commands/slipway/application/lockbox/grant/ensure.js",
-  "dist/commands/slipway/application/lockbox/grant/status.js",
-  "dist/commands/slipway/application/lockbox/grant/verify.js",
-  "dist/commands/slipway/application/lockbox/grant-status.js",
-  "dist/commands/slipway/application/lockbox/setup-pr.js",
-  "dist/commands/slipway/application/plans.js",
-  "dist/commands/slipway/application/status.js",
-  "dist/commands/slipway/custody.js",
-  "dist/commands/slipway/custody/account.js",
-  "dist/commands/slipway/custody/account/ensure.js",
-  "dist/commands/slipway/custody/child.js",
-  "dist/commands/slipway/custody/child/recover.js",
-  "dist/commands/slipway/custody/environment.js",
-  "dist/commands/slipway/custody/environment/upload.js",
-  "dist/commands/slipway/custody/execution.js",
-  "dist/commands/slipway/custody/execution/diagnose.js",
-  "dist/commands/slipway/custody/execution/list.js",
-  "dist/commands/slipway/custody/execution/observe.js",
-  "dist/commands/slipway/custody/execution/recover.js",
-  "dist/commands/slipway/custody/execution/submit.js",
-  "dist/commands/slipway/custody/machine.js",
-  "dist/commands/slipway/custody/machine/catalog.js",
-  "dist/commands/slipway/custody/preflight.js",
-  "dist/commands/slipway/login.js",
-  "dist/commands/slipway/logout.js",
-  "dist/commands/slipway/whoami.js",
+  "dist/commands/liskov.js",
+  "dist/commands/liskov/application.js",
+  "dist/commands/liskov/application/blackbox.js",
+  "dist/commands/liskov/application/blackbox/configure.js",
+  "dist/commands/liskov/application/deployment.js",
+  "dist/commands/liskov/application/deployment/import.js",
+  "dist/commands/liskov/application/import.js",
+  "dist/commands/liskov/application/lockbox.js",
+  "dist/commands/liskov/application/lockbox/dispatch.js",
+  "dist/commands/liskov/application/lockbox/grant.js",
+  "dist/commands/liskov/application/lockbox/grant/ensure.js",
+  "dist/commands/liskov/application/lockbox/grant/status.js",
+  "dist/commands/liskov/application/lockbox/grant/verify.js",
+  "dist/commands/liskov/application/lockbox/grant-status.js",
+  "dist/commands/liskov/application/lockbox/setup-pr.js",
+  "dist/commands/liskov/application/plans.js",
+  "dist/commands/liskov/application/status.js",
+  "dist/commands/liskov/custody.js",
+  "dist/commands/liskov/custody/account.js",
+  "dist/commands/liskov/custody/account/ensure.js",
+  "dist/commands/liskov/custody/child.js",
+  "dist/commands/liskov/custody/child/recover.js",
+  "dist/commands/liskov/custody/environment.js",
+  "dist/commands/liskov/custody/environment/upload.js",
+  "dist/commands/liskov/custody/execution.js",
+  "dist/commands/liskov/custody/execution/diagnose.js",
+  "dist/commands/liskov/custody/execution/list.js",
+  "dist/commands/liskov/custody/execution/observe.js",
+  "dist/commands/liskov/custody/execution/recover.js",
+  "dist/commands/liskov/custody/execution/submit.js",
+  "dist/commands/liskov/custody/machine.js",
+  "dist/commands/liskov/custody/machine/catalog.js",
+  "dist/commands/liskov/custody/preflight.js",
+  "dist/commands/liskov/login.js",
+  "dist/commands/liskov/logout.js",
+  "dist/commands/liskov/whoami.js",
   "dist/index.js",
   "dist/session.js",
   "oclif.manifest.json",
@@ -56,21 +56,21 @@ const forbiddenDependencies = [
   "slipway",
   "@proof-computer/proof-cli-blackbox",
   "@proof-computer/proof-cli-lockbox",
-  "@proof-computer/proof-cli-switchboard"
+  "@proof-computer/proof-cli-baran"
 ];
 
 const errors = [];
 
-if (packageJson.name !== "@proof-computer/proof-cli-slipway") {
-  errors.push("package.json name must be @proof-computer/proof-cli-slipway");
+if (packageJson.name !== "@proof-computer/proof-cli-liskov") {
+  errors.push("package.json name must be @proof-computer/proof-cli-liskov");
 }
 
 if (packageJson.private !== true) {
-  errors.push("package.json private must be true until Slipway is intentionally exposed");
+  errors.push("package.json private must be true until Liskov is intentionally exposed");
 }
 
 if (packageJson.bin) {
-  errors.push("Slipway proof plugin must not publish a standalone bin");
+  errors.push("Liskov proof plugin must not publish a standalone bin");
 }
 
 for (const artifact of requiredArtifacts) {
@@ -95,8 +95,8 @@ if (packageJson.oclif?.topicSeparator !== " ") {
   errors.push("package.json oclif.topicSeparator must be a single space");
 }
 
-if (!packageJson.oclif?.topics?.slipway) {
-  errors.push("package.json oclif.topics must declare slipway");
+if (!packageJson.oclif?.topics?.liskov) {
+  errors.push("package.json oclif.topics must declare liskov");
 }
 
 const dependencyBlocks = [
@@ -107,7 +107,7 @@ const dependencyBlocks = [
 ];
 for (const forbidden of forbiddenDependencies) {
   if (dependencyBlocks.some((block) => Object.hasOwn(block, forbidden))) {
-    errors.push(`Slipway plugin must not depend on sibling product package ${forbidden}`);
+    errors.push(`Liskov plugin must not depend on sibling product package ${forbidden}`);
   }
 }
 
