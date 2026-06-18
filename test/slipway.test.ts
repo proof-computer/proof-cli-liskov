@@ -37,7 +37,7 @@ import {
   saveSlipwaySession
 } from "../src/index.js";
 
-describe("proof-cli Slipway runner", () => {
+describe("proof-cli Liskov runner", () => {
   it("reads a saved session through /api/session without printing the bearer token", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
@@ -422,6 +422,7 @@ describe("proof-cli Slipway runner", () => {
       applicationRef: "alpha",
       status: "active",
       reason: "funded",
+      overrideReplacementHold: true,
       yes: true,
       config: sessionFile,
       json: true
@@ -445,7 +446,8 @@ describe("proof-cli Slipway runner", () => {
       body: {
         status: "active",
         confirm: true,
-        reason: "funded"
+        reason: "funded",
+        overrideReplacementHold: true
       }
     }]);
     assert.equal(out.text.includes(token), false);
@@ -457,6 +459,97 @@ describe("proof-cli Slipway runner", () => {
     assert.equal(outputs[1]?.status, "active");
     assert.equal(outputs[1]?.dryRun, false);
     assert.equal(outputs[1]?.application.resumeReason, "funded");
+  });
+
+  it("prints replacement-hold resume blockers and preserves server JSON", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_replacement_hold_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const serverBody = {
+      ok: false,
+      error: "application_resume_blocked_by_replacement_hold",
+      reason: "replacement_hold_requires_explicit_override_reason",
+      status: "active",
+      overrideRequired: true,
+      application: {
+        applicationUid: "app-1111111111111111",
+        applicationName: "alpha",
+        applicationId: "legacy-alpha",
+        ownerAddress: "5owner",
+        status: "paused"
+      },
+      replacementHold: {
+        domain: "proof.slipway.application-replacement-hold.v1",
+        executionId: "live-execution:latest",
+        deploymentId: "75824",
+        policyDigest: "c".repeat(64),
+        dossierClassification: "assignment_rows_missing_after_deadline",
+        replacementRisk: "high",
+        recommendation: "hold_replacement_spend",
+        comparisonCounts: {
+          observedDeployments: 2,
+          currentPolicyAssignmentDeadlineMissedDeployments: 2
+        }
+      }
+    };
+    const requests: Array<{ body?: Record<string, unknown>; authorization?: string }> = [];
+    const humanOut = writer();
+    const humanCode = await runSlipwayApplicationStatusTransition({
+      applicationRef: "alpha",
+      status: "active",
+      reason: "funded",
+      yes: true,
+      config: sessionFile
+    }, {
+      fetchImpl: async (_url: URL | RequestInfo, init?: RequestInit) => {
+        requests.push({
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
+        });
+        return jsonResponse(serverBody, 409);
+      },
+      stdout: humanOut.write
+    });
+    assert.equal(humanCode, 1);
+    assert.equal(humanOut.text.includes(token), false);
+    assert.match(humanOut.text, /application_resume_blocked_by_replacement_hold/u);
+    assert.match(humanOut.text, /replacement dossier/u);
+    assert.match(humanOut.text, /assignment_rows_missing_after_deadline/u);
+    assert.match(humanOut.text, /replacement risk high/u);
+    assert.match(humanOut.text, /--override-replacement-hold --reason TEXT --yes/u);
+    assert.deepEqual(requests[0], {
+      authorization: `Bearer ${token}`,
+      body: {
+        status: "active",
+        confirm: true,
+        reason: "funded"
+      }
+    });
+
+    const jsonOut = writer();
+    const jsonCode = await runSlipwayApplicationStatusTransition({
+      applicationRef: "alpha",
+      status: "active",
+      reason: "funded",
+      yes: true,
+      config: sessionFile,
+      json: true
+    }, {
+      fetchImpl: async () => jsonResponse(serverBody, 409),
+      stdout: jsonOut.write
+    });
+    assert.equal(jsonCode, 1);
+    assert.equal(jsonOut.text.includes(token), false);
+    const parsed = JSON.parse(jsonOut.text) as typeof serverBody;
+    assert.equal(parsed.error, "application_resume_blocked_by_replacement_hold");
+    assert.equal(parsed.replacementHold.executionId, "live-execution:latest");
+    assert.equal(parsed.replacementHold.recommendation, "hold_replacement_spend");
   });
 
   it("reads Application status with the stored session bearer without printing it", async () => {
@@ -628,7 +721,7 @@ describe("proof-cli Slipway runner", () => {
     assert.equal(parsed.statuses[0]?.requests.acceptedCount, 2);
   });
 
-  it("runs Application mutation commands through confirmed Slipway API requests", async () => {
+  it("runs Application mutation commands through confirmed Liskov API requests", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
     const token = "slipway_application_mutation_secret_token_do_not_print";

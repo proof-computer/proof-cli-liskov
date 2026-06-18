@@ -1,7 +1,7 @@
 {
-  "name": "@proof-computer/proof-cli-slipway",
+  "name": "@proof-computer/proof-cli-liskov",
   "version": "0.1.0",
-  "description": "Slipway plugin for the PROOF command line interface.",
+  "description": "Liskov plugin for the PROOF command line interface.",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.33.0",
@@ -20,7 +20,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/proof-computer/proof-cli-slipway.git"
+    "url": "git+https://github.com/proof-computer/proof-cli-liskov.git"
   },
   "engines": {
     "node": ">=22"
@@ -39,8 +39,8 @@
     "commands": "./dist/commands",
     "topicSeparator": " ",
     "topics": {
-      "slipway": {
-        "description": "Slipway application deployment commands"
+      "liskov": {
+        "description": "Liskov application deployment commands"
       }
     }
   },

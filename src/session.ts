@@ -115,6 +115,7 @@ export interface SlipwayApplicationStatusTransitionInput {
   status: "active" | "paused";
   owner?: string;
   reason?: string;
+  overrideReplacementHold?: boolean;
   yes?: boolean;
   slipwayUrl?: string;
   config?: string;
@@ -471,9 +472,24 @@ interface SlipwayApplicationStatusTransitionResponse {
   previousStatus?: string;
   status?: "active" | "paused";
   application?: PublicSlipwayApplicationSummary;
+  replacementHold?: PublicSlipwayReplacementHold;
+  overrideRequired?: boolean;
   error?: string;
   reason?: string;
   candidates?: PublicSlipwayApplicationRefCandidate[];
+  [key: string]: unknown;
+}
+
+interface PublicSlipwayReplacementHold {
+  domain?: string;
+  source?: string;
+  executionId?: string;
+  deploymentId?: string;
+  policyDigest?: string;
+  dossierClassification?: string;
+  replacementRisk?: string;
+  recommendation?: string;
+  comparisonCounts?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -594,7 +610,7 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
       message: errorMessage(error),
       slipwayUrl,
       sessionFile
-    }, `Error (SLIPWAY_CLI_LOGIN_CREATE_FAILED): could not create a Slipway CLI login request at ${slipwayUrl}.`);
+    }, `Error (SLIPWAY_CLI_LOGIN_CREATE_FAILED): could not create a Liskov CLI login request at ${slipwayUrl}.`);
     return 1;
   }
 
@@ -610,7 +626,7 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
       reason: created?.reason ?? created?.error,
       slipwayUrl,
       sessionFile
-    }, `Error (SLIPWAY_CLI_LOGIN_CREATE_FAILED): Slipway did not create a pending CLI login request.`);
+    }, `Error (SLIPWAY_CLI_LOGIN_CREATE_FAILED): Liskov did not create a pending CLI login request.`);
     return 1;
   }
 
@@ -651,7 +667,7 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
         message: errorMessage(error),
         slipwayUrl,
         sessionFile
-      }, `Error (SLIPWAY_CLI_LOGIN_POLL_FAILED): could not poll Slipway CLI login status at ${slipwayUrl}.`);
+      }, `Error (SLIPWAY_CLI_LOGIN_POLL_FAILED): could not poll Liskov CLI login status at ${slipwayUrl}.`);
       return 1;
     }
 
@@ -664,7 +680,7 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
         reason: polled?.reason ?? polled?.error,
         slipwayUrl,
         sessionFile
-      }, "Error (SLIPWAY_CLI_LOGIN_POLL_FAILED): Slipway rejected the CLI login poll request.");
+      }, "Error (SLIPWAY_CLI_LOGIN_POLL_FAILED): Liskov rejected the CLI login poll request.");
       return 1;
     }
 
@@ -695,7 +711,7 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
         status: polled.status,
         slipwayUrl,
         sessionFile
-      }, `Error (${error}): Slipway CLI login ${polled.status}. Run \`proof slipway login\` again.`);
+      }, `Error (${error}): Liskov CLI login ${polled.status}. Run \`proof liskov login\` again.`);
       return 1;
     }
 
@@ -708,7 +724,7 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
     status: "pending",
     slipwayUrl,
     sessionFile
-  }, "Error (SLIPWAY_CLI_LOGIN_TIMEOUT): Slipway CLI login timed out. Run `proof slipway login` again.");
+  }, "Error (SLIPWAY_CLI_LOGIN_TIMEOUT): Liskov CLI login timed out. Run `proof liskov login` again.");
   return 1;
 }
 
@@ -720,9 +736,9 @@ export async function runSlipwayWhoami(input: SlipwayWhoamiInput, options: Slipw
     writeStructuredOrHuman(options, input.json, {
       ok: false,
       error: "SLIPWAY_SESSION_NOT_FOUND",
-      message: "No Slipway CLI session is stored locally.",
+      message: "No Liskov CLI session is stored locally.",
       sessionFile
-    }, `Error (SLIPWAY_SESSION_NOT_FOUND): no Slipway CLI session found. Run \`proof slipway login\` first.`);
+    }, `Error (SLIPWAY_SESSION_NOT_FOUND): no Liskov CLI session found. Run \`proof liskov login\` first.`);
     return 1;
   }
 
@@ -744,7 +760,7 @@ export async function runSlipwayWhoami(input: SlipwayWhoamiInput, options: Slipw
       message: errorMessage(error),
       slipwayUrl,
       sessionFile
-    }, `Error (SLIPWAY_SESSION_READ_FAILED): could not read Slipway session from ${slipwayUrl}.`);
+    }, `Error (SLIPWAY_SESSION_READ_FAILED): could not read Liskov session from ${slipwayUrl}.`);
     return 1;
   }
 
@@ -758,7 +774,7 @@ export async function runSlipwayWhoami(input: SlipwayWhoamiInput, options: Slipw
       reason: body?.reason ?? body?.error,
       slipwayUrl,
       sessionFile
-    }, `Error (${error}): Slipway did not accept the stored CLI session. Run \`proof slipway login\` again.`);
+    }, `Error (${error}): Liskov did not accept the stored CLI session. Run \`proof liskov login\` again.`);
     return 1;
   }
 
@@ -784,8 +800,8 @@ export async function runSlipwayApplicationStatus(input: SlipwayApplicationStatu
     json: input.json,
     path: `/api/applications/${encodeURIComponent(input.applicationId)}`,
     requestErrorCode: "SLIPWAY_APPLICATION_STATUS_FAILED",
-    notFoundMessage: "No Slipway CLI session is stored locally.",
-    fetchFailedMessage: "could not read Slipway Application status"
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application status"
   }, options);
   if (!request.ok) return request.exitCode;
 
@@ -800,7 +816,7 @@ export async function runSlipwayApplicationStatus(input: SlipwayApplicationStatu
       applicationId: input.applicationId,
       slipwayUrl: request.slipwayUrl,
       sessionFile: request.sessionFile
-    }, `Error (${error}): Slipway could not read Application ${input.applicationId}.`);
+    }, `Error (${error}): Liskov could not read Application ${input.applicationId}.`);
     return 1;
   }
 
@@ -820,8 +836,8 @@ export async function runSlipwayApplicationList(input: SlipwayApplicationListInp
     json: input.json,
     path: "/api/applications",
     requestErrorCode: "SLIPWAY_APPLICATION_LIST_FAILED",
-    notFoundMessage: "No Slipway CLI session is stored locally.",
-    fetchFailedMessage: "could not list Slipway Applications"
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not list Liskov Applications"
   }, options);
   if (!request.ok) return request.exitCode;
 
@@ -835,7 +851,7 @@ export async function runSlipwayApplicationList(input: SlipwayApplicationListInp
       reason: body?.reason ?? body?.error,
       slipwayUrl: request.slipwayUrl,
       sessionFile: request.sessionFile
-    }, `Error (${error}): Slipway could not list Applications.`);
+    }, `Error (${error}): Liskov could not list Applications.`);
     return 1;
   }
 
@@ -859,8 +875,8 @@ export async function runSlipwayApplicationBackfillIdentities(input: SlipwayAppl
       confirm: input.yes === true
     },
     requestErrorCode: "SLIPWAY_APPLICATION_BACKFILL_IDENTITIES_FAILED",
-    notFoundMessage: "No Slipway CLI session is stored locally.",
-    fetchFailedMessage: "could not backfill Slipway Application identities"
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not backfill Liskov Application identities"
   }, options);
   if (!request.ok) return request.exitCode;
 
@@ -874,7 +890,7 @@ export async function runSlipwayApplicationBackfillIdentities(input: SlipwayAppl
       reason: body?.reason ?? body?.error,
       slipwayUrl: request.slipwayUrl,
       sessionFile: request.sessionFile
-    }, `Error (${error}): Slipway could not backfill Application identities.`);
+    }, `Error (${error}): Liskov could not backfill Application identities.`);
     return 1;
   }
 
@@ -900,8 +916,8 @@ export async function runSlipwayApplicationDelete(input: SlipwayApplicationDelet
       reason: input.reason
     },
     requestErrorCode: "SLIPWAY_APPLICATION_DELETE_FAILED",
-    notFoundMessage: "No Slipway CLI session is stored locally.",
-    fetchFailedMessage: "could not delete Slipway Application"
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not delete Liskov Application"
   }, options);
   if (!request.ok) return request.exitCode;
 
@@ -924,7 +940,7 @@ export async function runSlipwayApplicationDelete(input: SlipwayApplicationDelet
       sessionFile: request.sessionFile
     }, ambiguous
       ? formatApplicationAmbiguity(input.applicationRef, body!.candidates!)
-      : `Error (${error}): Slipway could not delete Application ${input.applicationRef}.`);
+      : `Error (${error}): Liskov could not delete Application ${input.applicationRef}.`);
     return 1;
   }
 
@@ -947,34 +963,43 @@ export async function runSlipwayApplicationStatusTransition(input: SlipwayApplic
     body: {
       status: input.status,
       confirm: input.yes === true,
-      reason: input.reason
+      reason: input.reason,
+      overrideReplacementHold: input.overrideReplacementHold === true ? true : undefined
     },
     requestErrorCode: "SLIPWAY_APPLICATION_STATUS_FAILED",
-    notFoundMessage: "No Slipway CLI session is stored locally.",
-    fetchFailedMessage: "could not update Slipway Application status"
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not update Liskov Application status"
   }, options);
   if (!request.ok) return request.exitCode;
 
   const body = request.body;
   if (body?.ok !== true || !body.application) {
     const ambiguous = body?.error === "ambiguous_application" && Array.isArray(body.candidates);
+    const replacementHoldBlocked = body?.error === "application_resume_blocked_by_replacement_hold";
     const error = request.response.status === 401
       ? "SLIPWAY_SESSION_UNAUTHORIZED"
       : ambiguous
         ? "SLIPWAY_APPLICATION_AMBIGUOUS"
+        : replacementHoldBlocked
+          ? "application_resume_blocked_by_replacement_hold"
         : "SLIPWAY_APPLICATION_STATUS_FAILED";
-    writeStructuredOrHuman(options, input.json, {
-      ok: false,
-      error,
-      status: request.response.status,
-      reason: body?.reason ?? body?.error,
-      applicationRef: input.applicationRef,
-      candidates: body?.candidates,
-      slipwayUrl: request.slipwayUrl,
-      sessionFile: request.sessionFile
-    }, ambiguous
+    const output = replacementHoldBlocked
+      ? body
+      : {
+          ok: false,
+          error,
+          status: request.response.status,
+          reason: body?.reason ?? body?.error,
+          applicationRef: input.applicationRef,
+          candidates: body?.candidates,
+          slipwayUrl: request.slipwayUrl,
+          sessionFile: request.sessionFile
+        };
+    writeStructuredOrHuman(options, input.json, output, ambiguous
       ? formatApplicationAmbiguity(input.applicationRef, body!.candidates!)
-      : `Error (${error}): Slipway could not update Application ${input.applicationRef} status.`);
+      : replacementHoldBlocked
+        ? formatReplacementHoldBlocked(input.applicationRef, body as SlipwayApplicationStatusTransitionResponse)
+        : `Error (${error}): Liskov could not update Application ${input.applicationRef} status.`);
     return 1;
   }
 
@@ -994,8 +1019,8 @@ export async function runSlipwayApplicationPlans(input: SlipwayApplicationPlansI
     json: input.json,
     path: `/api/applications/${encodeURIComponent(input.applicationId)}/plans`,
     requestErrorCode: "SLIPWAY_APPLICATION_PLANS_FAILED",
-    notFoundMessage: "No Slipway CLI session is stored locally.",
-    fetchFailedMessage: "could not read Slipway Application plans"
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application plans"
   }, options);
   if (!request.ok) return request.exitCode;
 
@@ -1010,7 +1035,7 @@ export async function runSlipwayApplicationPlans(input: SlipwayApplicationPlansI
       applicationId: input.applicationId,
       slipwayUrl: request.slipwayUrl,
       sessionFile: request.sessionFile
-    }, `Error (${error}): Slipway could not read plans for Application ${input.applicationId}.`);
+    }, `Error (${error}): Liskov could not read plans for Application ${input.applicationId}.`);
     return 1;
   }
 
@@ -1030,8 +1055,8 @@ export async function runSlipwayApplicationLockboxGrantStatus(input: SlipwayAppl
     json: input.json,
     path: `/api/applications/${encodeURIComponent(input.applicationId)}/lockbox/grant-status`,
     requestErrorCode: "SLIPWAY_APPLICATION_LOCKBOX_GRANT_STATUS_FAILED",
-    notFoundMessage: "No Slipway CLI session is stored locally.",
-    fetchFailedMessage: "could not read Slipway Application Lockbox grant status"
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application Lockbox grant status"
   }, options);
   if (!request.ok) return request.exitCode;
 
@@ -1046,7 +1071,7 @@ export async function runSlipwayApplicationLockboxGrantStatus(input: SlipwayAppl
       applicationId: input.applicationId,
       slipwayUrl: request.slipwayUrl,
       sessionFile: request.sessionFile
-    }, `Error (${error}): Slipway could not read Lockbox grant status for Application ${input.applicationId}.`);
+    }, `Error (${error}): Liskov could not read Lockbox grant status for Application ${input.applicationId}.`);
     return 1;
   }
 
@@ -1089,7 +1114,7 @@ export async function runSlipwayApplicationDeploymentImport(input: SlipwayApplic
       endpointHostname: input.endpointHostname
     },
     errorCode: "SLIPWAY_APPLICATION_DEPLOYMENT_IMPORT_FAILED",
-    fetchFailedMessage: "could not import Slipway Application deployment",
+    fetchFailedMessage: "could not import Liskov Application deployment",
     human: (body) => {
       const child = objectRecord(objectRecord(body).child);
       return `Imported deployment ${input.deploymentId ?? String(input.sequence)} for ${input.applicationRef}; child ${stringValue(child.childSessionId) ?? "recorded"}.`;
@@ -1108,7 +1133,7 @@ export async function runSlipwayApplicationLockboxSetupPr(input: SlipwayApplicat
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/lockbox/workflow-pr`,
     body: { baseRef: input.baseRef },
     errorCode: "SLIPWAY_APPLICATION_LOCKBOX_SETUP_PR_FAILED",
-    fetchFailedMessage: "could not create Slipway Lockbox setup PR",
+    fetchFailedMessage: "could not create Liskov Lockbox setup PR",
     human: (body) => {
       const setup = objectRecord(objectRecord(body).setup);
       const pullRequest = objectRecord(setup.pullRequest);
@@ -1127,7 +1152,7 @@ export async function runSlipwayApplicationLockboxDispatch(input: SlipwayApplica
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/lockbox/workflow-dispatch`,
     body: { ref: input.ref },
     errorCode: "SLIPWAY_APPLICATION_LOCKBOX_DISPATCH_FAILED",
-    fetchFailedMessage: "could not dispatch Slipway Lockbox workflow",
+    fetchFailedMessage: "could not dispatch Liskov Lockbox workflow",
     human: (body) => {
       const dispatch = objectRecord(objectRecord(body).dispatch);
       return `Lockbox dispatch ${stringValue(dispatch.dispatchId) ?? "submitted"} ${stringValue(dispatch.status) ?? "ready"} for ${input.applicationRef}.`;
@@ -1145,7 +1170,7 @@ export async function runSlipwayApplicationLockboxGrantEnsure(input: SlipwayAppl
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/lockbox/grants`,
     body: {},
     errorCode: "SLIPWAY_APPLICATION_LOCKBOX_GRANT_ENSURE_FAILED",
-    fetchFailedMessage: "could not ensure Slipway Lockbox grant",
+    fetchFailedMessage: "could not ensure Liskov Lockbox grant",
     human: (body) => {
       const grant = objectRecord(objectRecord(body).grant);
       return `Lockbox grant ${stringValue(grant.grantId) ?? "recorded"} ${stringValue(grant.status) ?? "ready"} for ${input.applicationRef}.`;
@@ -1163,7 +1188,7 @@ export async function runSlipwayApplicationLockboxGrantVerify(input: SlipwayAppl
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/lockbox/grants/${encodeURIComponent(input.grantId)}/verify`,
     body: {},
     errorCode: "SLIPWAY_APPLICATION_LOCKBOX_GRANT_VERIFY_FAILED",
-    fetchFailedMessage: "could not verify Slipway Lockbox grant",
+    fetchFailedMessage: "could not verify Liskov Lockbox grant",
     human: (body) => {
       const grant = objectRecord(objectRecord(body).grant);
       return `Lockbox grant ${stringValue(grant.grantId) ?? input.grantId} ${stringValue(grant.status) ?? "verified"} for ${input.applicationRef}.`;
@@ -1181,7 +1206,7 @@ export async function runSlipwayApplicationBlackboxConfigure(input: SlipwayAppli
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/blackbox/configurations`,
     body: {},
     errorCode: "SLIPWAY_APPLICATION_BLACKBOX_CONFIGURE_FAILED",
-    fetchFailedMessage: "could not configure Slipway Blackbox",
+    fetchFailedMessage: "could not configure Liskov Blackbox",
     human: (body) => {
       const configuration = objectRecord(objectRecord(body).configuration);
       return `Blackbox configuration ${stringValue(configuration.configurationId) ?? "recorded"} for ${input.applicationRef}.`;
@@ -1280,8 +1305,8 @@ export async function runSlipwayApplicationImport(input: SlipwayApplicationImpor
     path: "/api/applications/imports",
     body,
     requestErrorCode: "SLIPWAY_APPLICATION_IMPORT_FAILED",
-    notFoundMessage: "No Slipway CLI session is stored locally.",
-    fetchFailedMessage: "could not import Slipway Application policy"
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not import Liskov Application policy"
   }, options);
   if (!request.ok) return request.exitCode;
 
@@ -1295,7 +1320,7 @@ export async function runSlipwayApplicationImport(input: SlipwayApplicationImpor
       reason: responseBody?.reason ?? responseBody?.error,
       slipwayUrl: request.slipwayUrl,
       sessionFile: request.sessionFile
-    }, `Error (${error}): Slipway could not import the Application policy.`);
+    }, `Error (${error}): Liskov could not import the Application policy.`);
     return 1;
   }
 
@@ -1318,7 +1343,7 @@ export async function runSlipwayCustodyAccountEnsure(input: SlipwayCustodyAccoun
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/account`,
     body: { chain: input.chain },
     errorCode: "SLIPWAY_CUSTODY_ACCOUNT_ENSURE_FAILED",
-    fetchFailedMessage: "could not ensure Slipway live custody account",
+    fetchFailedMessage: "could not ensure Liskov live custody account",
     human: (body) => {
       const account = objectRecord(objectRecord(body).account);
       return `${input.applicationRef} ${stringValue(account.chain) ?? input.chain} custody account ${stringValue(account.address) ?? stringValue(account.accountRef) ?? "ready"}.`;
@@ -1333,8 +1358,8 @@ export async function runSlipwayCustodyPreflight(input: SlipwayCustodyPreflightI
     json: input.json,
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/preflight`,
     requestErrorCode: "SLIPWAY_CUSTODY_PREFLIGHT_FAILED",
-    notFoundMessage: "No Slipway CLI session is stored locally.",
-    fetchFailedMessage: "could not read Slipway live custody preflight"
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov live custody preflight"
   }, options);
   if (!request.ok) return request.exitCode;
   return writeCommandResponse({
@@ -1365,8 +1390,8 @@ export async function runSlipwayCustodyEnvironmentUpload(input: SlipwayCustodyEn
       path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/environment-handoffs`,
       body: { environmentHandoff: handoff },
       requestErrorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_UPLOAD_FAILED",
-      notFoundMessage: "No Slipway CLI session is stored locally.",
-      fetchFailedMessage: "could not upload Slipway live custody environment handoff"
+      notFoundMessage: "No Liskov CLI session is stored locally.",
+      fetchFailedMessage: "could not upload Liskov live custody environment handoff"
     }, options);
     if (!request.ok) return request.exitCode;
     if (request.body?.ok !== true) {
@@ -1375,7 +1400,7 @@ export async function runSlipwayCustodyEnvironmentUpload(input: SlipwayCustodyEn
         response: request.response,
         errorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_UPLOAD_FAILED",
         json: input.json,
-        human: () => `Error (SLIPWAY_CUSTODY_ENVIRONMENT_UPLOAD_FAILED): Slipway could not upload environment handoff for ${input.applicationRef}.`,
+        human: () => `Error (SLIPWAY_CUSTODY_ENVIRONMENT_UPLOAD_FAILED): Liskov could not upload environment handoff for ${input.applicationRef}.`,
         options
       });
     }
@@ -1397,8 +1422,8 @@ export async function runSlipwayCustodyExecutionList(input: SlipwayCustodyExecut
     json: input.json,
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions`,
     requestErrorCode: "SLIPWAY_CUSTODY_EXECUTION_LIST_FAILED",
-    notFoundMessage: "No Slipway CLI session is stored locally.",
-    fetchFailedMessage: "could not list Slipway live custody executions"
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not list Liskov live custody executions"
   }, options);
   if (!request.ok) return request.exitCode;
   return writeCommandResponse({
@@ -1442,7 +1467,7 @@ export async function runSlipwayCustodyExecutionSubmit(input: SlipwayCustodyExec
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions`,
     body,
     errorCode: "SLIPWAY_CUSTODY_EXECUTION_SUBMIT_FAILED",
-    fetchFailedMessage: "could not submit Slipway live custody execution",
+    fetchFailedMessage: "could not submit Liskov live custody execution",
     human: (responseBody) => {
       const attempt = objectRecord(objectRecord(responseBody).attempt);
       return `Submitted live custody execution ${stringValue(attempt.executionId) ?? input.planItemId} ${stringValue(attempt.status) ?? ""}`.trim();
@@ -1459,7 +1484,7 @@ export async function runSlipwayCustodyExecutionObserve(input: SlipwayCustodyExe
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions/${encodeURIComponent(input.executionId)}/observe`,
     body: {},
     errorCode: "SLIPWAY_CUSTODY_EXECUTION_OBSERVE_FAILED",
-    fetchFailedMessage: "could not observe Slipway live custody execution",
+    fetchFailedMessage: "could not observe Liskov live custody execution",
     human: (body) => {
       const attempt = objectRecord(objectRecord(body).attempt);
       return `Observed live custody execution ${stringValue(attempt.executionId) ?? input.executionId}: ${stringValue(attempt.status) ?? "updated"}.`;
@@ -1533,7 +1558,7 @@ export async function runSlipwayCustodyExecutionRunOne(input: SlipwayCustodyExec
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions/run-one`,
     body,
     errorCode: "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_FAILED",
-    fetchFailedMessage: "could not run one Slipway live custody execution",
+    fetchFailedMessage: "could not run one Liskov live custody execution",
     human: (responseBody) => {
       const bodyRecord = objectRecord(responseBody);
       const attempt = objectRecord(bodyRecord.attempt);
@@ -1558,8 +1583,8 @@ export async function runSlipwayCustodyExecutionDiagnose(input: SlipwayCustodyEx
     json: input.json,
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions/${encodeURIComponent(input.executionId)}/diagnosis${suffix ? `?${suffix}` : ""}`,
     requestErrorCode: "SLIPWAY_CUSTODY_EXECUTION_DIAGNOSE_FAILED",
-    notFoundMessage: "No Slipway CLI session is stored locally.",
-    fetchFailedMessage: "could not diagnose Slipway live custody execution"
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not diagnose Liskov live custody execution"
   }, options);
   if (!request.ok) return request.exitCode;
   return writeCommandResponse({
@@ -1607,7 +1632,7 @@ export async function runSlipwayCustodyExecutionRecover(input: SlipwayCustodyExe
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions/${encodeURIComponent(input.executionId)}/recover`,
     body: { yesRecover: true, acknowledgement: "operator-reviewed", reason: input.reason },
     errorCode: "SLIPWAY_CUSTODY_EXECUTION_RECOVER_FAILED",
-    fetchFailedMessage: "could not recover Slipway live custody execution",
+    fetchFailedMessage: "could not recover Liskov live custody execution",
     human: (body) => {
       const attempt = objectRecord(objectRecord(body).attempt);
       return `Recovered live custody execution ${stringValue(attempt.executionId) ?? input.executionId}: ${stringValue(attempt.status) ?? "reviewed"}.`;
@@ -1625,7 +1650,7 @@ export async function runSlipwayCustodyChildRecover(input: SlipwayCustodyChildRe
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/child-sessions/${encodeURIComponent(input.childSessionId)}/recover`,
     body: { yesRecover: true, acknowledgement: "operator-reviewed", reason: input.reason },
     errorCode: "SLIPWAY_CUSTODY_CHILD_RECOVER_FAILED",
-    fetchFailedMessage: "could not recover Slipway live custody child",
+    fetchFailedMessage: "could not recover Liskov live custody child",
     human: (body) => {
       const child = objectRecord(objectRecord(body).child);
       return `Recovered child ${stringValue(child.childSessionId) ?? input.childSessionId}: ${stringValue(child.status) ?? "reviewed"}.`;
@@ -1643,8 +1668,8 @@ export async function runSlipwayCustodyMachineCatalog(input: SlipwayCustodyMachi
     json: input.json,
     path: `/api/live-custody/machine-catalog${suffix ? `?${suffix}` : ""}`,
     requestErrorCode: "SLIPWAY_CUSTODY_MACHINE_CATALOG_FAILED",
-    notFoundMessage: "No Slipway CLI session is stored locally.",
-    fetchFailedMessage: "could not read Slipway Acurast machine catalog"
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Acurast machine catalog"
   }, options);
   if (!request.ok) return request.exitCode;
   return writeCommandResponse({
@@ -1667,7 +1692,7 @@ export async function runSlipwayLogout(input: SlipwayLogoutInput, options: Slipw
     loggedOut: saved !== undefined,
     slipwayUrl: saved?.slipwayUrl,
     sessionFile
-  }, saved ? `Logged out from ${saved.slipwayUrl}.` : "No Slipway CLI session was stored locally.");
+  }, saved ? `Logged out from ${saved.slipwayUrl}.` : "No Liskov CLI session was stored locally.");
   return 0;
 }
 
@@ -1694,7 +1719,7 @@ export function resolveSlipwaySessionFile(input: { config?: string; env?: NodeJS
   const explicit = input.config ?? env.PROOF_SLIPWAY_SESSION_FILE;
   if (explicit) return path.resolve(explicit);
   const configHome = env.XDG_CONFIG_HOME ? path.resolve(env.XDG_CONFIG_HOME) : path.join(homedir(), ".config");
-  return path.join(configHome, "proof", "slipway", "session.json");
+  return path.join(configHome, "proof", "liskov", "session.json");
 }
 
 async function authenticatedSlipwayRequest<T>(
@@ -1727,7 +1752,7 @@ async function authenticatedSlipwayRequest<T>(
       error: "SLIPWAY_SESSION_NOT_FOUND",
       message: input.notFoundMessage,
       sessionFile
-    }, `Error (SLIPWAY_SESSION_NOT_FOUND): no Slipway CLI session found. Run \`proof slipway login\` first.`);
+    }, `Error (SLIPWAY_SESSION_NOT_FOUND): no Liskov CLI session found. Run \`proof liskov login\` first.`);
     return { ok: false, exitCode: 1 };
   }
 
@@ -1794,7 +1819,7 @@ async function authenticatedSlipwayJsonRequest<T>(
       error: "SLIPWAY_SESSION_NOT_FOUND",
       message: input.notFoundMessage,
       sessionFile
-    }, `Error (SLIPWAY_SESSION_NOT_FOUND): no Slipway CLI session found. Run \`proof slipway login\` first.`);
+    }, `Error (SLIPWAY_SESSION_NOT_FOUND): no Liskov CLI session found. Run \`proof liskov login\` first.`);
     return { ok: false, exitCode: 1 };
   }
 
@@ -1853,7 +1878,7 @@ async function runSlipwayJsonCommand(
     path: input.path,
     body: withoutUndefinedDeep(input.body),
     requestErrorCode: input.errorCode,
-    notFoundMessage: "No Slipway CLI session is stored locally.",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
     fetchFailedMessage: input.fetchFailedMessage
   }, options);
   if (!request.ok) return request.exitCode;
@@ -1882,7 +1907,7 @@ function writeCommandResponse(input: {
       error,
       status: input.response.status,
       reason: input.body?.reason ?? input.body?.error
-    }, `Error (${error}): Slipway request failed.`);
+    }, `Error (${error}): Liskov request failed.`);
     return 1;
   }
   writeStructuredOrHuman(input.options, input.json, input.body, input.human(input.body));
@@ -1915,8 +1940,8 @@ async function prepareEnvironmentHandoffs(
     json: input.json,
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/action-plan`,
     requestErrorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_PLAN_FAILED",
-    notFoundMessage: "No Slipway CLI session is stored locally.",
-    fetchFailedMessage: "could not read Slipway live custody action plan"
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov live custody action plan"
   }, options);
   if (!actionPlan.ok) return { ok: false, exitCode: actionPlan.exitCode };
   if (!actionPlan.response.ok || actionPlan.body?.ok === false) {
@@ -1927,7 +1952,7 @@ async function prepareEnvironmentHandoffs(
         response: actionPlan.response,
         errorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_PLAN_FAILED",
         json: input.json,
-        human: () => `Error (SLIPWAY_CUSTODY_ENVIRONMENT_PLAN_FAILED): Slipway could not read action plan for ${input.applicationRef}.`,
+        human: () => `Error (SLIPWAY_CUSTODY_ENVIRONMENT_PLAN_FAILED): Liskov could not read action plan for ${input.applicationRef}.`,
         options
       })
     };
@@ -2023,8 +2048,8 @@ async function loadPolicyContext(
     json: input.json,
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}`,
     requestErrorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_POLICY_FAILED",
-    notFoundMessage: "No Slipway CLI session is stored locally.",
-    fetchFailedMessage: "could not read Slipway Application policy"
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application policy"
   }, options);
   if (!request.ok) return { ok: false, exitCode: request.exitCode };
   if (!request.response.ok || request.body?.ok === false) {
@@ -2035,7 +2060,7 @@ async function loadPolicyContext(
         response: request.response,
         errorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_POLICY_FAILED",
         json: input.json,
-        human: () => `Error (SLIPWAY_CUSTODY_ENVIRONMENT_POLICY_FAILED): Slipway could not read Application ${input.applicationRef}.`,
+        human: () => `Error (SLIPWAY_CUSTODY_ENVIRONMENT_POLICY_FAILED): Liskov could not read Application ${input.applicationRef}.`,
         options
       })
     };
@@ -2068,8 +2093,8 @@ async function loadSubmitMaterials(
       json: input.json,
       path: `/api/actions/${encodeURIComponent(action.actionId)}/submit-material`,
       requestErrorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_SUBMIT_MATERIAL_FAILED",
-      notFoundMessage: "No Slipway CLI session is stored locally.",
-      fetchFailedMessage: "could not read Slipway submit material"
+      notFoundMessage: "No Liskov CLI session is stored locally.",
+      fetchFailedMessage: "could not read Liskov submit material"
     }, options);
     if (!request.ok) return { ok: false, exitCode: request.exitCode };
     if (!request.response.ok || request.body?.ok === false) {
@@ -2080,7 +2105,7 @@ async function loadSubmitMaterials(
           response: request.response,
           errorCode: "SLIPWAY_CUSTODY_ENVIRONMENT_SUBMIT_MATERIAL_FAILED",
           json: input.json,
-          human: () => `Error (SLIPWAY_CUSTODY_ENVIRONMENT_SUBMIT_MATERIAL_FAILED): Slipway could not read submit material for ${action.actionId}.`,
+          human: () => `Error (SLIPWAY_CUSTODY_ENVIRONMENT_SUBMIT_MATERIAL_FAILED): Liskov could not read submit material for ${action.actionId}.`,
           options
         })
       };
@@ -2288,7 +2313,7 @@ async function readSlipwaySession(sessionFile: string): Promise<SlipwaySessionFi
   try {
     const parsed = JSON.parse(await readFile(sessionFile, "utf8")) as Partial<SlipwaySessionFile>;
     if (parsed.version !== 1 || typeof parsed.slipwayUrl !== "string" || typeof parsed.sessionToken !== "string") {
-      throw new Error(`Slipway session file ${sessionFile} is not a version 1 session file`);
+      throw new Error(`Liskov session file ${sessionFile} is not a version 1 session file`);
     }
     return {
       version: 1,
@@ -2332,7 +2357,7 @@ function emitError(options: SlipwayCliOptions, line: string): void {
 function normalizeBaseUrl(value: string): string {
   const url = new URL(value);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Slipway URL must use http or https");
+    throw new Error("Liskov URL must use http or https");
   }
   url.hash = "";
   url.search = "";
@@ -2342,7 +2367,7 @@ function normalizeBaseUrl(value: string): string {
 function resolveVerificationUrl(value: string, slipwayUrl: string): string {
   const url = new URL(value, slipwayUrl);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Slipway verification URL must use http or https");
+    throw new Error("Liskov verification URL must use http or https");
   }
   return url.toString();
 }
@@ -2374,8 +2399,8 @@ function emitLoginInstruction(
 ): void {
   const lines = [
     input.browserOpened
-      ? "Browser opened for Slipway CLI authorization."
-      : "Open this URL to authorize Slipway CLI login:",
+      ? "Browser opened for Liskov CLI authorization."
+      : "Open this URL to authorize Liskov CLI login:",
     input.verificationUri,
     `Code: ${input.userCode}`,
     "Waiting for browser authorization..."
@@ -2575,8 +2600,8 @@ function formatApplicationStatus(body: SlipwayApplicationStatusResponse, fallbac
 function formatApplicationList(body: SlipwayApplicationListResponse): string {
   const applications = body.applications ?? [];
   const count = typeof body.count === "number" ? body.count : applications.length;
-  if (applications.length === 0) return "No Slipway Applications found.";
-  const lines = [`${count} Slipway Application(s):`];
+  if (applications.length === 0) return "No Liskov Applications found.";
+  const lines = [`${count} Liskov Application(s):`];
   for (const application of applications) {
     const primary = application.applicationName ?? application.applicationUid ?? application.applicationId ?? "unknown";
     const applicationId = formatApplicationLabel(application);
@@ -2637,6 +2662,9 @@ function formatApplicationStatusTransition(body: SlipwayApplicationStatusTransit
   const status = body.status === "active" ? "active" : "paused";
   const verb = status === "active" ? "resumed" : "paused";
   const already = status === "active" ? "already active" : "already paused";
+  if (status === "active" && body.replacementHold && body.overrideRequired === true) {
+    return `Dry run: ${target} resume is blocked by the replacement dossier. ${formatReplacementHoldSummary(body.replacementHold)} Use --override-replacement-hold --reason TEXT --yes after explicit operator review.`;
+  }
   if (body.dryRun === true) {
     return body.changed === false
       ? `Dry run: ${target} is ${already}.`
@@ -2645,6 +2673,27 @@ function formatApplicationStatusTransition(body: SlipwayApplicationStatusTransit
   return body.changed === false
     ? `${target} is ${already}.`
     : `${verb[0]!.toUpperCase()}${verb.slice(1)} ${target}.`;
+}
+
+function formatReplacementHoldBlocked(applicationRef: string, body: SlipwayApplicationStatusTransitionResponse): string {
+  const target = formatApplicationLabel(body.application, applicationRef);
+  const hold = body.replacementHold;
+  const lines = [`Error (application_resume_blocked_by_replacement_hold): ${target} resume is blocked by the replacement dossier.`];
+  if (hold) lines.push(formatReplacementHoldSummary(hold));
+  lines.push("Default action is blocked; use --override-replacement-hold --reason TEXT --yes only after explicit operator review.");
+  return lines.join(" ");
+}
+
+function formatReplacementHoldSummary(hold: PublicSlipwayReplacementHold): string {
+  const details = [
+    hold.dossierClassification ? `classification ${hold.dossierClassification}` : undefined,
+    hold.replacementRisk ? `replacement risk ${hold.replacementRisk}` : undefined,
+    hold.recommendation ? `recommendation ${hold.recommendation}` : undefined,
+    hold.executionId ? `execution ${hold.executionId}` : undefined,
+    hold.deploymentId ? `deployment ${hold.deploymentId}` : undefined,
+    hold.policyDigest ? `policy ${hold.policyDigest}` : undefined
+  ].filter((item): item is string => item !== undefined);
+  return `Hold: ${details.length > 0 ? details.join(", ") : "replacement spend requires review"}.`;
 }
 
 function formatApplicationAmbiguity(applicationRef: string, candidates: PublicSlipwayApplicationRefCandidate[]): string {

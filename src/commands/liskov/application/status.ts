@@ -1,0 +1,35 @@
+import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+
+import { runSlipwayApplicationStatus } from "../../../session.js";
+
+export default class SlipwayApplicationStatus extends Command {
+  static args = {
+    application_id: Args.string({ description: "Liskov Application id.", required: true })
+  };
+  static description = "Read Liskov Application status.";
+  static examples = [
+    "<%= config.bin %> liskov application status proof-docs",
+    "<%= config.bin %> liskov application status proof-docs --json",
+    "<%= config.bin %> liskov application status proof-docs --slipway-url https://slipway.proof.computer"
+  ];
+  static flags: Interfaces.FlagInput = {
+    config: Flags.string({ description: "Path to the local Liskov session file." }),
+    help: Flags.help({ char: "h" }),
+    json: Flags.boolean({ description: "Emit machine-readable JSON." }),
+    "slipway-url": Flags.string({ description: "Liskov service URL." })
+  };
+  static summary = "Read Liskov Application status.";
+
+  async run(): Promise<void> {
+    const { args, flags } = await this.parse(SlipwayApplicationStatus);
+    const code = await runSlipwayApplicationStatus({
+      applicationId: args.application_id,
+      config: flags.config as string | undefined,
+      json: flags.json as boolean | undefined,
+      slipwayUrl: flags["slipway-url"] as string | undefined
+    }, {
+      stdout: (line) => this.log(line)
+    });
+    if (code !== 0) this.exit(code);
+  }
+}
