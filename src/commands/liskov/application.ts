@@ -36,6 +36,7 @@ COMMANDS
   resume APP_REF [--owner OWNER] [--reason TEXT] [--yes]
   status APPLICATION_ID
   plans APPLICATION_ID
+  runtime-image workflow APP_REF [--output PATH]
   deployment import APP_REF --sequence N --origin ADDRESS --yes
   lockbox setup-pr APP_REF --yes
   lockbox dispatch APP_REF --yes

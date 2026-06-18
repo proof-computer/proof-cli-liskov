@@ -18,6 +18,7 @@ import {
   runSlipwayApplicationLockboxGrantVerify,
   runSlipwayApplicationLockboxSetupPr,
   runSlipwayApplicationPlans,
+  runSlipwayApplicationRuntimeImageWorkflow,
   runSlipwayApplicationStatus,
   runSlipwayApplicationStatusTransition,
   runSlipwayCustodyAccountEnsure,
@@ -38,6 +39,71 @@ import {
 } from "../src/index.js";
 
 describe("proof-cli Liskov runner", () => {
+  it("writes a runtime-image upload workflow without emitting credentials", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const output = path.join(dir, ".github", "workflows", "liskov-runtime-image.yml");
+    const out = writer();
+    const code = await runSlipwayApplicationRuntimeImageWorkflow({
+      applicationRef: "proof-docs",
+      json: true,
+      liskovUrl: "https://liskov.test",
+      oidcAudience: "liskov-runtime-image-upload",
+      output,
+      workflowName: "Upload Runtime"
+    }, { stdout: out.write });
+
+    assert.equal(code, 0);
+    const parsed = JSON.parse(out.text) as {
+      ok: boolean;
+      applicationRef: string;
+      output: string;
+      liskovUrl: string;
+      oidcAudience: string;
+      policyWorkflowRefHint: string;
+    };
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.applicationRef, "proof-docs");
+    assert.equal(parsed.output, output);
+    assert.equal(parsed.liskovUrl, "https://liskov.test");
+    assert.equal(parsed.oidcAudience, "liskov-runtime-image-upload");
+    assert.match(parsed.policyWorkflowRefHint, /\.github\/workflows\/liskov-runtime-image\.yml@refs\/heads\/<branch>/u);
+    assert.equal(out.text.includes("secretAccessKey"), false);
+    assert.equal(out.text.includes("AWS_SECRET_ACCESS_KEY"), false);
+
+    const workflow = await readFile(output, "utf8");
+    assert.match(workflow, /^name: 'Upload Runtime'$/mu);
+    assert.match(workflow, /id-token: write/u);
+    assert.match(workflow, /LISKOV_URL: 'https:\/\/liskov\.test'/u);
+    assert.match(workflow, /LISKOV_APPLICATION_REF: 'proof-docs'/u);
+    assert.match(workflow, /runtime-images\/upload-session/u);
+    assert.match(workflow, /runtime-images\/upload-sessions\/\$\{session_path\}\/finalize/u);
+    assert.match(workflow, /aws s3api put-object/u);
+    assert.match(workflow, /::add-mask::/u);
+    assert.doesNotMatch(workflow, /\$GITHUB_ENV/u);
+    assert.doesNotMatch(workflow, /steps\.[^.]+\.outputs\.token/u);
+    assert.doesNotMatch(workflow, /set -x/u);
+    assert.doesNotMatch(workflow, /secret-once|do_not_print/u);
+  });
+
+  it("does not overwrite an existing runtime-image workflow without --yes", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const output = path.join(dir, "runtime-image.yml");
+    await writeFile(output, "existing workflow\n", "utf8");
+    const out = writer();
+    const code = await runSlipwayApplicationRuntimeImageWorkflow({
+      applicationRef: "proof-docs",
+      json: true,
+      output
+    }, { stdout: out.write });
+
+    assert.equal(code, 1);
+    assert.equal(await readFile(output, "utf8"), "existing workflow\n");
+    const parsed = JSON.parse(out.text) as { ok: boolean; error: string; output: string };
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.error, "SLIPWAY_RUNTIME_IMAGE_WORKFLOW_EXISTS");
+    assert.equal(parsed.output, output);
+  });
+
   it("reads a saved session through /api/session without printing the bearer token", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");

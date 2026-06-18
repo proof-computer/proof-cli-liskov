@@ -11,6 +11,7 @@ proof liskov application status proof-docs
 proof liskov application plans proof-docs --json
 proof liskov application pause proof-docs --reason "funding pending" --yes
 proof liskov application resume proof-docs --reason "funded" --yes
+proof liskov application runtime-image workflow proof-docs
 proof liskov application deployment import proof-docs --sequence 701 --origin 5... --yes
 proof liskov application lockbox setup-pr proof-docs --yes
 proof liskov application lockbox dispatch proof-docs --yes
@@ -54,6 +55,18 @@ Pause, resume, delete, and identity backfill dry-run by default and require
 `--yes`; live execution submit also requires `--yes-spend`. The plugin does
 not expose the old direct manual Acurast spend fallback; diagnostics and
 machine catalog reads stay server-side.
+
+`proof liskov application runtime-image workflow APP_REF` writes a manual
+GitHub Actions workflow for the stage 1-2 PRoot runtime-image upload path. The
+workflow requests GitHub OIDC with audience `liskov-runtime-image-upload`,
+downloads a pinned image URL supplied at dispatch time, asks Liskov for a
+one-run Tigris upload session, uploads with `aws s3api put-object`, and calls
+the Liskov finalize route with digest, byte size, object key, and provenance.
+It does not store the returned Tigris secret key in the repository. The active
+Application policy must allow the repository/ref under
+`runtimeImageAutomation.github`; if it pins `workflowRef`, set it to
+`<owner>/<repo>/.github/workflows/liskov-runtime-image.yml@refs/heads/<branch>`
+or the path written with `--output`.
 
 ## Development
 

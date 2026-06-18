@@ -34,6 +34,7 @@ COMMANDS
   application resume APP_REF --yes
   application status APPLICATION_ID
   application plans APPLICATION_ID
+  application runtime-image workflow APP_REF [--output PATH]
   application deployment import APP_REF --sequence N --origin ADDRESS --yes
   application lockbox setup-pr APP_REF --yes
   application lockbox dispatch APP_REF --yes
