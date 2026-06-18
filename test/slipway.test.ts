@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -79,10 +80,12 @@ describe("proof-cli Liskov runner", () => {
     assert.match(workflow, /runtime-images\/upload-sessions\/\$\{session_path\}\/finalize/u);
     assert.match(workflow, /aws s3api put-object/u);
     assert.match(workflow, /::add-mask::/u);
+    assert.doesNotMatch(workflow, /^const fs = require/m);
     assert.doesNotMatch(workflow, /\$GITHUB_ENV/u);
     assert.doesNotMatch(workflow, /steps\.[^.]+\.outputs\.token/u);
     assert.doesNotMatch(workflow, /set -x/u);
     assert.doesNotMatch(workflow, /secret-once|do_not_print/u);
+    await assertWorkflowRunBlocksAreBashSyntax(workflow, dir);
   });
 
   it("does not overwrite an existing runtime-image workflow without --yes", async () => {
@@ -1905,6 +1908,41 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: { "content-type": "application/json" }
   });
+}
+
+async function assertWorkflowRunBlocksAreBashSyntax(workflow: string, dir: string): Promise<void> {
+  const blocks = extractYamlRunBlocks(workflow);
+  assert.equal(blocks.length, 4);
+  for (const [index, block] of blocks.entries()) {
+    const scriptPath = path.join(dir, `workflow-run-${index + 1}.sh`);
+    await writeFile(scriptPath, block, "utf8");
+    const result = spawnSync("bash", ["-n", scriptPath], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+  }
+}
+
+function extractYamlRunBlocks(workflow: string): string[] {
+  const lines = workflow.split(/\r?\n/u);
+  const blocks: string[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]!;
+    if (line.trim() !== "run: |") continue;
+    const baseIndent = line.length - line.trimStart().length;
+    const block: string[] = [];
+    index += 1;
+    while (index < lines.length) {
+      const blockLine = lines[index]!;
+      const indent = blockLine.length - blockLine.trimStart().length;
+      if (blockLine.trim() && indent <= baseIndent) {
+        index -= 1;
+        break;
+      }
+      block.push(blockLine.length >= baseIndent + 2 ? blockLine.slice(baseIndent + 2) : "");
+      index += 1;
+    }
+    blocks.push(`${block.join("\n")}\n`);
+  }
+  return blocks;
 }
 
 function setEnvironmentPlanItem(
