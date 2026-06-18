@@ -2,7 +2,7 @@
   "name": "@proof-computer/proof-cli-liskov",
   "version": "0.1.0",
   "description": "Liskov plugin for the PROOF command line interface.",
-  "private": true,
+  "private": false,
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "files": [

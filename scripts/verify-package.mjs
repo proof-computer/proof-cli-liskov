@@ -65,10 +65,6 @@ if (packageJson.name !== "@proof-computer/proof-cli-liskov") {
   errors.push("package.json name must be @proof-computer/proof-cli-liskov");
 }
 
-if (packageJson.private !== true) {
-  errors.push("package.json private must be true until Liskov is intentionally exposed");
-}
-
 if (packageJson.bin) {
   errors.push("Liskov proof plugin must not publish a standalone bin");
 }
