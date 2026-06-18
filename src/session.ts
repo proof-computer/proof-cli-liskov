@@ -1810,7 +1810,7 @@ function renderRuntimeImageWorkflow(input: {
   return [
     `name: ${yamlSingleQuoted(input.workflowName)}`,
     "",
-    "on:",
+    "\"on\":",
     "  workflow_dispatch:",
     "    inputs:",
     "      image_url:",
