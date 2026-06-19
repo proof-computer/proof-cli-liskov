@@ -140,6 +140,84 @@ export interface SlipwayApplicationPlansInput {
   json?: boolean;
 }
 
+export interface SlipwayGenericResponse {
+  ok?: boolean;
+  error?: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+export interface SlipwayApplicationDeploymentStatusInput {
+  applicationRef: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationConsoleInput {
+  applicationRef: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationActivityInput {
+  applicationRef: string;
+  limit?: number;
+  before?: number;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationActionPlanInput {
+  applicationRef: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationArtifactPinListInput {
+  applicationRef: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationArtifactPinRestoreInput {
+  applicationRef: string;
+  pinId: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationLockboxGrantListInput {
+  applicationRef: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayAdminProcessorListInput {
+  greylisted?: boolean;
+  adminToken?: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayAdminProcessorClearGreylistInput {
+  processorId: string;
+  reason?: string;
+  yes?: boolean;
+  adminToken?: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationRuntimeImageWorkflowInput {
   applicationRef: string;
   liskovUrl?: string;
@@ -1062,6 +1140,224 @@ export async function runSlipwayApplicationPlans(input: SlipwayApplicationPlansI
   return 0;
 }
 
+export async function runSlipwayApplicationDeploymentStatus(input: SlipwayApplicationDeploymentStatusInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayRequest<SlipwayGenericResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/deployments`,
+    requestErrorCode: "SLIPWAY_APPLICATION_DEPLOYMENT_STATUS_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application deployment status"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  const body = request.body;
+  if (body?.ok !== true) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_DEPLOYMENT_STATUS_FAILED";
+    writeStructuredOrHuman(options, input.json, { ok: false, error, status: request.response.status, reason: body?.reason ?? body?.error, applicationRef: input.applicationRef, slipwayUrl: request.slipwayUrl, sessionFile: request.sessionFile }, `Error (${error}): Liskov could not read the deployment status for Application ${input.applicationRef}.`);
+    return 1;
+  }
+  writeStructuredOrHuman(options, input.json, body, `Deployment state for ${input.applicationRef}.`);
+  return 0;
+}
+
+export async function runSlipwayApplicationConsole(input: SlipwayApplicationConsoleInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayRequest<SlipwayGenericResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/console`,
+    requestErrorCode: "SLIPWAY_APPLICATION_CONSOLE_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application console"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  const body = request.body;
+  if (body?.ok !== true) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_CONSOLE_FAILED";
+    writeStructuredOrHuman(options, input.json, { ok: false, error, status: request.response.status, reason: body?.reason ?? body?.error, applicationRef: input.applicationRef, slipwayUrl: request.slipwayUrl, sessionFile: request.sessionFile }, `Error (${error}): Liskov could not read the console for Application ${input.applicationRef}.`);
+    return 1;
+  }
+  writeStructuredOrHuman(options, input.json, body, `Console view for ${input.applicationRef}.`);
+  return 0;
+}
+
+export async function runSlipwayApplicationActivity(input: SlipwayApplicationActivityInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const query = new URLSearchParams();
+  if (input.limit !== undefined) query.set("limit", String(input.limit));
+  if (input.before !== undefined) query.set("before", String(input.before));
+  const queryString = query.toString();
+  const request = await authenticatedSlipwayRequest<SlipwayGenericResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/activity${queryString ? `?${queryString}` : ""}`,
+    requestErrorCode: "SLIPWAY_APPLICATION_ACTIVITY_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application activity"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  const body = request.body;
+  if (body?.ok !== true) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_ACTIVITY_FAILED";
+    writeStructuredOrHuman(options, input.json, { ok: false, error, status: request.response.status, reason: body?.reason ?? body?.error, applicationRef: input.applicationRef, slipwayUrl: request.slipwayUrl, sessionFile: request.sessionFile }, `Error (${error}): Liskov could not read the activity for Application ${input.applicationRef}.`);
+    return 1;
+  }
+  const events = body.events;
+  const count = typeof body.count === "number" ? body.count : Array.isArray(events) ? events.length : 0;
+  writeStructuredOrHuman(options, input.json, body, `${count} activity event(s) for ${input.applicationRef}.`);
+  return 0;
+}
+
+export async function runSlipwayApplicationActionPlan(input: SlipwayApplicationActionPlanInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayRequest<SlipwayGenericResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/action-plan`,
+    requestErrorCode: "SLIPWAY_APPLICATION_ACTION_PLAN_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application action plan"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  const body = request.body;
+  if (body?.ok !== true) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_ACTION_PLAN_FAILED";
+    writeStructuredOrHuman(options, input.json, { ok: false, error, status: request.response.status, reason: body?.reason ?? body?.error, applicationRef: input.applicationRef, slipwayUrl: request.slipwayUrl, sessionFile: request.sessionFile }, `Error (${error}): Liskov could not read the action plan for Application ${input.applicationRef}.`);
+    return 1;
+  }
+  writeStructuredOrHuman(options, input.json, body, `Action plan for ${input.applicationRef}.`);
+  return 0;
+}
+
+export async function runSlipwayApplicationArtifactPinList(input: SlipwayApplicationArtifactPinListInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayRequest<SlipwayGenericResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/artifact-pins`,
+    requestErrorCode: "SLIPWAY_APPLICATION_ARTIFACT_PIN_LIST_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application artifact pins"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  const body = request.body;
+  if (body?.ok !== true) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_ARTIFACT_PIN_LIST_FAILED";
+    writeStructuredOrHuman(options, input.json, { ok: false, error, status: request.response.status, reason: body?.reason ?? body?.error, applicationRef: input.applicationRef, slipwayUrl: request.slipwayUrl, sessionFile: request.sessionFile }, `Error (${error}): Liskov could not read artifact pins for Application ${input.applicationRef}.`);
+    return 1;
+  }
+  const pins = body.pins;
+  const count = typeof body.count === "number" ? body.count : Array.isArray(pins) ? pins.length : 0;
+  writeStructuredOrHuman(options, input.json, body, `${count} artifact pin(s) for ${input.applicationRef}.`);
+  return 0;
+}
+
+export async function runSlipwayApplicationArtifactPinRestore(input: SlipwayApplicationArtifactPinRestoreInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayJsonRequest<SlipwayGenericResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/artifact-pins/${encodeURIComponent(input.pinId)}/restore`,
+    body: withoutUndefinedDeep({ confirm: input.yes === true }),
+    requestErrorCode: "SLIPWAY_APPLICATION_ARTIFACT_PIN_RESTORE_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not restore Liskov Application artifact pin"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  const body = request.body;
+  if (body?.ok !== true) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_ARTIFACT_PIN_RESTORE_FAILED";
+    writeStructuredOrHuman(options, input.json, { ok: false, error, status: request.response.status, reason: body?.reason ?? body?.error, applicationRef: input.applicationRef, pinId: input.pinId, slipwayUrl: request.slipwayUrl, sessionFile: request.sessionFile }, `Error (${error}): Liskov could not restore pin ${input.pinId} for Application ${input.applicationRef}.`);
+    return 1;
+  }
+  writeStructuredOrHuman(options, input.json, body, body.dryRun
+    ? `Dry run: would restore pin ${input.pinId} for ${input.applicationRef}. Pass --yes to apply.`
+    : `Restored pin ${input.pinId} for ${input.applicationRef}.`);
+  return 0;
+}
+
+export async function runSlipwayApplicationLockboxGrantList(input: SlipwayApplicationLockboxGrantListInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayRequest<SlipwayGenericResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/lockbox/grants`,
+    requestErrorCode: "SLIPWAY_APPLICATION_LOCKBOX_GRANT_LIST_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application lockbox grants"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  const body = request.body;
+  if (body?.ok !== true) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_LOCKBOX_GRANT_LIST_FAILED";
+    writeStructuredOrHuman(options, input.json, { ok: false, error, status: request.response.status, reason: body?.reason ?? body?.error, applicationRef: input.applicationRef, slipwayUrl: request.slipwayUrl, sessionFile: request.sessionFile }, `Error (${error}): Liskov could not read lockbox grants for Application ${input.applicationRef}.`);
+    return 1;
+  }
+  const grants = body.grants;
+  const count = typeof body.count === "number" ? body.count : Array.isArray(grants) ? grants.length : 0;
+  writeStructuredOrHuman(options, input.json, body, `${count} lockbox grant(s) for ${input.applicationRef}.`);
+  return 0;
+}
+
+export async function runSlipwayAdminProcessorList(input: SlipwayAdminProcessorListInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayRequest<SlipwayGenericResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/admin/processors${input.greylisted ? "?greylisted=true" : ""}`,
+    authToken: resolveAdminToken({ token: input.adminToken, env: options.env ?? process.env }),
+    requestErrorCode: "SLIPWAY_ADMIN_PROCESSOR_LIST_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov admin processors"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  const body = request.body;
+  if (body?.ok !== true) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_ADMIN_PROCESSOR_LIST_FAILED";
+    writeStructuredOrHuman(options, input.json, { ok: false, error, status: request.response.status, reason: body?.reason ?? body?.error, slipwayUrl: request.slipwayUrl, sessionFile: request.sessionFile }, `Error (${error}): Liskov could not read admin processors.`);
+    return 1;
+  }
+  const processors = body.processors;
+  const total = Array.isArray(processors) ? processors.length : 0;
+  const greylistedCount = typeof body.greylistedCount === "number"
+    ? body.greylistedCount
+    : Array.isArray(processors)
+      ? processors.filter((p) => p && typeof p === "object" && (p as { greylisted?: unknown }).greylisted === true).length
+      : 0;
+  writeStructuredOrHuman(options, input.json, body, `${greylistedCount} of ${total} processor(s) greylisted.`);
+  return 0;
+}
+
+export async function runSlipwayAdminProcessorClearGreylist(input: SlipwayAdminProcessorClearGreylistInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayJsonRequest<SlipwayGenericResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/admin/processors/${encodeURIComponent(input.processorId)}/clear-greylist`,
+    body: withoutUndefinedDeep({ confirm: input.yes === true, reason: input.reason }),
+    authToken: resolveAdminToken({ token: input.adminToken, env: options.env ?? process.env }),
+    requestErrorCode: "SLIPWAY_ADMIN_PROCESSOR_CLEAR_GREYLIST_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not clear Liskov processor greylist"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  const body = request.body;
+  if (body?.ok !== true) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_ADMIN_PROCESSOR_CLEAR_GREYLIST_FAILED";
+    writeStructuredOrHuman(options, input.json, { ok: false, error, status: request.response.status, reason: body?.reason ?? body?.error, processorId: input.processorId, slipwayUrl: request.slipwayUrl, sessionFile: request.sessionFile }, `Error (${error}): Liskov could not clear the greylist for processor ${input.processorId}.`);
+    return 1;
+  }
+  writeStructuredOrHuman(options, input.json, body, body.dryRun
+    ? `Dry run: ${body.wasGreylisted ? "would clear" : "nothing to clear for"} processor ${input.processorId}. Pass --yes to apply.`
+    : body.cleared
+      ? `Cleared greylist for processor ${input.processorId}.`
+      : `No greylist to clear for processor ${input.processorId}.`);
+  return 0;
+}
+
 export async function runSlipwayApplicationRuntimeImageWorkflow(
   input: SlipwayApplicationRuntimeImageWorkflowInput,
   options: SlipwayCliOptions = {}
@@ -1782,6 +2078,18 @@ export function resolveSlipwaySessionFile(input: { config?: string; env?: NodeJS
   return path.join(configHome, "proof", "liskov", "session.json");
 }
 
+/**
+ * Resolve the bearer token for an admin (`/api/admin/*`) request: an explicit
+ * `--admin-token` flag, else `PROOF_SLIPWAY_ADMIN_SERVICE_TOKEN`, else `undefined`
+ * so the caller falls back to the saved session token (a platform-admin GitHub
+ * session also satisfies the backend admin gate).
+ */
+export function resolveAdminToken(input: { token?: string; env?: NodeJS.ProcessEnv } = {}): string | undefined {
+  const env = input.env ?? process.env;
+  const token = input.token ?? env.PROOF_SLIPWAY_ADMIN_SERVICE_TOKEN;
+  return token && token.length > 0 ? token : undefined;
+}
+
 async function fileExists(file: string): Promise<boolean> {
   try {
     await access(file);
@@ -2030,6 +2338,7 @@ async function authenticatedSlipwayRequest<T>(
     slipwayUrl?: string;
     json?: boolean;
     path: string;
+    authToken?: string;
     requestErrorCode: string;
     notFoundMessage: string;
     fetchFailedMessage: string;
@@ -2066,7 +2375,7 @@ async function authenticatedSlipwayRequest<T>(
       method: "GET",
       headers: {
         accept: "application/json",
-        authorization: `Bearer ${saved.sessionToken}`
+        authorization: `Bearer ${input.authToken ?? saved.sessionToken}`
       }
     });
   } catch (error) {
@@ -2097,6 +2406,7 @@ async function authenticatedSlipwayJsonRequest<T>(
     method: "DELETE" | "POST";
     path: string;
     body: unknown;
+    authToken?: string;
     requestErrorCode: string;
     notFoundMessage: string;
     fetchFailedMessage: string;
@@ -2133,7 +2443,7 @@ async function authenticatedSlipwayJsonRequest<T>(
       method: input.method,
       headers: {
         accept: "application/json",
-        authorization: `Bearer ${saved.sessionToken}`,
+        authorization: `Bearer ${input.authToken ?? saved.sessionToken}`,
         "content-type": "application/json"
       },
       body: JSON.stringify(input.body)
