@@ -32,10 +32,12 @@ COMMANDS
   import --github owner/repo:path@ref [--server-fetch] [--publish]
   import --file PATH [--publish]
   list
+  publish APP_REF --yes
   pause APP_REF [--owner OWNER] [--reason TEXT] [--yes]
   resume APP_REF [--owner OWNER] [--reason TEXT] [--yes]
   status APPLICATION_ID
   plans APPLICATION_ID
+  devtools view-key APP_REF DEPLOYMENT_ID
   runtime-image workflow APP_REF [--output PATH]
   deployment import APP_REF --sequence N --origin ADDRESS --yes
   lockbox setup-pr APP_REF --yes

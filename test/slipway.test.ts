@@ -19,6 +19,8 @@ import {
   runSlipwayApplicationLockboxGrantVerify,
   runSlipwayApplicationLockboxSetupPr,
   runSlipwayApplicationPlans,
+  runSlipwayApplicationPublish,
+  runSlipwayApplicationDevtoolsViewKey,
   runSlipwayApplicationRuntimeImageWorkflow,
   runSlipwayApplicationStatus,
   runSlipwayApplicationStatusTransition,
@@ -805,6 +807,20 @@ describe("proof-cli Liskov runner", () => {
 
     const cases = [
       {
+        name: "publish",
+        run: () => runSlipwayApplicationPublish({
+          applicationRef: "alpha",
+          config: sessionFile,
+          json: true,
+          yes: true
+        }, sharedOptions()),
+        expected: {
+          url: "https://slipway.test/api/applications/alpha/publish",
+          method: "POST",
+          body: {}
+        }
+      },
+      {
         name: "deployment import",
         run: () => runSlipwayApplicationDeploymentImport({
           applicationRef: "alpha",
@@ -957,6 +973,7 @@ describe("proof-cli Liskov runner", () => {
       stdout: out.write
     };
     const commands = [
+      runSlipwayApplicationPublish({ applicationRef: "alpha", config: sessionFile, json: true }, options),
       runSlipwayApplicationDeploymentImport({ applicationRef: "alpha", sequence: 1, origin: "5origin", config: sessionFile, json: true }, options),
       runSlipwayApplicationLockboxSetupPr({ applicationRef: "alpha", config: sessionFile, json: true }, options),
       runSlipwayApplicationLockboxDispatch({ applicationRef: "alpha", config: sessionFile, json: true }, options),
@@ -965,8 +982,94 @@ describe("proof-cli Liskov runner", () => {
       runSlipwayApplicationBlackboxConfigure({ applicationRef: "alpha", config: sessionFile, json: true }, options)
     ];
     const codes = await Promise.all(commands);
-    assert.deepEqual(codes, [1, 1, 1, 1, 1, 1]);
+    assert.deepEqual(codes, [1, 1, 1, 1, 1, 1, 1]);
     assert.match(out.text, /CONFIRMATION_REQUIRED/u);
+  });
+
+  it("mints Application DevTools view keys without printing the session token", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_devtools_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const humanOut = writer();
+    const humanCode = await runSlipwayApplicationDevtoolsViewKey({
+      applicationRef: "alpha",
+      deploymentId: "66059",
+      config: sessionFile
+    }, {
+      fetchImpl: async (url: URL | RequestInfo, init?: RequestInit) => {
+        requests.push({
+          url: String(url),
+          method: init?.method,
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
+        });
+        return jsonResponse({
+          ok: true,
+          deploymentId: "66059",
+          jobId: "[\"5origin\",66059]",
+          viewKey: "view-key-secret",
+          expiresAt: "2026-06-20T12:10:00.000Z",
+          devtoolsUrl: "https://devtools.test/deployment/66059?viewKey=view-key-secret"
+        });
+      },
+      stdout: humanOut.write
+    });
+    assert.equal(humanCode, 0);
+    assert.deepEqual(requests[0], {
+      url: "https://slipway.test/api/applications/alpha/live-custody/devtools/view-key",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: { deploymentId: "66059" }
+    });
+    assert.match(humanOut.text, /https:\/\/devtools\.test\/deployment\/66059\?viewKey=view-key-secret/u);
+    assert.match(humanOut.text, /Expires: 2026-06-20T12:10:00\.000Z/u);
+    assert.equal(humanOut.text.includes(token), false);
+
+    const jsonOut = writer();
+    const jsonCode = await runSlipwayApplicationDevtoolsViewKey({
+      applicationRef: "alpha",
+      deploymentId: "66059",
+      accountRef: "live-custody:owner/repo:acurast",
+      config: sessionFile,
+      json: true
+    }, {
+      fetchImpl: async (url: URL | RequestInfo, init?: RequestInit) => {
+        requests.push({
+          url: String(url),
+          method: init?.method,
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
+        });
+        return jsonResponse({
+          ok: true,
+          deploymentId: "66059",
+          viewKey: "json-view-key-secret",
+          expiresAt: "2026-06-20T12:15:00.000Z",
+          devtoolsUrl: "https://devtools.test/deployment/66059?viewKey=json-view-key-secret"
+        });
+      },
+      stdout: jsonOut.write
+    });
+    assert.equal(jsonCode, 0);
+    assert.deepEqual(requests[1], {
+      url: "https://slipway.test/api/applications/alpha/live-custody/devtools/view-key",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: { deploymentId: "66059", accountRef: "live-custody:owner/repo:acurast" }
+    });
+    assert.equal(jsonOut.text.includes(token), false);
+    const parsed = JSON.parse(jsonOut.text) as { ok: boolean; viewKey: string; devtoolsUrl: string };
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.viewKey, "json-view-key-secret");
+    assert.match(parsed.devtoolsUrl, /json-view-key-secret/u);
   });
 
   it("runs live custody commands through saved bearer sessions", async () => {

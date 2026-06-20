@@ -126,6 +126,14 @@ export interface SlipwayApplicationStatusTransitionInput {
   json?: boolean;
 }
 
+export interface SlipwayApplicationPublishInput {
+  applicationRef: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationBackfillIdentitiesInput {
   yes?: boolean;
   slipwayUrl?: string;
@@ -149,6 +157,15 @@ export interface SlipwayGenericResponse {
 
 export interface SlipwayApplicationDeploymentStatusInput {
   applicationRef: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationDevtoolsViewKeyInput {
+  applicationRef: string;
+  deploymentId: string;
+  accountRef?: string;
   slipwayUrl?: string;
   config?: string;
   json?: boolean;
@@ -1104,6 +1121,25 @@ export async function runSlipwayApplicationStatusTransition(input: SlipwayApplic
   return 0;
 }
 
+export async function runSlipwayApplicationPublish(input: SlipwayApplicationPublishInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_PUBLISH_CONFIRMATION_REQUIRED", "Application publish");
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/publish`,
+    body: {},
+    errorCode: "SLIPWAY_APPLICATION_PUBLISH_FAILED",
+    fetchFailedMessage: "could not publish Liskov Application",
+    human: (body) => {
+      const policy = objectRecord(objectRecord(body).policy);
+      const version = stringValue(policy.policyVersionId) ?? stringValue(policy.versionId);
+      return `Published ${version ? `policy ${version}` : "active policy"} for ${input.applicationRef}.`;
+    }
+  }, options);
+}
+
 export async function runSlipwayApplicationPlans(input: SlipwayApplicationPlansInput, options: SlipwayCliOptions = {}): Promise<number> {
   const request = await authenticatedSlipwayRequest<SlipwayApplicationPlansResponse>({
     config: input.config,
@@ -1159,6 +1195,23 @@ export async function runSlipwayApplicationDeploymentStatus(input: SlipwayApplic
   }
   writeStructuredOrHuman(options, input.json, body, `Deployment state for ${input.applicationRef}.`);
   return 0;
+}
+
+export async function runSlipwayApplicationDevtoolsViewKey(input: SlipwayApplicationDevtoolsViewKeyInput, options: SlipwayCliOptions = {}): Promise<number> {
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/devtools/view-key`,
+    body: {
+      deploymentId: input.deploymentId,
+      accountRef: input.accountRef
+    },
+    errorCode: "SLIPWAY_APPLICATION_DEVTOOLS_VIEW_KEY_FAILED",
+    fetchFailedMessage: "could not mint a Liskov Acurast DevTools view key",
+    human: (body) => formatApplicationDevtoolsViewKey(body, input)
+  }, options);
 }
 
 export async function runSlipwayApplicationConsole(input: SlipwayApplicationConsoleInput, options: SlipwayCliOptions = {}): Promise<number> {
@@ -3285,6 +3338,20 @@ function formatApplicationStatusTransition(body: SlipwayApplicationStatusTransit
   return body.changed === false
     ? `${target} is ${already}.`
     : `${verb[0]!.toUpperCase()}${verb.slice(1)} ${target}.`;
+}
+
+function formatApplicationDevtoolsViewKey(body: unknown, input: SlipwayApplicationDevtoolsViewKeyInput): string {
+  const record = objectRecord(body);
+  const deploymentId = stringValue(record.deploymentId) ?? input.deploymentId;
+  const devtoolsUrl = stringValue(record.devtoolsUrl) ?? "unavailable";
+  const expiresAt = stringValue(record.expiresAt) ?? "unknown";
+  const jobId = stringValue(record.jobId);
+  return [
+    `Acurast DevTools view key for ${input.applicationRef} deployment ${deploymentId}.`,
+    `URL: ${devtoolsUrl}`,
+    `Expires: ${expiresAt}`,
+    jobId ? `Job: ${jobId}` : undefined
+  ].filter((line): line is string => line !== undefined).join("\n");
 }
 
 function formatReplacementHoldBlocked(applicationRef: string, body: SlipwayApplicationStatusTransitionResponse): string {

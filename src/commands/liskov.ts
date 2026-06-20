@@ -30,10 +30,12 @@ COMMANDS
   login
   application import --github owner/repo:path@ref [--server-fetch] [--publish]
   application list
+  application publish APP_REF --yes
   application pause APP_REF --yes
   application resume APP_REF --yes
   application status APPLICATION_ID
   application plans APPLICATION_ID
+  application devtools view-key APP_REF DEPLOYMENT_ID
   application runtime-image workflow APP_REF [--output PATH]
   application deployment import APP_REF --sequence N --origin ADDRESS --yes
   application lockbox setup-pr APP_REF --yes

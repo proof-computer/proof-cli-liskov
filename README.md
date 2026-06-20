@@ -9,8 +9,10 @@ proof liskov application import --github proof-computer/docs:.slipway/applicatio
 proof liskov application list
 proof liskov application status proof-docs
 proof liskov application plans proof-docs --json
+proof liskov application publish proof-docs --yes
 proof liskov application pause proof-docs --reason "funding pending" --yes
 proof liskov application resume proof-docs --reason "funded" --yes
+proof liskov application devtools view-key proof-docs 66059 --json
 proof liskov application runtime-image workflow proof-docs
 proof liskov application deployment import proof-docs --sequence 701 --origin 5... --yes
 proof liskov application lockbox setup-pr proof-docs --yes
@@ -51,8 +53,8 @@ do not stop existing Acurast jobs, revoke Lockbox grants, drain routes, or
 spend.
 
 Pause, resume, delete, and identity backfill dry-run by default and require
-`--yes` to mutate. Other mutating Application and custody commands require
-`--yes`; live execution submit also requires `--yes-spend`. The plugin does
+`--yes` to mutate. Publish and other mutating Application and custody commands
+require `--yes`; live execution submit also requires `--yes-spend`. The plugin does
 not expose the old direct manual Acurast spend fallback; diagnostics and
 machine catalog reads stay server-side.
 
