@@ -1,5 +1,13 @@
 # Agent Instructions
 
+> ## ✅ ACTIVE — this is the only CLI for Liskov
+>
+> `proof-cli-liskov` is the **sole, actively-maintained CLI implementation for
+> Liskov**. There is no Rust CLI and no other CLI. It is **TypeScript but not
+> legacy** — do **not** confuse it with the frozen `liskov-ts` reference. "Don't
+> modify the TS codebase" applies to `liskov-ts` only; normal product work
+> belongs here. See the workspace constitution `../../AGENTS.md`.
+
 This private package owns the Slipway plugin for the root `proof` CLI.
 
 - Keep this package private until Slipway is intentionally exposed.
