@@ -614,6 +614,7 @@ interface SlipwayApplicationSetRepositoryResponse {
   to?: SlipwayApplicationRepositoryRefs;
   policy?: { policyVersionId?: string; [key: string]: unknown };
   error?: string;
+  reasonCode?: string;
   reason?: string;
   candidates?: PublicSlipwayApplicationRefCandidate[];
   [key: string]: unknown;
@@ -1184,7 +1185,7 @@ export async function runSlipwayApplicationSetRepository(input: SlipwayApplicati
   const body = request.body;
   if (body?.ok !== true) {
     const ambiguous = body?.error === "ambiguous_application" && Array.isArray(body.candidates);
-    const accessDenied = body?.error === "github_repository_access_denied";
+    const accessDenied = body?.reasonCode === "github_repository_access_denied" || body?.error === "github_repository_access_denied";
     const error = request.response.status === 401
       ? "SLIPWAY_SESSION_UNAUTHORIZED"
       : ambiguous

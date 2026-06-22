@@ -675,7 +675,8 @@ describe("proof-cli Liskov runner", () => {
     }, {
       fetchImpl: async () => jsonResponse({
         ok: false,
-        error: "github_repository_access_denied",
+        error: "forbidden",
+        reasonCode: "github_repository_access_denied",
         reason: "GitHub session does not include the requested repository"
       }, 403),
       stdout: out.write
