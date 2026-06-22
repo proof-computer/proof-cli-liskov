@@ -22,6 +22,7 @@ import {
   runSlipwayApplicationPublish,
   runSlipwayApplicationDevtoolsViewKey,
   runSlipwayApplicationRuntimeImageWorkflow,
+  runSlipwayApplicationSetRepository,
   runSlipwayApplicationStatus,
   runSlipwayApplicationStatusTransition,
   runSlipwayCustodyAccountEnsure,
@@ -532,6 +533,159 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(outputs[1]?.status, "active");
     assert.equal(outputs[1]?.dryRun, false);
     assert.equal(outputs[1]?.application.resumeReason, "funded");
+  });
+
+  it("dry-runs and confirms an Application repository change without printing the bearer token", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_set_repository_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    const options = {
+      fetchImpl: async (url: URL | RequestInfo, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { repository?: string; workflowRef?: string; confirm?: boolean };
+        requests.push({
+          url: String(url),
+          method: init?.method,
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body
+        });
+        return jsonResponse({
+          ok: true,
+          dryRun: body.confirm !== true,
+          changed: true,
+          from: {
+            repository: "proof-computer/slipway-diagnostic",
+            artifactRepository: "proof-computer/slipway-diagnostic",
+            workflowRef: "proof-computer/slipway-diagnostic/.github/workflows/diagnostic-ipfs.yml@refs/heads/main"
+          },
+          to: {
+            repository: body.repository,
+            artifactRepository: body.repository,
+            workflowRef: body.workflowRef ?? `${body.repository}/.github/workflows/diagnostic-ipfs.yml@refs/heads/main`
+          },
+          policy: body.confirm === true ? { policyVersionId: "slipway-diagnostic-v23" } : undefined
+        });
+      },
+      stdout: out.write
+    };
+
+    const dryRunCode = await runSlipwayApplicationSetRepository({
+      applicationRef: "slipway-diagnostic",
+      owner: "5owner",
+      repository: "proof-computer/liskov-diagnostic",
+      config: sessionFile,
+      json: true
+    }, options);
+    const confirmCode = await runSlipwayApplicationSetRepository({
+      applicationRef: "slipway-diagnostic",
+      repository: "proof-computer/liskov-diagnostic",
+      workflowRef: "proof-computer/liskov-diagnostic/.github/workflows/diagnostic-ipfs.yml@refs/heads/main",
+      yes: true,
+      config: sessionFile,
+      json: true
+    }, options);
+
+    assert.equal(dryRunCode, 0);
+    assert.equal(confirmCode, 0);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications/slipway-diagnostic/repository?owner=5owner",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: {
+        repository: "proof-computer/liskov-diagnostic",
+        confirm: false
+      }
+    }, {
+      url: "https://slipway.test/api/applications/slipway-diagnostic/repository",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: {
+        repository: "proof-computer/liskov-diagnostic",
+        workflowRef: "proof-computer/liskov-diagnostic/.github/workflows/diagnostic-ipfs.yml@refs/heads/main",
+        confirm: true
+      }
+    }]);
+    assert.equal(out.text.includes(token), false);
+    const outputs = out.text.trim().split(/\n(?=\{)/u).map((line) => JSON.parse(line) as { ok: boolean; dryRun: boolean; to: { repository: string }; policy?: { policyVersionId?: string } });
+    assert.equal(outputs[0]?.ok, true);
+    assert.equal(outputs[0]?.dryRun, true);
+    assert.equal(outputs[0]?.to.repository, "proof-computer/liskov-diagnostic");
+    assert.equal(outputs[1]?.dryRun, false);
+    assert.equal(outputs[1]?.policy?.policyVersionId, "slipway-diagnostic-v23");
+  });
+
+  it("rejects an invalid repository slug before making any request", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "slipway_invalid_repo_token_do_not_print",
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    let calls = 0;
+    const out = writer();
+    const code = await runSlipwayApplicationSetRepository({
+      applicationRef: "slipway-diagnostic",
+      repository: "not-a-repo",
+      config: sessionFile,
+      json: true
+    }, {
+      fetchImpl: async () => {
+        calls += 1;
+        return jsonResponse({ ok: true });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 1);
+    assert.equal(calls, 0);
+    const parsed = JSON.parse(out.text) as { ok: boolean; error: string };
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.error, "SLIPWAY_SET_REPOSITORY_INVALID");
+  });
+
+  it("surfaces a new-repository access denial as a non-zero exit", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_repo_denied_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const out = writer();
+    const code = await runSlipwayApplicationSetRepository({
+      applicationRef: "slipway-diagnostic",
+      repository: "proof-computer/liskov-diagnostic",
+      yes: true,
+      config: sessionFile,
+      json: true
+    }, {
+      fetchImpl: async () => jsonResponse({
+        ok: false,
+        error: "github_repository_access_denied",
+        reason: "GitHub session does not include the requested repository"
+      }, 403),
+      stdout: out.write
+    });
+
+    assert.equal(code, 1);
+    assert.equal(out.text.includes(token), false);
+    const parsed = JSON.parse(out.text) as { ok: boolean; error: string };
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.error, "SLIPWAY_REPOSITORY_ACCESS_DENIED");
   });
 
   it("prints replacement-hold resume blockers and preserves server JSON", async () => {

@@ -126,6 +126,17 @@ export interface SlipwayApplicationStatusTransitionInput {
   json?: boolean;
 }
 
+export interface SlipwayApplicationSetRepositoryInput {
+  applicationRef: string;
+  repository: string;
+  workflowRef?: string;
+  owner?: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationPublishInput {
   applicationRef: string;
   yes?: boolean;
@@ -583,6 +594,25 @@ interface SlipwayApplicationStatusTransitionResponse {
   application?: PublicSlipwayApplicationSummary;
   replacementHold?: PublicSlipwayReplacementHold;
   overrideRequired?: boolean;
+  error?: string;
+  reason?: string;
+  candidates?: PublicSlipwayApplicationRefCandidate[];
+  [key: string]: unknown;
+}
+
+interface SlipwayApplicationRepositoryRefs {
+  repository?: string | null;
+  artifactRepository?: string | null;
+  workflowRef?: string | null;
+}
+
+interface SlipwayApplicationSetRepositoryResponse {
+  ok?: boolean;
+  dryRun?: boolean;
+  changed?: boolean;
+  from?: SlipwayApplicationRepositoryRefs;
+  to?: SlipwayApplicationRepositoryRefs;
+  policy?: { policyVersionId?: string; [key: string]: unknown };
   error?: string;
   reason?: string;
   candidates?: PublicSlipwayApplicationRefCandidate[];
@@ -1117,6 +1147,71 @@ export async function runSlipwayApplicationStatusTransition(input: SlipwayApplic
     input.json,
     body,
     formatApplicationStatusTransition(body)
+  );
+  return 0;
+}
+
+export async function runSlipwayApplicationSetRepository(input: SlipwayApplicationSetRepositoryInput, options: SlipwayCliOptions = {}): Promise<number> {
+  let repository: string;
+  try {
+    repository = parseRepositorySlug(input.repository);
+  } catch (error) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_SET_REPOSITORY_INVALID",
+      message: errorMessage(error),
+      applicationRef: input.applicationRef
+    }, "Error (SLIPWAY_SET_REPOSITORY_INVALID): repository must be owner/repo.");
+    return 1;
+  }
+  const request = await authenticatedSlipwayJsonRequest<SlipwayApplicationSetRepositoryResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: applicationRepositoryPath(input.applicationRef, input.owner),
+    body: {
+      repository,
+      workflowRef: input.workflowRef,
+      confirm: input.yes === true
+    },
+    requestErrorCode: "SLIPWAY_APPLICATION_SET_REPOSITORY_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not update Liskov Application repository"
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const body = request.body;
+  if (body?.ok !== true) {
+    const ambiguous = body?.error === "ambiguous_application" && Array.isArray(body.candidates);
+    const accessDenied = body?.error === "github_repository_access_denied";
+    const error = request.response.status === 401
+      ? "SLIPWAY_SESSION_UNAUTHORIZED"
+      : ambiguous
+        ? "SLIPWAY_APPLICATION_AMBIGUOUS"
+        : accessDenied
+          ? "SLIPWAY_REPOSITORY_ACCESS_DENIED"
+          : "SLIPWAY_APPLICATION_SET_REPOSITORY_FAILED";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      reason: body?.reason ?? body?.error,
+      applicationRef: input.applicationRef,
+      candidates: body?.candidates,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, ambiguous
+      ? formatApplicationAmbiguity(input.applicationRef, body!.candidates!)
+      : `Error (${error}): Liskov could not update Application ${input.applicationRef} repository.`);
+    return 1;
+  }
+
+  writeStructuredOrHuman(
+    options,
+    input.json,
+    body,
+    formatApplicationSetRepository(input.applicationRef, body)
   );
   return 0;
 }
@@ -3142,6 +3237,21 @@ function applicationStatusPath(applicationRef: string, owner: string | undefined
   return `${pathValue}?${query.toString()}`;
 }
 
+function applicationRepositoryPath(applicationRef: string, owner: string | undefined): string {
+  const pathValue = `/api/applications/${encodeURIComponent(applicationRef)}/repository`;
+  if (!owner || !owner.trim()) return pathValue;
+  const query = new URLSearchParams({ owner: owner.trim() });
+  return `${pathValue}?${query.toString()}`;
+}
+
+function parseRepositorySlug(value: string): string {
+  const repository = value.trim();
+  if (!/^[^/\s]+\/[^/\s]+$/u.test(repository)) {
+    throw new Error("repository must be owner/repo");
+  }
+  return repository;
+}
+
 function normalizeNetworkFlag(value: SlipwayAcurastNetworkFlag | undefined): "mainnet" | "canary" {
   if (value === undefined || value === "mainnet") return "mainnet";
   if (value === "testnet" || value === "canary") return "canary";
@@ -3338,6 +3448,25 @@ function formatApplicationStatusTransition(body: SlipwayApplicationStatusTransit
   return body.changed === false
     ? `${target} is ${already}.`
     : `${verb[0]!.toUpperCase()}${verb.slice(1)} ${target}.`;
+}
+
+function formatApplicationSetRepository(applicationRef: string, body: SlipwayApplicationSetRepositoryResponse): string {
+  const to = body.to?.repository ?? "(unknown)";
+  const from = body.from?.repository ?? "(unknown)";
+  if (body.changed === false) {
+    return body.dryRun === true
+      ? `Dry run: ${applicationRef} repository is already ${to}.`
+      : `${applicationRef} repository is already ${to}.`;
+  }
+  if (body.dryRun === true) {
+    return `Dry run: ${applicationRef} repository would move ${from} → ${to}.`;
+  }
+  const version = body.policy?.policyVersionId;
+  const suffix = version ? ` (policy ${version})` : "";
+  return [
+    `Moved ${applicationRef} repository to ${to}${suffix}.`,
+    "Remember to update and commit the repository's .liskov policy file so re-imports stay consistent."
+  ].join("\n");
 }
 
 function formatApplicationDevtoolsViewKey(body: unknown, input: SlipwayApplicationDevtoolsViewKeyInput): string {
