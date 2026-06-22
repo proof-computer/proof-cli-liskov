@@ -21,6 +21,7 @@ import {
   runSlipwayApplicationPlans,
   runSlipwayApplicationPublish,
   runSlipwayApplicationDevtoolsViewKey,
+  runSlipwayApplicationRename,
   runSlipwayApplicationRuntimeImageWorkflow,
   runSlipwayApplicationSetRepository,
   runSlipwayApplicationStatus,
@@ -435,8 +436,9 @@ describe("proof-cli Liskov runner", () => {
     }]);
     assert.equal(out.text.includes(token), false);
     assert.match(out.text, /SLIPWAY_APPLICATION_AMBIGUOUS/u);
-    assert.match(out.text, /shared-a \(legacy shared\)/u);
-    assert.match(out.text, /owner 5owner-a/u);
+    // Label is the slug only — the internal applicationId codename is no longer surfaced.
+    assert.match(out.text, /shared-a \(owner 5owner-a/u);
+    assert.doesNotMatch(out.text, /legacy shared/u);
     assert.match(out.text, /Use an Application uid\/name/u);
   });
 
@@ -687,6 +689,113 @@ describe("proof-cli Liskov runner", () => {
     const parsed = JSON.parse(out.text) as { ok: boolean; error: string };
     assert.equal(parsed.ok, false);
     assert.equal(parsed.error, "SLIPWAY_REPOSITORY_ACCESS_DENIED");
+  });
+
+  it("dry-runs and confirms an Application rename without printing the bearer token", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_rename_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    const options = {
+      fetchImpl: async (url: URL | RequestInfo, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { displayName?: string; confirm?: boolean };
+        requests.push({
+          url: String(url),
+          method: init?.method,
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body
+        });
+        return jsonResponse({
+          ok: true,
+          dryRun: body.confirm !== true,
+          changed: true,
+          from: { displayName: "Slipway diagnostic", applicationName: "slipway-diagnostic" },
+          to: {
+            displayName: body.displayName,
+            applicationName: "liskov-diagnostic",
+            expectedPolicyPath: ".liskov/liskov-diagnostic.policy.json"
+          },
+          policy: body.confirm === true ? { policyVersionId: "slipway-diagnostic-v23" } : undefined
+        });
+      },
+      stdout: out.write
+    };
+
+    const dryRunCode = await runSlipwayApplicationRename({
+      applicationRef: "slipway-diagnostic",
+      owner: "5owner",
+      displayName: "Liskov Diagnostic",
+      config: sessionFile,
+      json: true
+    }, options);
+    const confirmCode = await runSlipwayApplicationRename({
+      applicationRef: "slipway-diagnostic",
+      displayName: "Liskov Diagnostic",
+      yes: true,
+      config: sessionFile,
+      json: true
+    }, options);
+
+    assert.equal(dryRunCode, 0);
+    assert.equal(confirmCode, 0);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications/slipway-diagnostic/rename?owner=5owner",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: { displayName: "Liskov Diagnostic", confirm: false }
+    }, {
+      url: "https://slipway.test/api/applications/slipway-diagnostic/rename",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: { displayName: "Liskov Diagnostic", confirm: true }
+    }]);
+    assert.equal(out.text.includes(token), false);
+    const outputs = out.text.trim().split(/\n(?=\{)/u).map((line) => JSON.parse(line) as { ok: boolean; dryRun: boolean; to: { applicationName: string }; policy?: { policyVersionId?: string } });
+    assert.equal(outputs[0]?.ok, true);
+    assert.equal(outputs[0]?.dryRun, true);
+    assert.equal(outputs[0]?.to.applicationName, "liskov-diagnostic");
+    assert.equal(outputs[1]?.dryRun, false);
+    assert.equal(outputs[1]?.policy?.policyVersionId, "slipway-diagnostic-v23");
+  });
+
+  it("rejects an empty rename display name before making any request", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "slipway_rename_invalid_token_do_not_print",
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    let calls = 0;
+    const out = writer();
+    const code = await runSlipwayApplicationRename({
+      applicationRef: "slipway-diagnostic",
+      displayName: "   ",
+      config: sessionFile,
+      json: true
+    }, {
+      fetchImpl: async () => {
+        calls += 1;
+        return jsonResponse({ ok: true });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 1);
+    assert.equal(calls, 0);
+    const parsed = JSON.parse(out.text) as { ok: boolean; error: string };
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.error, "SLIPWAY_RENAME_INVALID");
   });
 
   it("prints replacement-hold resume blockers and preserves server JSON", async () => {

@@ -137,6 +137,16 @@ export interface SlipwayApplicationSetRepositoryInput {
   json?: boolean;
 }
 
+export interface SlipwayApplicationRenameInput {
+  applicationRef: string;
+  displayName: string;
+  owner?: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationPublishInput {
   applicationRef: string;
   yes?: boolean;
@@ -615,6 +625,25 @@ interface SlipwayApplicationSetRepositoryResponse {
   policy?: { policyVersionId?: string; [key: string]: unknown };
   error?: string;
   reasonCode?: string;
+  reason?: string;
+  candidates?: PublicSlipwayApplicationRefCandidate[];
+  [key: string]: unknown;
+}
+
+interface SlipwayApplicationRenameRefs {
+  displayName?: string | null;
+  applicationName?: string | null;
+  expectedPolicyPath?: string | null;
+}
+
+interface SlipwayApplicationRenameResponse {
+  ok?: boolean;
+  dryRun?: boolean;
+  changed?: boolean;
+  from?: SlipwayApplicationRenameRefs;
+  to?: SlipwayApplicationRenameRefs;
+  policy?: { policyVersionId?: string; [key: string]: unknown };
+  error?: string;
   reason?: string;
   candidates?: PublicSlipwayApplicationRefCandidate[];
   [key: string]: unknown;
@@ -1213,6 +1242,65 @@ export async function runSlipwayApplicationSetRepository(input: SlipwayApplicati
     input.json,
     body,
     formatApplicationSetRepository(input.applicationRef, body)
+  );
+  return 0;
+}
+
+export async function runSlipwayApplicationRename(input: SlipwayApplicationRenameInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const displayName = (input.displayName ?? "").trim();
+  if (!displayName) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_RENAME_INVALID",
+      message: "displayName must not be empty",
+      applicationRef: input.applicationRef
+    }, "Error (SLIPWAY_RENAME_INVALID): a non-empty display name is required.");
+    return 1;
+  }
+  const request = await authenticatedSlipwayJsonRequest<SlipwayApplicationRenameResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: applicationRenamePath(input.applicationRef, input.owner),
+    body: {
+      displayName,
+      confirm: input.yes === true
+    },
+    requestErrorCode: "SLIPWAY_APPLICATION_RENAME_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not rename Liskov Application"
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const body = request.body;
+  if (body?.ok !== true) {
+    const ambiguous = body?.error === "ambiguous_application" && Array.isArray(body.candidates);
+    const error = request.response.status === 401
+      ? "SLIPWAY_SESSION_UNAUTHORIZED"
+      : ambiguous
+        ? "SLIPWAY_APPLICATION_AMBIGUOUS"
+        : "SLIPWAY_APPLICATION_RENAME_FAILED";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      reason: body?.reason ?? body?.error,
+      applicationRef: input.applicationRef,
+      candidates: body?.candidates,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, ambiguous
+      ? formatApplicationAmbiguity(input.applicationRef, body!.candidates!)
+      : `Error (${error}): Liskov could not rename Application ${input.applicationRef}.`);
+    return 1;
+  }
+
+  writeStructuredOrHuman(
+    options,
+    input.json,
+    body,
+    formatApplicationRename(input.applicationRef, body)
   );
   return 0;
 }
@@ -3253,6 +3341,13 @@ function parseRepositorySlug(value: string): string {
   return repository;
 }
 
+function applicationRenamePath(applicationRef: string, owner: string | undefined): string {
+  const pathValue = `/api/applications/${encodeURIComponent(applicationRef)}/rename`;
+  if (!owner || !owner.trim()) return pathValue;
+  const query = new URLSearchParams({ owner: owner.trim() });
+  return `${pathValue}?${query.toString()}`;
+}
+
 function normalizeNetworkFlag(value: SlipwayAcurastNetworkFlag | undefined): "mainnet" | "canary" {
   if (value === undefined || value === "mainnet") return "mainnet";
   if (value === "testnet" || value === "canary") return "canary";
@@ -3470,6 +3565,27 @@ function formatApplicationSetRepository(applicationRef: string, body: SlipwayApp
   ].join("\n");
 }
 
+function formatApplicationRename(applicationRef: string, body: SlipwayApplicationRenameResponse): string {
+  const toName = body.to?.displayName ?? "(unknown)";
+  const fromName = body.from?.displayName ?? "(unknown)";
+  const slug = body.to?.applicationName ?? undefined;
+  const policyPath = body.to?.expectedPolicyPath ?? (slug ? `.liskov/${slug}.policy.json` : undefined);
+  if (body.changed === false) {
+    return body.dryRun === true
+      ? `Dry run: ${applicationRef} is already named "${toName}".`
+      : `${applicationRef} is already named "${toName}".`;
+  }
+  if (body.dryRun === true) {
+    const lines = [`Dry run: ${applicationRef} would be renamed "${fromName}" → "${toName}"${slug ? ` (slug ${slug})` : ""}.`];
+    if (policyPath) lines.push(`Then rename the repo policy file to ${policyPath}, update its source.path, and re-import.`);
+    return lines.join("\n");
+  }
+  const version = body.policy?.policyVersionId;
+  const lines = [`Renamed ${applicationRef} to "${toName}"${slug ? ` (slug ${slug})` : ""}${version ? ` (policy ${version})` : ""}.`];
+  if (policyPath) lines.push(`Now rename the repo policy file to ${policyPath}, update its source.path, commit, and re-import.`);
+  return lines.join("\n");
+}
+
 function formatApplicationDevtoolsViewKey(body: unknown, input: SlipwayApplicationDevtoolsViewKeyInput): string {
   const record = objectRecord(body);
   const deploymentId = stringValue(record.deploymentId) ?? input.deploymentId;
@@ -3533,9 +3649,9 @@ function formatApplicationLabel(
   application: Pick<PublicSlipwayApplicationSummary, "applicationUid" | "applicationName" | "applicationId"> | undefined,
   fallbackApplicationId = "unknown"
 ): string {
-  const primary = application?.applicationName ?? application?.applicationUid ?? application?.applicationId ?? fallbackApplicationId;
-  const legacy = application?.applicationId;
-  return legacy && legacy !== primary ? `${primary} (legacy ${legacy})` : primary;
+  // Label by the user-facing slug (or uid); never surface the internal
+  // applicationId codename (it would re-leak after a rename).
+  return application?.applicationName ?? application?.applicationUid ?? application?.applicationId ?? fallbackApplicationId;
 }
 
 function formatLockboxGrantStatus(body: SlipwayApplicationLockboxGrantStatusResponse, fallbackApplicationId: string): string {
