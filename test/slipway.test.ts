@@ -1037,7 +1037,11 @@ describe("proof-cli Liskov runner", () => {
         ok: true,
         selectedDeploymentId: "dep-failed",
         deployments: [{ deploymentId: "dep-failed" }],
-        deployment: { state: "failed_offline", stateLabel: "Signer offline" },
+        deployment: {
+          state: "failed_offline",
+          stateLabel: "Signer offline",
+          summary: "Fund the self-custody address with enough ACU to cover the deployment reward and transaction fee buffer, then retry."
+        },
         selfCustodySigner: {
           status: "failed_offline",
           address: "5C62Ck4UrFPiBtoCmeSrgF7x9yv9mn38446dhCpsi2mLHiFT",
@@ -1050,6 +1054,7 @@ describe("proof-cli Liskov runner", () => {
 
     assert.equal(failedCode, 0);
     assert.match(failedOut.text, /Deployment state for alpha: Signer offline \(dep-failed\)\./u);
+    assert.match(failedOut.text, /Fund the self-custody address/u);
     assert.match(failedOut.text, /signer failed offline/u);
     assert.match(failedOut.text, /start the signer daemon and retry/u);
     assert.equal(failedOut.text.includes(token), false);

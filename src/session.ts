@@ -3585,6 +3585,8 @@ function formatApplicationDeploymentStatus(body: SlipwayGenericResponse, fallbac
   const count = arrayValue(record.deployments).length;
   const suffix = selected ? ` (${selected})` : count > 0 ? ` (${count} generation${count === 1 ? "" : "s"})` : "";
   const lines = [`Deployment state for ${fallbackApplicationId}: ${state}${suffix}.`];
+  const summary = stringValue(deployment.summary);
+  if (summary) lines.push(summary);
   const signer = formatSelfCustodySigner(record.selfCustodySigner);
   if (signer) lines.push(signer);
   return lines.join("\n");
