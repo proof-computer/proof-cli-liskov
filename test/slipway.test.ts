@@ -36,6 +36,7 @@ import {
   runSlipwayCustodyExecutionRunOne,
   runSlipwayCustodyExecutionSubmit,
   runSlipwayCustodyMachineCatalog,
+  runSlipwayCustodyPair,
   runSlipwayCustodyPreflight,
   runSlipwayLogin,
   runSlipwayLogout,
@@ -1334,6 +1335,66 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.ok, true);
     assert.equal(parsed.viewKey, "json-view-key-secret");
     assert.match(parsed.devtoolsUrl, /json-view-key-secret/u);
+  });
+
+  it("issues a self-custody signer pairing token without printing the session bearer", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_pair_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    const code = await runSlipwayCustodyPair({
+      applicationRef: "proof-docs",
+      config: sessionFile,
+      json: true
+    }, {
+      fetchImpl: async (url: URL | RequestInfo, init?: RequestInit) => {
+        requests.push({
+          url: String(url),
+          method: init?.method,
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
+        });
+        return jsonResponse({
+          ok: true,
+          pairingToken: "lsk_pair_secret_for_signer",
+          organizationId: "org-1",
+          applicationId: "app-1",
+          expiresAtMs: 1_750_000_030_000,
+          websocketPath: "/api/custody/signer?pairingToken=lsk_pair_secret_for_signer",
+          protocolVersion: 1
+        });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications/proof-docs/custody/signer/pairing-token",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: {}
+    }]);
+    assert.equal(out.text.includes(token), false);
+    const parsed = JSON.parse(out.text) as {
+      ok: boolean;
+      pairingToken: string;
+      controlPlaneUrl: string;
+      websocketUrl: string;
+      signerCommand: string;
+    };
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.pairingToken, "lsk_pair_secret_for_signer");
+    assert.equal(parsed.controlPlaneUrl, "wss://slipway.test/api/custody/signer");
+    assert.equal(parsed.websocketUrl, "wss://slipway.test/api/custody/signer?pairingToken=lsk_pair_secret_for_signer");
+    assert.match(parsed.signerCommand, /liskov-self-custody-signer --control-plane-url 'wss:\/\/slipway\.test\/api\/custody\/signer' --pairing-token 'lsk_pair_secret_for_signer'/u);
   });
 
   it("runs live custody commands through saved bearer sessions", async () => {

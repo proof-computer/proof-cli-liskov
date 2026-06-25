@@ -364,6 +364,13 @@ export interface SlipwayCustodyPreflightInput {
   json?: boolean;
 }
 
+export interface SlipwayCustodyPairInput {
+  applicationRef: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayCustodyEnvironmentUploadInput {
   applicationRef: string;
   secretsFile: string;
@@ -740,6 +747,19 @@ interface SlipwayApplicationImportResponse {
 
 interface SlipwayLiveCustodyCommandResponse {
   ok?: boolean;
+  error?: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+interface SlipwayCustodyPairingTokenResponse {
+  ok?: boolean;
+  pairingToken?: string;
+  organizationId?: string;
+  applicationId?: string;
+  expiresAtMs?: number;
+  websocketPath?: string;
+  protocolVersion?: number;
   error?: string;
   reason?: string;
   [key: string]: unknown;
@@ -1967,6 +1987,60 @@ export async function runSlipwayCustodyPreflight(input: SlipwayCustodyPreflightI
     },
     options
   });
+}
+
+export async function runSlipwayCustodyPair(input: SlipwayCustodyPairInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayJsonRequest<SlipwayCustodyPairingTokenResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/custody/signer/pairing-token`,
+    body: {},
+    requestErrorCode: "SLIPWAY_CUSTODY_PAIR_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not issue Liskov self-custody signer pairing token"
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const body = request.body;
+  const pairingToken = stringValue(body?.pairingToken);
+  if (!request.response.ok || body?.ok !== true || !pairingToken) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_CUSTODY_PAIR_FAILED";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      reason: body?.reason ?? body?.error,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, `Error (${error}): Liskov could not issue a self-custody signer pairing token.`);
+    return 1;
+  }
+
+  const controlPlaneUrl = signerControlPlaneUrl(request.slipwayUrl);
+  const websocketUrl = signerWebsocketUrl(request.slipwayUrl, body.websocketPath, pairingToken);
+  const signerCommand = `liskov-self-custody-signer --control-plane-url ${shellQuote(controlPlaneUrl)} --pairing-token ${shellQuote(pairingToken)}`;
+  const output = {
+    ...body,
+    controlPlaneUrl,
+    websocketUrl,
+    signerCommand
+  };
+  const expiresAtMs = numberValue(body.expiresAtMs);
+  const expiresAt = expiresAtMs === undefined ? "unknown" : new Date(expiresAtMs).toISOString();
+  writeStructuredOrHuman(
+    options,
+    input.json,
+    output,
+    [
+      `Issued self-custody signer pairing token for ${stringValue(body.applicationId) ?? input.applicationRef}.`,
+      `Control plane: ${controlPlaneUrl}`,
+      `Expires at: ${expiresAt}`,
+      `Run signer: ${signerCommand}`
+    ].join("\n")
+  );
+  return 0;
 }
 
 export async function runSlipwayCustodyEnvironmentUpload(input: SlipwayCustodyEnvironmentUploadInput, options: SlipwayCliOptions = {}): Promise<number> {
@@ -3211,6 +3285,28 @@ function normalizeBaseUrl(value: string): string {
   url.hash = "";
   url.search = "";
   return url.toString().replace(/\/+$/u, "");
+}
+
+function signerControlPlaneUrl(slipwayUrl: string): string {
+  return websocketUrl(new URL("/api/custody/signer", slipwayUrl));
+}
+
+function signerWebsocketUrl(slipwayUrl: string, websocketPath: string | undefined, pairingToken: string): string {
+  const path = stringValue(websocketPath) ?? "/api/custody/signer";
+  const url = new URL(path, slipwayUrl);
+  if (!url.searchParams.has("pairingToken")) url.searchParams.set("pairingToken", pairingToken);
+  return websocketUrl(url);
+}
+
+function websocketUrl(url: URL): string {
+  if (url.protocol === "https:") url.protocol = "wss:";
+  else if (url.protocol === "http:") url.protocol = "ws:";
+  else throw new Error("Liskov URL must use http or https");
+  return url.toString();
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/gu, "'\\''")}'`;
 }
 
 function resolveVerificationUrl(value: string, slipwayUrl: string): string {
