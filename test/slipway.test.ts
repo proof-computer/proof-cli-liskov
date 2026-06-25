@@ -11,6 +11,7 @@ import {
   runSlipwayApplicationBlackboxConfigure,
   runSlipwayApplicationDelete,
   runSlipwayApplicationDeploymentImport,
+  runSlipwayApplicationDeploymentStatus,
   runSlipwayApplicationImport,
   runSlipwayApplicationList,
   runSlipwayApplicationLockboxDispatch,
@@ -944,6 +945,114 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.application.applicationId, "alpha");
     assert.equal(parsed.application.status, "active");
     assert.equal(parsed.observed.missingReplicas, 1);
+  });
+
+  it("prints self-custody signer state in Application status human output without token leakage", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_status_human_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const out = writer();
+    const code = await runSlipwayApplicationStatus({
+      applicationId: "alpha",
+      config: sessionFile
+    }, {
+      fetchImpl: async () => jsonResponse({
+        ok: true,
+        application: {
+          applicationId: "alpha",
+          status: "active",
+          source: { repository: "proof-computer/alpha" }
+        },
+        activePolicy: { policyVersionId: "alpha-v2", status: "active" },
+        selfCustodySigner: {
+          status: "online",
+          address: "5C62Ck4UrFPiBtoCmeSrgF7x9yv9mn38446dhCpsi2mLHiFT",
+          connected: true,
+          pendingRequestCount: 0,
+          message: "Self-custody signer is online.",
+          pairingToken: "lsk_pair_secret_should_not_print"
+        }
+      }),
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.match(out.text, /alpha: active/u);
+    assert.match(out.text, /signer online 5C62Ck4U…2mLHiFT/u);
+    assert.equal(out.text.includes(token), false);
+    assert.equal(out.text.includes("lsk_pair_secret_should_not_print"), false);
+  });
+
+  it("prints waiting and failed-offline signer state in deployment status human output", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_deploy_status_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const waitingOut = writer();
+    const waitingCode = await runSlipwayApplicationDeploymentStatus({
+      applicationRef: "alpha",
+      config: sessionFile
+    }, {
+      fetchImpl: async () => jsonResponse({
+        ok: true,
+        selectedDeploymentId: "dep-waiting",
+        deployments: [{ deploymentId: "dep-waiting" }],
+        deployment: { state: "waiting_for_signer", stateLabel: "Waiting for signer" },
+        selfCustodySigner: {
+          status: "waiting_for_signer",
+          address: "5C62Ck4UrFPiBtoCmeSrgF7x9yv9mn38446dhCpsi2mLHiFT",
+          pendingRequestCount: 1,
+          message: "Waiting for the self-custody signer to reconnect before deploying.",
+          websocketPath: "/api/custody/signer?pairingToken=lsk_pair_secret_should_not_print"
+        }
+      }),
+      stdout: waitingOut.write
+    });
+
+    assert.equal(waitingCode, 0);
+    assert.match(waitingOut.text, /Deployment state for alpha: Waiting for signer \(dep-waiting\)\./u);
+    assert.match(waitingOut.text, /signer waiting for signer 5C62Ck4U…2mLHiFT, 1 pending/u);
+    assert.equal(waitingOut.text.includes(token), false);
+    assert.equal(waitingOut.text.includes("lsk_pair_secret_should_not_print"), false);
+
+    const failedOut = writer();
+    const failedCode = await runSlipwayApplicationDeploymentStatus({
+      applicationRef: "alpha",
+      config: sessionFile
+    }, {
+      fetchImpl: async () => jsonResponse({
+        ok: true,
+        selectedDeploymentId: "dep-failed",
+        deployments: [{ deploymentId: "dep-failed" }],
+        deployment: { state: "failed_offline", stateLabel: "Signer offline" },
+        selfCustodySigner: {
+          status: "failed_offline",
+          address: "5C62Ck4UrFPiBtoCmeSrgF7x9yv9mn38446dhCpsi2mLHiFT",
+          pendingRequestCount: 0,
+          message: "Self-custody signer was offline for 5 minutes; start the signer daemon and retry the deployment."
+        }
+      }),
+      stdout: failedOut.write
+    });
+
+    assert.equal(failedCode, 0);
+    assert.match(failedOut.text, /Deployment state for alpha: Signer offline \(dep-failed\)\./u);
+    assert.match(failedOut.text, /signer failed offline/u);
+    assert.match(failedOut.text, /start the signer daemon and retry/u);
+    assert.equal(failedOut.text.includes(token), false);
   });
 
   it("reads Application plans with the stored session bearer without printing it", async () => {

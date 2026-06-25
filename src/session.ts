@@ -560,6 +560,17 @@ interface SlipwayApplicationDeleteBlocker {
   count?: number;
 }
 
+interface PublicSelfCustodySigner {
+  status?: string;
+  address?: string | null;
+  connected?: boolean;
+  pendingRequestCount?: number;
+  offlineTtlMs?: number;
+  offlineDeadlineAtMs?: number | null;
+  message?: string;
+  [key: string]: unknown;
+}
+
 interface SlipwayApplicationStatusResponse {
   ok?: boolean;
   application?: PublicSlipwayApplicationSummary;
@@ -575,6 +586,7 @@ interface SlipwayApplicationStatusResponse {
     scheduledReplicas?: number;
     missingReplicas?: number;
   };
+  selfCustodySigner?: PublicSelfCustodySigner;
   error?: string;
   reason?: string;
   [key: string]: unknown;
@@ -1397,7 +1409,7 @@ export async function runSlipwayApplicationDeploymentStatus(input: SlipwayApplic
     writeStructuredOrHuman(options, input.json, { ok: false, error, status: request.response.status, reason: body?.reason ?? body?.error, applicationRef: input.applicationRef, slipwayUrl: request.slipwayUrl, sessionFile: request.sessionFile }, `Error (${error}): Liskov could not read the deployment status for Application ${input.applicationRef}.`);
     return 1;
   }
-  writeStructuredOrHuman(options, input.json, body, `Deployment state for ${input.applicationRef}.`);
+  writeStructuredOrHuman(options, input.json, body, formatApplicationDeploymentStatus(body, input.applicationRef));
   return 0;
 }
 
@@ -3561,7 +3573,55 @@ function formatApplicationStatus(body: SlipwayApplicationStatusResponse, fallbac
   const policy = body.activePolicy?.policyVersionId ? `; policy ${body.activePolicy.policyVersionId}` : "";
   const repository = app?.source?.repository ? `; repo ${app.source.repository}` : "";
   const deleted = typeof app?.deletedAtMs === "number" ? `; deleted ${new Date(app.deletedAtMs).toISOString()}` : "";
-  return `${applicationId}: ${status}${replicaSummary ? ` (${replicaSummary})` : ""}${policy}${repository}${deleted}`;
+  const signer = formatSelfCustodySigner(body.selfCustodySigner);
+  return `${applicationId}: ${status}${replicaSummary ? ` (${replicaSummary})` : ""}${policy}${repository}${deleted}${signer ? `; ${signer}` : ""}`;
+}
+
+function formatApplicationDeploymentStatus(body: SlipwayGenericResponse, fallbackApplicationId: string): string {
+  const record = objectRecord(body);
+  const deployment = objectRecord(record.deployment);
+  const state = stringValue(deployment.stateLabel) ?? stringValue(deployment.state) ?? "unknown";
+  const selected = stringValue(record.selectedDeploymentId);
+  const count = arrayValue(record.deployments).length;
+  const suffix = selected ? ` (${selected})` : count > 0 ? ` (${count} generation${count === 1 ? "" : "s"})` : "";
+  const lines = [`Deployment state for ${fallbackApplicationId}: ${state}${suffix}.`];
+  const signer = formatSelfCustodySigner(record.selfCustodySigner);
+  if (signer) lines.push(signer);
+  return lines.join("\n");
+}
+
+function formatSelfCustodySigner(value: unknown): string | undefined {
+  const signer = objectRecord(value);
+  const status = stringValue(signer.status);
+  const address = stringValue(signer.address);
+  if ((!status || status === "not_configured") && !address) return undefined;
+  const pending = numberValue(signer.pendingRequestCount);
+  const message = stringValue(signer.message);
+  const label = signerStatusLabel(status);
+  const addressPart = address ? ` ${compactSignerAddress(address)}` : "";
+  const pendingPart = pending && pending > 0 ? `, ${pending} pending` : "";
+  const messagePart = message ? `: ${message}` : "";
+  return `signer ${label}${addressPart}${pendingPart}${messagePart}`;
+}
+
+function signerStatusLabel(status: string | undefined): string {
+  switch (status) {
+    case "online":
+      return "online";
+    case "waiting_for_signer":
+      return "waiting for signer";
+    case "failed_offline":
+      return "failed offline";
+    case "offline":
+      return "offline";
+    default:
+      return status?.replace(/_/gu, " ") ?? "unknown";
+  }
+}
+
+function compactSignerAddress(address: string): string {
+  const trimmed = address.trim();
+  return trimmed.length > 18 ? `${trimmed.slice(0, 8)}…${trimmed.slice(-7)}` : trimmed;
 }
 
 function formatApplicationList(body: SlipwayApplicationListResponse): string {
