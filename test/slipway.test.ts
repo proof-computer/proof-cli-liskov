@@ -9,6 +9,7 @@ import { describe, it } from "node:test";
 import {
   runSlipwayApplicationBackfillIdentities,
   runSlipwayApplicationBlackboxConfigure,
+  runSlipwayApplicationActivity,
   runSlipwayApplicationDelete,
   runSlipwayApplicationDeploymentImport,
   runSlipwayApplicationDeploymentStatus,
@@ -1058,6 +1059,122 @@ describe("proof-cli Liskov runner", () => {
     assert.match(failedOut.text, /signer failed offline/u);
     assert.match(failedOut.text, /start the signer daemon and retry/u);
     assert.equal(failedOut.text.includes(token), false);
+  });
+
+  it("prints self-custody signer activity rows in human output without leaking raw call bytes", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_activity_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const out = writer();
+    const code = await runSlipwayApplicationActivity({
+      applicationRef: "alpha",
+      config: sessionFile
+    }, {
+      fetchImpl: async () => jsonResponse({
+        ok: true,
+        events: [
+          {
+            eventId: "ev-1",
+            kind: "liskov.sign_requested",
+            category: "deploy",
+            summary: "Signature requested — acurast.register.",
+            payload: {
+              requestId: "req-1",
+              operation: "acurast.register",
+              signerAddress: "5C62Ck4UrFPiBtoCmeSrgF7x9yv9mn38446dhCpsi2mLHiFT",
+              callHash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              queued: true,
+              callBytesHex: "0x04010203",
+              pairingToken: "lsk_pair_secret_should_not_print"
+            },
+            createdAtMs: 1_700_000_000_000
+          },
+          {
+            eventId: "ev-2",
+            kind: "liskov.sign_submitted",
+            category: "deploy",
+            summary: "Self-custody signer submitted acurast.register.",
+            payload: {
+              requestId: "req-1",
+              operation: "acurast.register",
+              signerAddress: "5C62Ck4UrFPiBtoCmeSrgF7x9yv9mn38446dhCpsi2mLHiFT",
+              callHash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              txHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            createdAtMs: 1_700_000_001_000
+          },
+          {
+            eventId: "ev-3",
+            kind: "liskov.sign_rejected",
+            category: "hold",
+            summary: "Self-custody signer rejected acurast.setEnvironments — userRejected.",
+            payload: {
+              requestId: "req-2",
+              operation: "acurast.setEnvironments",
+              signerAddress: "5C62Ck4UrFPiBtoCmeSrgF7x9yv9mn38446dhCpsi2mLHiFT",
+              callHash: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              reason: "userRejected",
+              message: "local signer note should not print"
+            },
+            createdAtMs: 1_700_000_002_000
+          }
+        ]
+      }),
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.match(out.text, /3 activity event\(s\) for alpha\./u);
+    assert.match(out.text, /Signature requested — acurast\.register\./u);
+    assert.match(out.text, /Self-custody signer submitted acurast\.register\./u);
+    assert.match(out.text, /Self-custody signer rejected acurast\.setEnvironments — userRejected\./u);
+    assert.match(out.text, /signer 5C62Ck4U…2mLHiFT/u);
+    assert.match(out.text, /call sha256:bbbb/u);
+    assert.equal(out.text.includes(token), false);
+    assert.equal(out.text.includes("0x04010203"), false);
+    assert.equal(out.text.includes("lsk_pair_secret_should_not_print"), false);
+    assert.equal(out.text.includes("local signer note should not print"), false);
+  });
+
+  it("keeps Application activity JSON output as the server response", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_activity_json_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const body = {
+      ok: true,
+      events: [{
+        eventId: "ev-json",
+        kind: "liskov.sign_requested",
+        payload: { requestId: "req-json", callBytesHex: "server-json-is-pass-through" }
+      }]
+    };
+    const out = writer();
+    const code = await runSlipwayApplicationActivity({
+      applicationRef: "alpha",
+      config: sessionFile,
+      json: true
+    }, {
+      fetchImpl: async () => jsonResponse(body),
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.deepEqual(JSON.parse(out.text), body);
+    assert.equal(out.text.includes(token), false);
   });
 
   it("reads Application plans with the stored session bearer without printing it", async () => {

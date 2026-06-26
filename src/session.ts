@@ -1474,7 +1474,7 @@ export async function runSlipwayApplicationActivity(input: SlipwayApplicationAct
   }
   const events = body.events;
   const count = typeof body.count === "number" ? body.count : Array.isArray(events) ? events.length : 0;
-  writeStructuredOrHuman(options, input.json, body, `${count} activity event(s) for ${input.applicationRef}.`);
+  writeStructuredOrHuman(options, input.json, body, formatApplicationActivity(body, input.applicationRef, count));
   return 0;
 }
 
@@ -3590,6 +3590,44 @@ function formatApplicationDeploymentStatus(body: SlipwayGenericResponse, fallbac
   const signer = formatSelfCustodySigner(record.selfCustodySigner);
   if (signer) lines.push(signer);
   return lines.join("\n");
+}
+
+function formatApplicationActivity(body: SlipwayGenericResponse, fallbackApplicationId: string, count: number): string {
+  const events = arrayValue(objectRecord(body).events);
+  const lines = [`${count} activity event(s) for ${fallbackApplicationId}.`];
+  for (const item of events) {
+    const event = objectRecord(item);
+    lines.push(formatActivityEventLine(event));
+  }
+  return lines.join("\n");
+}
+
+function formatActivityEventLine(event: Record<string, unknown>): string {
+  const payload = objectRecord(event.payload);
+  const kind = stringValue(event.kind) ?? "event";
+  const summary = stringValue(event.summary) ?? activitySummaryFromKind(kind, payload) ?? kind;
+  const createdAtMs = numberValue(event.createdAtMs);
+  const when = createdAtMs === undefined ? "" : `${new Date(createdAtMs).toISOString()} `;
+  const details = [
+    stringValue(payload.requestId) ? `request ${stringValue(payload.requestId)}` : undefined,
+    stringValue(payload.signerAddress) ? `signer ${compactSignerAddress(stringValue(payload.signerAddress) as string)}` : undefined,
+    stringValue(payload.txHash) ? `tx ${stringValue(payload.txHash)}` : undefined,
+    stringValue(payload.callHash) ? `call ${stringValue(payload.callHash)}` : undefined
+  ].filter((item): item is string => item !== undefined);
+  return `- ${when}${summary}${details.length > 0 ? ` (${details.join(", ")})` : ""}`;
+}
+
+function activitySummaryFromKind(kind: string, payload: Record<string, unknown>): string | undefined {
+  const operation = stringValue(payload.operation) ?? "signature";
+  if (kind === "liskov.sign_requested") return `Signature requested — ${operation}.`;
+  if (kind === "liskov.sign_submitted") return `Self-custody signer submitted ${operation}.`;
+  if (kind === "liskov.sign_rejected") {
+    const reason = stringValue(payload.reason);
+    return reason
+      ? `Self-custody signer rejected ${operation} — ${reason}.`
+      : `Self-custody signer rejected ${operation}.`;
+  }
+  return undefined;
 }
 
 function formatSelfCustodySigner(value: unknown): string | undefined {
