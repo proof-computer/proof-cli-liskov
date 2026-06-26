@@ -35,6 +35,8 @@ COMMANDS
   application resume APP_REF --yes
   application status APPLICATION_ID
   application plans APPLICATION_ID
+  application action-plan APP_REF
+  application action-plan retry APP_REF --decision-id ID --reason TEXT --yes
   application devtools view-key APP_REF DEPLOYMENT_ID
   application runtime-image workflow APP_REF [--output PATH]
   application deployment import APP_REF --sequence N --origin ADDRESS --yes
@@ -54,6 +56,7 @@ COMMANDS
   custody execution observe APP_REF --execution-id ID
   custody execution diagnose APP_REF --execution-id ID
   custody execution recover APP_REF --execution-id ID --reason TEXT --yes
+  custody execution retry APP_REF --execution-id ID --reason TEXT --yes
   custody child recover APP_REF --child-session-id ID --reason TEXT --yes
   custody machine catalog
   whoami

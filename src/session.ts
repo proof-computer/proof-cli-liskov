@@ -215,6 +215,16 @@ export interface SlipwayApplicationActionPlanInput {
   json?: boolean;
 }
 
+export interface SlipwayApplicationActionPlanRetryInput {
+  applicationRef: string;
+  decisionId: string;
+  reason: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationArtifactPinListInput {
   applicationRef: string;
   slipwayUrl?: string;
@@ -442,6 +452,17 @@ export interface SlipwayCustodyExecutionDiagnoseInput {
 }
 
 export interface SlipwayCustodyExecutionRecoverInput {
+  applicationRef: string;
+  executionId: string;
+  reason: string;
+  mode?: "review" | "retry" | "abandon";
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayCustodyExecutionRetryInput {
   applicationRef: string;
   executionId: string;
   reason: string;
@@ -1499,6 +1520,26 @@ export async function runSlipwayApplicationActionPlan(input: SlipwayApplicationA
   return 0;
 }
 
+export async function runSlipwayApplicationActionPlanRetry(input: SlipwayApplicationActionPlanRetryInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_ACTION_PLAN_RETRY_CONFIRMATION_REQUIRED", "application action-plan retry");
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/action-plan/decisions/${encodeURIComponent(input.decisionId)}`,
+    body: { action: "retry_all", acknowledgement: "operator-reviewed", reason: input.reason },
+    errorCode: "SLIPWAY_APPLICATION_ACTION_PLAN_RETRY_FAILED",
+    fetchFailedMessage: "could not retry Liskov Application action-plan decision",
+    human: (body) => {
+      const record = objectRecord(body);
+      const affected = numberValue(record.affectedReplicaCount) ?? numberValue(record.affectedDeploymentCount);
+      const suffix = affected === undefined ? "" : ` (${affected} affected)`;
+      return `Retried action-plan decision ${stringValue(record.decisionId) ?? input.decisionId} for ${input.applicationRef}${suffix}.`;
+    }
+  }, options);
+}
+
 export async function runSlipwayApplicationArtifactPinList(input: SlipwayApplicationArtifactPinListInput, options: SlipwayCliOptions = {}): Promise<number> {
   const request = await authenticatedSlipwayRequest<SlipwayGenericResponse>({
     config: input.config,
@@ -2309,12 +2350,30 @@ export async function runSlipwayCustodyExecutionRecover(input: SlipwayCustodyExe
     json: input.json,
     method: "POST",
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions/${encodeURIComponent(input.executionId)}/recover`,
-    body: { yesRecover: true, acknowledgement: "operator-reviewed", reason: input.reason },
+    body: { yesRecover: true, acknowledgement: "operator-reviewed", reason: input.reason, mode: input.mode },
     errorCode: "SLIPWAY_CUSTODY_EXECUTION_RECOVER_FAILED",
     fetchFailedMessage: "could not recover Liskov live custody execution",
     human: (body) => {
       const attempt = objectRecord(objectRecord(body).attempt);
       return `Recovered live custody execution ${stringValue(attempt.executionId) ?? input.executionId}: ${stringValue(attempt.status) ?? "reviewed"}.`;
+    }
+  }, options);
+}
+
+export async function runSlipwayCustodyExecutionRetry(input: SlipwayCustodyExecutionRetryInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_CUSTODY_EXECUTION_RETRY_CONFIRMATION_REQUIRED", "custody execution retry");
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions/${encodeURIComponent(input.executionId)}/recover`,
+    body: { yesRecover: true, acknowledgement: "operator-reviewed", reason: input.reason, mode: "retry" },
+    errorCode: "SLIPWAY_CUSTODY_EXECUTION_RETRY_FAILED",
+    fetchFailedMessage: "could not retry Liskov live custody execution",
+    human: (body) => {
+      const attempt = objectRecord(objectRecord(body).attempt);
+      return `Retried live custody execution ${stringValue(attempt.executionId) ?? input.executionId}: ${stringValue(attempt.status) ?? "reviewed"}.`;
     }
   }, options);
 }

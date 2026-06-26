@@ -10,6 +10,7 @@ import {
   runSlipwayApplicationBackfillIdentities,
   runSlipwayApplicationBlackboxConfigure,
   runSlipwayApplicationActivity,
+  runSlipwayApplicationActionPlanRetry,
   runSlipwayApplicationDelete,
   runSlipwayApplicationDeploymentImport,
   runSlipwayApplicationDeploymentStatus,
@@ -35,6 +36,7 @@ import {
   runSlipwayCustodyExecutionList,
   runSlipwayCustodyExecutionObserve,
   runSlipwayCustodyExecutionRecover,
+  runSlipwayCustodyExecutionRetry,
   runSlipwayCustodyExecutionRunOne,
   runSlipwayCustodyExecutionSubmit,
   runSlipwayCustodyMachineCatalog,
@@ -1711,6 +1713,8 @@ describe("proof-cli Liskov runner", () => {
     }, options), 0);
     assert.equal(await runSlipwayCustodyExecutionDiagnose({ applicationRef: "alpha", executionId: "exec-1", network: "testnet", config: sessionFile, json: true }, options), 0);
     assert.equal(await runSlipwayCustodyExecutionRecover({ applicationRef: "alpha", executionId: "exec-1", reason: "operator reviewed", config: sessionFile, json: true, yes: true }, options), 0);
+    assert.equal(await runSlipwayCustodyExecutionRetry({ applicationRef: "alpha", executionId: "exec-1", reason: "operator retry secret reason", config: sessionFile, json: true, yes: true }, options), 0);
+    assert.equal(await runSlipwayApplicationActionPlanRetry({ applicationRef: "alpha", decisionId: "decision-1", reason: "cohort retry secret reason", config: sessionFile, json: true, yes: true }, options), 0);
     assert.equal(await runSlipwayCustodyChildRecover({ applicationRef: "alpha", childSessionId: "child-1", reason: "operator reviewed", config: sessionFile, json: true, yes: true }, options), 0);
     assert.equal(await runSlipwayCustodyMachineCatalog({ network: "testnet", config: sessionFile, json: true }, options), 0);
 
@@ -1757,6 +1761,16 @@ describe("proof-cli Liskov runner", () => {
       authorization: `Bearer ${token}`,
       body: { yesRecover: true, acknowledgement: "operator-reviewed", reason: "operator reviewed" }
     }, {
+      url: "https://slipway.test/api/applications/alpha/live-custody/executions/exec-1/recover",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: { yesRecover: true, acknowledgement: "operator-reviewed", reason: "operator retry secret reason", mode: "retry" }
+    }, {
+      url: "https://slipway.test/api/applications/alpha/action-plan/decisions/decision-1",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: { action: "retry_all", acknowledgement: "operator-reviewed", reason: "cohort retry secret reason" }
+    }, {
       url: "https://slipway.test/api/applications/alpha/live-custody/child-sessions/child-1/recover",
       method: "POST",
       authorization: `Bearer ${token}`,
@@ -1768,6 +1782,8 @@ describe("proof-cli Liskov runner", () => {
       body: undefined
     }]);
     assert.equal(out.text.includes(token), false);
+    assert.equal(out.text.includes("operator retry secret reason"), false);
+    assert.equal(out.text.includes("cohort retry secret reason"), false);
   });
 
   it("prints assignment dossier risk in human custody diagnosis output", async () => {
@@ -1859,6 +1875,8 @@ describe("proof-cli Liskov runner", () => {
       yes: true
     }, options), 1);
     assert.equal(await runSlipwayCustodyExecutionRecover({ applicationRef: "alpha", executionId: "exec-1", reason: "review", config: sessionFile, json: true }, options), 1);
+    assert.equal(await runSlipwayCustodyExecutionRetry({ applicationRef: "alpha", executionId: "exec-1", reason: "retry", config: sessionFile, json: true }, options), 1);
+    assert.equal(await runSlipwayApplicationActionPlanRetry({ applicationRef: "alpha", decisionId: "decision-1", reason: "retry", config: sessionFile, json: true }, options), 1);
     assert.equal(await runSlipwayCustodyChildRecover({ applicationRef: "alpha", childSessionId: "child-1", reason: "review", config: sessionFile, json: true }, options), 1);
     assert.match(out.text, /--yes/u);
     assert.match(out.text, /--yes-spend/u);

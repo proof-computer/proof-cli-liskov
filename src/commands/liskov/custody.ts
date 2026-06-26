@@ -41,6 +41,7 @@ COMMANDS
   execution observe APP_REF --execution-id ID
   execution diagnose APP_REF --execution-id ID
   execution recover APP_REF --execution-id ID --reason TEXT --yes
+  execution retry APP_REF --execution-id ID --reason TEXT --yes
   child recover APP_REF --child-session-id ID --reason TEXT --yes
   machine catalog
 

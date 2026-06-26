@@ -37,6 +37,8 @@ COMMANDS
   resume APP_REF [--owner OWNER] [--reason TEXT] [--yes]
   status APPLICATION_ID
   plans APPLICATION_ID
+  action-plan APP_REF
+  action-plan retry APP_REF --decision-id ID --reason TEXT --yes
   devtools view-key APP_REF DEPLOYMENT_ID
   runtime-image workflow APP_REF [--output PATH]
   deployment import APP_REF --sequence N --origin ADDRESS --yes
