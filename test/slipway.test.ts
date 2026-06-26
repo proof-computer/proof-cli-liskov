@@ -1059,6 +1059,38 @@ describe("proof-cli Liskov runner", () => {
     assert.match(failedOut.text, /signer failed offline/u);
     assert.match(failedOut.text, /start the signer daemon and retry/u);
     assert.equal(failedOut.text.includes(token), false);
+
+    const mismatchOut = writer();
+    const mismatchCode = await runSlipwayApplicationDeploymentStatus({
+      applicationRef: "alpha",
+      config: sessionFile
+    }, {
+      fetchImpl: async () => jsonResponse({
+        ok: true,
+        selectedDeploymentId: "dep-mismatch",
+        deployments: [{ deploymentId: "dep-mismatch" }],
+        deployment: {
+          state: "runtime_mismatch",
+          stateLabel: "Signer runtime mismatch",
+          summary: "Self-custody signer Acurast runtime metadata does not match Liskov; update or restart the signer, or check its Acurast RPC URL."
+        },
+        selfCustodySigner: {
+          status: "runtime_mismatch",
+          address: "5C62Ck4UrFPiBtoCmeSrgF7x9yv9mn38446dhCpsi2mLHiFT",
+          pendingRequestCount: 0,
+          message: "Self-custody signer Acurast runtime metadata does not match Liskov; update or restart the signer, or check its Acurast RPC URL.",
+          websocketPath: "/api/custody/signer?pairingToken=lsk_pair_secret_should_not_print"
+        }
+      }),
+      stdout: mismatchOut.write
+    });
+
+    assert.equal(mismatchCode, 0);
+    assert.match(mismatchOut.text, /Deployment state for alpha: Signer runtime mismatch \(dep-mismatch\)\./u);
+    assert.match(mismatchOut.text, /signer runtime mismatch/u);
+    assert.match(mismatchOut.text, /update or restart the signer/u);
+    assert.equal(mismatchOut.text.includes(token), false);
+    assert.equal(mismatchOut.text.includes("lsk_pair_secret_should_not_print"), false);
   });
 
   it("prints self-custody signer activity rows in human output without leaking raw call bytes", async () => {

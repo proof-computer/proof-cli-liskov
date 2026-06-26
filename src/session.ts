@@ -3650,6 +3650,8 @@ function signerStatusLabel(status: string | undefined): string {
       return "online";
     case "waiting_for_signer":
       return "waiting for signer";
+    case "runtime_mismatch":
+      return "runtime mismatch";
     case "failed_offline":
       return "failed offline";
     case "offline":
