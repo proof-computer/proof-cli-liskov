@@ -1683,6 +1683,26 @@ describe("proof-cli Liskov runner", () => {
           authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
           body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
         });
+        if (String(url).endsWith("/api/applications/alpha/action-plan")) {
+          return jsonResponse({
+            ok: true,
+            blockingDecision: {
+              decisionId: "decision-1",
+              actions: [{
+                action: "retry_all",
+                method: "POST",
+                href: "/api/applications/alpha/action-plan/decisions/decision-1",
+                body: {
+                  action: "retry_all",
+                  acknowledgement: "operator-reviewed",
+                  reason: "retry parked deployment generation",
+                  targetExecutionIds: ["exec-1"],
+                  targetExecutionCount: 1
+                }
+              }]
+            }
+          });
+        }
         return jsonResponse({
           ok: true,
           account: { accountRef: "live-custody:acurast:test", chain: "acurast", address: "5hot" },
@@ -1766,10 +1786,21 @@ describe("proof-cli Liskov runner", () => {
       authorization: `Bearer ${token}`,
       body: { yesRecover: true, acknowledgement: "operator-reviewed", reason: "operator retry secret reason", mode: "retry" }
     }, {
+      url: "https://slipway.test/api/applications/alpha/action-plan",
+      method: "GET",
+      authorization: `Bearer ${token}`,
+      body: undefined
+    }, {
       url: "https://slipway.test/api/applications/alpha/action-plan/decisions/decision-1",
       method: "POST",
       authorization: `Bearer ${token}`,
-      body: { action: "retry_all", acknowledgement: "operator-reviewed", reason: "cohort retry secret reason" }
+      body: {
+        action: "retry_all",
+        acknowledgement: "operator-reviewed",
+        reason: "cohort retry secret reason",
+        targetExecutionIds: ["exec-1"],
+        targetExecutionCount: 1
+      }
     }, {
       url: "https://slipway.test/api/applications/alpha/live-custody/child-sessions/child-1/recover",
       method: "POST",
@@ -1880,6 +1911,68 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(await runSlipwayCustodyChildRecover({ applicationRef: "alpha", childSessionId: "child-1", reason: "review", config: sessionFile, json: true }, options), 1);
     assert.match(out.text, /--yes/u);
     assert.match(out.text, /--yes-spend/u);
+  });
+
+  it("fails action-plan retry when the decision is no longer served", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_action_plan_absent_decision_token";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    const code = await runSlipwayApplicationActionPlanRetry({
+      applicationRef: "alpha",
+      decisionId: "decision-missing",
+      reason: "retry",
+      config: sessionFile,
+      json: true,
+      yes: true
+    }, {
+      fetchImpl: async (url: URL | RequestInfo, init?: RequestInit) => {
+        requests.push({
+          url: String(url),
+          method: init?.method ?? "GET",
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
+        });
+        return jsonResponse({
+          ok: true,
+          blockingDecision: {
+            decisionId: "decision-1",
+            actions: [{
+              action: "retry_all",
+              method: "POST",
+              href: "/api/applications/alpha/action-plan/decisions/decision-1",
+              body: {
+                action: "retry_all",
+                acknowledgement: "operator-reviewed",
+                reason: "retry parked deployment generation",
+                targetExecutionIds: ["exec-1"]
+              }
+            }]
+          }
+        });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 1);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications/alpha/action-plan",
+      method: "GET",
+      authorization: `Bearer ${token}`,
+      body: undefined
+    }]);
+    const parsed = JSON.parse(out.text) as { ok: boolean; error: string; decisionId: string };
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.error, "SLIPWAY_APPLICATION_ACTION_PLAN_DECISION_NOT_SERVED");
+    assert.equal(parsed.decisionId, "decision-missing");
   });
 
   it("builds encrypted environment handoffs without printing local secret values", async () => {

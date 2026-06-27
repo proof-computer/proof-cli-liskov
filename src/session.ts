@@ -1522,13 +1522,47 @@ export async function runSlipwayApplicationActionPlan(input: SlipwayApplicationA
 
 export async function runSlipwayApplicationActionPlanRetry(input: SlipwayApplicationActionPlanRetryInput, options: SlipwayCliOptions = {}): Promise<number> {
   if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_ACTION_PLAN_RETRY_CONFIRMATION_REQUIRED", "application action-plan retry");
+  const actionPlan = await authenticatedSlipwayRequest<SlipwayActionPlanResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/action-plan`,
+    requestErrorCode: "SLIPWAY_APPLICATION_ACTION_PLAN_RETRY_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application action plan"
+  }, options);
+  if (!actionPlan.ok) return actionPlan.exitCode;
+  if (!actionPlan.response.ok || actionPlan.body?.ok === false) {
+    const error = actionPlan.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_ACTION_PLAN_RETRY_FAILED";
+    writeStructuredOrHuman(options, input.json, { ok: false, error, status: actionPlan.response.status, reason: actionPlan.body?.reason ?? actionPlan.body?.error, applicationRef: input.applicationRef, decisionId: input.decisionId, slipwayUrl: actionPlan.slipwayUrl, sessionFile: actionPlan.sessionFile }, `Error (${error}): Liskov could not read the action plan for Application ${input.applicationRef}.`);
+    return 1;
+  }
+
+  const blockingDecision = objectRecord(objectRecord(actionPlan.body).blockingDecision);
+  const actions = arrayValue(blockingDecision.actions).map(objectRecord);
+  const retryAction = stringValue(blockingDecision.decisionId) === input.decisionId
+    ? actions.find((action) => stringValue(action.action) === "retry_all")
+    : undefined;
+  const href = stringValue(retryAction?.href);
+  if (!retryAction || !href) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_ACTION_PLAN_DECISION_NOT_SERVED",
+      applicationRef: input.applicationRef,
+      decisionId: input.decisionId,
+      reason: "action_plan_decision_not_served"
+    }, `Error (SLIPWAY_APPLICATION_ACTION_PLAN_DECISION_NOT_SERVED): action-plan decision ${input.decisionId} is no longer served for Application ${input.applicationRef}. Refresh the action plan and retry.`);
+    return 1;
+  }
+
+  const servedBody = objectRecord(retryAction.body);
   return runSlipwayJsonCommand({
     config: input.config,
     slipwayUrl: input.slipwayUrl,
     json: input.json,
     method: "POST",
-    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/action-plan/decisions/${encodeURIComponent(input.decisionId)}`,
-    body: { action: "retry_all", acknowledgement: "operator-reviewed", reason: input.reason },
+    path: href,
+    body: { ...servedBody, reason: input.reason },
     errorCode: "SLIPWAY_APPLICATION_ACTION_PLAN_RETRY_FAILED",
     fetchFailedMessage: "could not retry Liskov Application action-plan decision",
     human: (body) => {
