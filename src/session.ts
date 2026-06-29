@@ -2070,7 +2070,16 @@ export async function runSlipwayCustodyPreflight(input: SlipwayCustodyPreflightI
     human: (body) => {
       const actionPlan = objectRecord(objectRecord(body).actionPlan);
       const count = numberValue(actionPlan.count) ?? arrayValue(actionPlan.items).length;
-      return `${count} live custody plan item(s) for ${input.applicationRef}.`;
+      const reclaim = objectRecord(objectRecord(body).reclaim);
+      const candidateCount = numberValue(reclaim.candidateCount);
+      if (candidateCount === undefined) return `${count} live custody plan item(s) for ${input.applicationRef}.`;
+      const reclaimableCount = numberValue(reclaim.reclaimableCount) ?? 0;
+      const blockedCount = numberValue(reclaim.blockedCount) ?? 0;
+      const failedCount = numberValue(reclaim.failedCount) ?? 0;
+      const alreadyReclaimedCount = numberValue(reclaim.alreadyReclaimedCount) ?? 0;
+      const alreadyDeregisteredCount = numberValue(reclaim.alreadyDeregisteredCount) ?? 0;
+      const skippedByLimitCount = numberValue(reclaim.skippedByLimitCount) ?? 0;
+      return `${count} live custody plan item(s) for ${input.applicationRef}. Reclaim: ${candidateCount} candidate(s), ${reclaimableCount} reclaimable, ${blockedCount} blocked, ${failedCount} failed, ${alreadyReclaimedCount} already reclaimed, ${alreadyDeregisteredCount} already deregistered, ${skippedByLimitCount} skipped by limit.`;
     },
     options
   });

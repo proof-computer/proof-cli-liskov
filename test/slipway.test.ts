@@ -1817,6 +1817,60 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(out.text.includes("cohort retry secret reason"), false);
   });
 
+  it("prints reclaim counts in live custody preflight human output", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_preflight_reclaim_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method: string; authorization?: string }> = [];
+    const out = writer();
+    const code = await runSlipwayCustodyPreflight({
+      applicationRef: "alpha",
+      config: sessionFile
+    }, {
+      fetchImpl: async (url, init) => {
+        requests.push({
+          url: String(url),
+          method: init?.method ?? "GET",
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization
+        });
+        return jsonResponse({
+          ok: true,
+          actionPlan: { count: 2, items: [{ planItemId: "plan-1" }, { planItemId: "plan-2" }] },
+          reclaim: {
+            sweepEnabled: false,
+            maxPerTick: 2,
+            candidateCount: 7,
+            reclaimableCount: 2,
+            blockedCount: 1,
+            failedCount: 1,
+            alreadyReclaimedCount: 1,
+            alreadyDeregisteredCount: 1,
+            skippedByLimitCount: 1,
+            items: []
+          }
+        });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications/alpha/live-custody/preflight",
+      method: "GET",
+      authorization: `Bearer ${token}`
+    }]);
+    assert.match(out.text, /2 live custody plan item\(s\) for alpha\./u);
+    assert.match(out.text, /Reclaim: 7 candidate\(s\), 2 reclaimable, 1 blocked, 1 failed, 1 already reclaimed, 1 already deregistered, 1 skipped by limit\./u);
+    assert.equal(out.text.includes(token), false);
+  });
+
   it("prints assignment dossier risk in human custody diagnosis output", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
