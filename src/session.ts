@@ -169,6 +169,13 @@ export interface SlipwayApplicationPlansInput {
   json?: boolean;
 }
 
+export interface SlipwayApplicationSecretsInput {
+  applicationId: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayGenericResponse {
   ok?: boolean;
   error?: string;
@@ -731,6 +738,25 @@ interface SlipwayApplicationPlansResponse {
     replicaIndex?: number;
     reason?: string;
   }>;
+  error?: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+interface SlipwayApplicationSecretsResponse {
+  ok?: boolean;
+  secrets?: {
+    declarations?: Array<{
+      secretId?: string;
+      name?: string;
+      bundleId?: string;
+      target?: string;
+      required?: boolean;
+      scope?: string;
+    }>;
+    counts?: { required?: number; present?: number | null; missing?: number | null };
+    resolution?: { available?: boolean; reason?: string };
+  };
   error?: string;
   reason?: string;
   [key: string]: unknown;
@@ -1410,6 +1436,37 @@ export async function runSlipwayApplicationPlans(input: SlipwayApplicationPlansI
     body,
     `${typeof body.count === "number" ? body.count : body.plans?.length ?? 0} plan(s) for ${input.applicationId}.`
   );
+  return 0;
+}
+
+export async function runSlipwayApplicationSecrets(input: SlipwayApplicationSecretsInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayRequest<SlipwayApplicationSecretsResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationId)}/secrets`,
+    requestErrorCode: "SLIPWAY_APPLICATION_SECRETS_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application secrets"
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const body = request.body;
+  if (body?.ok !== true) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_SECRETS_FAILED";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      reason: body?.reason ?? body?.error,
+      applicationId: input.applicationId,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, `Error (${error}): Liskov could not read secrets for Application ${input.applicationId}.`);
+    return 1;
+  }
+
+  writeStructuredOrHuman(options, input.json, body, formatApplicationSecrets(body, input.applicationId));
   return 0;
 }
 
@@ -3691,6 +3748,43 @@ function formatApplicationDeploymentStatus(body: SlipwayGenericResponse, fallbac
   if (summary) lines.push(summary);
   const signer = formatSelfCustodySigner(record.selfCustodySigner);
   if (signer) lines.push(signer);
+  return lines.join("\n");
+}
+
+function formatApplicationSecrets(body: SlipwayApplicationSecretsResponse, fallbackApplicationId: string): string {
+  const secrets = objectRecord(objectRecord(body as Record<string, unknown>).secrets);
+  const counts = objectRecord(secrets.counts);
+  const declarations = arrayValue(secrets.declarations);
+  const required = numberValue(counts.required) ?? declarations.length;
+  const asCount = (value: unknown): string => {
+    const n = numberValue(value);
+    return n === undefined ? "—" : String(n);
+  };
+  const lines = [
+    `Secrets for ${fallbackApplicationId}: ${required} required, ${asCount(counts.present)} present, ${asCount(counts.missing)} missing.`
+  ];
+  if (declarations.length === 0) {
+    lines.push("  No secret declarations in the active policy.");
+  } else {
+    for (const item of declarations) {
+      const decl = objectRecord(item);
+      const name = stringValue(decl.name) ?? stringValue(decl.secretId) ?? "secret";
+      const details: string[] = [];
+      const secretId = stringValue(decl.secretId);
+      if (secretId && secretId !== name) details.push(`secretId ${secretId}`);
+      const bundleId = stringValue(decl.bundleId);
+      if (bundleId) details.push(`bundle ${bundleId}`);
+      const target = stringValue(decl.target);
+      if (target) details.push(target);
+      if (booleanValue(decl.required)) details.push("required");
+      lines.push(`  ${name}${details.length > 0 ? `  (${details.join(", ")})` : ""}`);
+    }
+  }
+  const resolution = objectRecord(secrets.resolution);
+  if (booleanValue(resolution.available) !== true) {
+    const reason = stringValue(resolution.reason);
+    lines.push(`Present/missing not yet resolved${reason ? ` (${reason})` : ""}.`);
+  }
   return lines.join("\n");
 }
 
