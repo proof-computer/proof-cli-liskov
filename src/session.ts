@@ -199,13 +199,6 @@ export interface SlipwayApplicationDevtoolsViewKeyInput {
   json?: boolean;
 }
 
-export interface SlipwayApplicationConsoleInput {
-  applicationRef: string;
-  slipwayUrl?: string;
-  config?: string;
-  json?: boolean;
-}
-
 export interface SlipwayApplicationActivityInput {
   applicationRef: string;
   limit?: number;
@@ -1506,27 +1499,6 @@ export async function runSlipwayApplicationDevtoolsViewKey(input: SlipwayApplica
     fetchFailedMessage: "could not mint a Liskov Acurast DevTools view key",
     human: (body) => formatApplicationDevtoolsViewKey(body, input)
   }, options);
-}
-
-export async function runSlipwayApplicationConsole(input: SlipwayApplicationConsoleInput, options: SlipwayCliOptions = {}): Promise<number> {
-  const request = await authenticatedSlipwayRequest<SlipwayGenericResponse>({
-    config: input.config,
-    slipwayUrl: input.slipwayUrl,
-    json: input.json,
-    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/console`,
-    requestErrorCode: "SLIPWAY_APPLICATION_CONSOLE_FAILED",
-    notFoundMessage: "No Liskov CLI session is stored locally.",
-    fetchFailedMessage: "could not read Liskov Application console"
-  }, options);
-  if (!request.ok) return request.exitCode;
-  const body = request.body;
-  if (body?.ok !== true) {
-    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_CONSOLE_FAILED";
-    writeStructuredOrHuman(options, input.json, { ok: false, error, status: request.response.status, reason: body?.reason ?? body?.error, applicationRef: input.applicationRef, slipwayUrl: request.slipwayUrl, sessionFile: request.sessionFile }, `Error (${error}): Liskov could not read the console for Application ${input.applicationRef}.`);
-    return 1;
-  }
-  writeStructuredOrHuman(options, input.json, body, `Console view for ${input.applicationRef}.`);
-  return 0;
 }
 
 export async function runSlipwayApplicationActivity(input: SlipwayApplicationActivityInput, options: SlipwayCliOptions = {}): Promise<number> {
