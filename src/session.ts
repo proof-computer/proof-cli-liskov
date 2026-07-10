@@ -472,16 +472,6 @@ export interface SlipwayCustodyExecutionRetryInput {
   json?: boolean;
 }
 
-export interface SlipwayCustodyChildRecoverInput {
-  applicationRef: string;
-  childSessionId: string;
-  reason: string;
-  yes?: boolean;
-  slipwayUrl?: string;
-  config?: string;
-  json?: boolean;
-}
-
 export interface SlipwayCustodyMachineCatalogInput {
   network?: SlipwayAcurastNetworkFlag;
   slipwayUrl?: string;
@@ -2446,24 +2436,6 @@ export async function runSlipwayCustodyExecutionRetry(input: SlipwayCustodyExecu
     human: (body) => {
       const attempt = objectRecord(objectRecord(body).attempt);
       return `Retried live custody execution ${stringValue(attempt.executionId) ?? input.executionId}: ${stringValue(attempt.status) ?? "reviewed"}.`;
-    }
-  }, options);
-}
-
-export async function runSlipwayCustodyChildRecover(input: SlipwayCustodyChildRecoverInput, options: SlipwayCliOptions = {}): Promise<number> {
-  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_CUSTODY_CHILD_RECOVER_CONFIRMATION_REQUIRED", "custody child recover");
-  return runSlipwayJsonCommand({
-    config: input.config,
-    slipwayUrl: input.slipwayUrl,
-    json: input.json,
-    method: "POST",
-    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/child-sessions/${encodeURIComponent(input.childSessionId)}/recover`,
-    body: { yesRecover: true, acknowledgement: "operator-reviewed", reason: input.reason },
-    errorCode: "SLIPWAY_CUSTODY_CHILD_RECOVER_FAILED",
-    fetchFailedMessage: "could not recover Liskov live custody child",
-    human: (body) => {
-      const child = objectRecord(objectRecord(body).child);
-      return `Recovered child ${stringValue(child.childSessionId) ?? input.childSessionId}: ${stringValue(child.status) ?? "reviewed"}.`;
     }
   }, options);
 }

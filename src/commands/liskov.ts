@@ -57,7 +57,6 @@ COMMANDS
   custody execution diagnose APP_REF --execution-id ID
   custody execution recover APP_REF --execution-id ID --reason TEXT --yes
   custody execution retry APP_REF --execution-id ID --reason TEXT --yes
-  custody child recover APP_REF --child-session-id ID --reason TEXT --yes
   custody machine catalog
   whoami
   logout

@@ -29,7 +29,6 @@ proof liskov custody execution submit proof-docs --plan-item-id ID --idempotency
 proof liskov custody execution observe proof-docs --execution-id ID --json
 proof liskov custody execution diagnose proof-docs --execution-id ID --network mainnet --json
 proof liskov custody execution recover proof-docs --execution-id ID --reason "operator reviewed" --yes
-proof liskov custody child recover proof-docs --child-session-id ID --reason "operator reviewed" --yes
 proof liskov custody machine catalog --network mainnet --json
 proof liskov application backfill-identities
 proof liskov application delete proof-docs --reason retired --yes
