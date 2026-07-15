@@ -6,10 +6,11 @@ export default class SlipwayCustodyExecutionRunOne extends Command {
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true })
   };
-  static description = "Run exactly one guarded server-owned live custody transition.";
+  static description = "Run exactly one guarded server-owned live custody transition. Submit mode freshly preflights the selected plan and requires both values copied from one custodial.live item.";
   static examples = [
     "<%= config.bin %> liskov custody execution run-one proof-docs --execution-id live-execution:abc --expect-kind acurast.deploy --expect-policy-digest sha256:abc --expect-deployment-id 75824 --yes --json",
-    "<%= config.bin %> liskov custody execution run-one proof-docs --plan-item-id deploy-1 --idempotency-key key-1 --expect-kind acurast.deploy --expect-policy-digest sha256:abc --yes --yes-spend"
+    "<%= config.bin %> liskov custody preflight proof-docs --json",
+    "<%= config.bin %> liskov custody execution run-one proof-docs --plan-item-id PLAN_ITEM_ID_FROM_ONE_ITEM --idempotency-key OPAQUE_KEY_FROM_SAME_ITEM --expect-kind acurast.deploy --expect-policy-digest sha256:abc --yes --yes-spend"
   ];
   static flags: Interfaces.FlagInput = {
     config: Flags.string({ description: "Path to the local Liskov session file." }),
@@ -18,10 +19,10 @@ export default class SlipwayCustodyExecutionRunOne extends Command {
     "expect-kind": Flags.string({ description: "Require this live custody action kind.", required: true }),
     "expect-policy-digest": Flags.string({ description: "Require this active policy digest.", required: true }),
     help: Flags.help({ char: "h" }),
-    "idempotency-key": Flags.string({ description: "Plan idempotency key for submit mode." }),
+    "idempotency-key": Flags.string({ description: "Opaque idempotencyKey copied unchanged from the same preflight --json item as --plan-item-id; never generate one." }),
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
     network: Flags.string({ description: "Acurast network for optional environment handoff.", options: ["mainnet", "testnet", "canary"] }),
-    "plan-item-id": Flags.string({ description: "Live custody plan item id for submit mode." }),
+    "plan-item-id": Flags.string({ description: "planItemId copied from one custodial.live preflight --json item together with its idempotencyKey." }),
     "repo-dir": Flags.string({ description: "Repository directory for future local action providers." }),
     "rpc-url": Flags.string({ description: "Acurast RPC URL for optional environment handoff." }),
     "secrets-file": Flags.string({ description: "Local dotenv file for acurast.setEnvironment submit mode." }),

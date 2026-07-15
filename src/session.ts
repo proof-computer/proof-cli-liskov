@@ -2089,16 +2089,19 @@ export async function runSlipwayCustodyPreflight(input: SlipwayCustodyPreflightI
     human: (body) => {
       const actionPlan = objectRecord(objectRecord(body).actionPlan);
       const count = numberValue(actionPlan.count) ?? arrayValue(actionPlan.items).length;
+      const selectionInstruction = count > 0
+        ? " Run preflight with --json, then copy both planItemId and the opaque idempotencyKey from the same custodial.live actionPlan item."
+        : "";
       const reclaim = objectRecord(objectRecord(body).reclaim);
       const candidateCount = numberValue(reclaim.candidateCount);
-      if (candidateCount === undefined) return `${count} live custody plan item(s) for ${input.applicationRef}.`;
+      if (candidateCount === undefined) return `${count} live custody plan item(s) for ${input.applicationRef}.${selectionInstruction}`;
       const reclaimableCount = numberValue(reclaim.reclaimableCount) ?? 0;
       const blockedCount = numberValue(reclaim.blockedCount) ?? 0;
       const failedCount = numberValue(reclaim.failedCount) ?? 0;
       const alreadyReclaimedCount = numberValue(reclaim.alreadyReclaimedCount) ?? 0;
       const alreadyDeregisteredCount = numberValue(reclaim.alreadyDeregisteredCount) ?? 0;
       const skippedByLimitCount = numberValue(reclaim.skippedByLimitCount) ?? 0;
-      return `${count} live custody plan item(s) for ${input.applicationRef}. Reclaim: ${candidateCount} candidate(s), ${reclaimableCount} reclaimable, ${blockedCount} blocked, ${failedCount} failed, ${alreadyReclaimedCount} already reclaimed, ${alreadyDeregisteredCount} already deregistered, ${skippedByLimitCount} skipped by limit.`;
+      return `${count} live custody plan item(s) for ${input.applicationRef}. Reclaim: ${candidateCount} candidate(s), ${reclaimableCount} reclaimable, ${blockedCount} blocked, ${failedCount} failed, ${alreadyReclaimedCount} already reclaimed, ${alreadyDeregisteredCount} already deregistered, ${skippedByLimitCount} skipped by limit.${selectionInstruction}`;
     },
     options
   });
@@ -2305,19 +2308,21 @@ export async function runSlipwayCustodyExecutionRunOne(input: SlipwayCustodyExec
       return 1;
     }
     if (!input.yesSpend) return writeConfirmationRequired(options, input.json, "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_SPEND_CONFIRMATION_REQUIRED", "custody execution run-one spend", "--yes-spend");
-    body.planItemId = input.planItemId;
-    body.idempotencyKey = input.idempotencyKey;
+    if (input.secretsFile !== undefined && input.expectKind !== "acurast.setEnvironment") {
+      writeStructuredOrHuman(options, input.json, {
+        ok: false,
+        error: "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_SECRETS_UNSUPPORTED",
+        message: "--secrets-file is only supported for acurast.setEnvironment run-one submit."
+      }, "Error (SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_SECRETS_UNSUPPORTED): --secrets-file is only supported for acurast.setEnvironment submit.");
+      return 1;
+    }
+    const preflight = await selectFreshRunOnePlanItem(input, options);
+    if (!preflight.ok) return preflight.exitCode;
+    body.planItemId = preflight.planItemId;
+    body.idempotencyKey = preflight.idempotencyKey;
     body.yesSpend = true;
     body.spendAcknowledgement = "yes-spend";
     if (input.secretsFile !== undefined) {
-      if (input.expectKind !== "acurast.setEnvironment") {
-        writeStructuredOrHuman(options, input.json, {
-          ok: false,
-          error: "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_SECRETS_UNSUPPORTED",
-          message: "--secrets-file is only supported for acurast.setEnvironment run-one submit."
-        }, "Error (SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_SECRETS_UNSUPPORTED): --secrets-file is only supported for acurast.setEnvironment submit.");
-        return 1;
-      }
       const prepared = await prepareEnvironmentHandoffs({
         applicationRef: input.applicationRef,
         secretsFile: input.secretsFile,
@@ -2327,7 +2332,7 @@ export async function runSlipwayCustodyExecutionRunOne(input: SlipwayCustodyExec
         config: input.config,
         slipwayUrl: input.slipwayUrl,
         json: input.json
-      }, options, input.planItemId);
+      }, options, preflight.planItemId);
       if (!prepared.ok) return prepared.exitCode;
       if (prepared.handoffs.length > 0) body.environmentHandoff = prepared.handoffs[0];
     }
@@ -2353,6 +2358,166 @@ export async function runSlipwayCustodyExecutionRunOne(input: SlipwayCustodyExec
       return `Run-one ${executionId}: ${status}${deployment} (${outcome}).`;
     }
   }, options);
+}
+
+type FreshRunOnePlanSelection =
+  | { ok: true; planItemId: string; idempotencyKey: string }
+  | { ok: false; exitCode: number };
+
+async function selectFreshRunOnePlanItem(
+  input: SlipwayCustodyExecutionRunOneInput & { planItemId?: string; idempotencyKey?: string },
+  options: SlipwayCliOptions
+): Promise<FreshRunOnePlanSelection> {
+  const fail = (reason: string, status?: number): FreshRunOnePlanSelection => {
+    const message = `Could not read a fresh authorized live custody preflight for ${input.applicationRef}; verify the saved session and UID-scoped access, then retry.`;
+    const output: Record<string, unknown> = {
+      ok: false,
+      error: "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_PREFLIGHT_FAILED",
+      reason,
+      message
+    };
+    if (status !== undefined) output.status = status;
+    writeStructuredOrHuman(
+      options,
+      input.json,
+      output,
+      `Error (SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_PREFLIGHT_FAILED): ${message} (${reason})`
+    );
+    return { ok: false, exitCode: 1 };
+  };
+  const reject = (reason: string, details: Record<string, unknown> = {}): FreshRunOnePlanSelection => {
+    const message = `Fresh preflight rejected run-one submit; run \`proof liskov custody preflight ${input.applicationRef} --json\` and copy planItemId plus the opaque idempotencyKey from the same custodial.live item.`;
+    writeStructuredOrHuman(
+      options,
+      input.json,
+      {
+        ok: false,
+        error: "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_PREFLIGHT_REJECTED",
+        reason,
+        message,
+        ...details
+      },
+      `Error (SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_PREFLIGHT_REJECTED): ${message} (${reason})`
+    );
+    return { ok: false, exitCode: 1 };
+  };
+
+  const env = options.env ?? process.env;
+  const sessionFile = resolveSlipwaySessionFile({ config: input.config, env });
+  let saved: SlipwaySessionFile | undefined;
+  try {
+    saved = await readSlipwaySession(sessionFile);
+  } catch {
+    return fail("session_read_failed");
+  }
+  if (!saved) return fail("session_not_found");
+
+  const slipwayUrl = normalizeBaseUrl(input.slipwayUrl ?? saved.slipwayUrl);
+  let response: Response;
+  let preflight: SlipwayLiveCustodyCommandResponse | undefined;
+  try {
+    response = await (options.fetchImpl ?? fetch)(
+      new URL(`/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/preflight`, slipwayUrl),
+      {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+          authorization: `Bearer ${saved.sessionToken}`
+        }
+      }
+    );
+    preflight = await readJsonResponse<SlipwayLiveCustodyCommandResponse>(response);
+  } catch {
+    return fail("preflight_read_failed");
+  }
+  if (!response.ok || preflight?.ok !== true) {
+    return fail(stringValue(preflight?.reason) ?? stringValue(preflight?.error) ?? "preflight_request_failed", response.status);
+  }
+
+  const actionPlan = preflight.actionPlan;
+  if (!actionPlan || typeof actionPlan !== "object" || Array.isArray(actionPlan)) {
+    return reject("invalid_live_custody_preflight", { field: "actionPlan" });
+  }
+  const items = (actionPlan as Record<string, unknown>).items;
+  if (!Array.isArray(items)) {
+    return reject("invalid_live_custody_preflight", { field: "actionPlan.items" });
+  }
+  const liveItems = items
+    .map((item) => objectRecord(item))
+    .filter((item) => item.executorMode === "custodial.live");
+  const malformedCount = liveItems.filter((item) =>
+    !nonEmptyOpaqueString(item.planItemId)
+    || !nonEmptyOpaqueString(item.idempotencyKey)
+    || !nonEmptyOpaqueString(item.kind)
+    || !nonEmptyOpaqueString(item.policyDigest)
+    || !Array.isArray(item.blockers)
+  ).length;
+  if (malformedCount > 0) {
+    return reject("invalid_live_custody_plan_item", {
+      field: "actionPlan.items",
+      malformedCount,
+      livePlanCount: liveItems.length
+    });
+  }
+
+  const planItemId = input.planItemId!;
+  const idempotencyKey = input.idempotencyKey!;
+  const exact = liveItems.filter((item) => item.planItemId === planItemId && item.idempotencyKey === idempotencyKey);
+  let selected: Record<string, unknown> | undefined;
+  if (exact.length === 1) {
+    selected = exact[0];
+  } else if (exact.length > 1) {
+    return reject("live_custody_run_one_ambiguous_plan_item", { matches: exact.length });
+  } else {
+    const planItemMatches = liveItems.filter((item) => item.planItemId === planItemId);
+    const idempotencyMatches = liveItems.filter((item) => item.idempotencyKey === idempotencyKey);
+    if (planItemMatches.length === 0 && idempotencyMatches.length === 1) {
+      selected = idempotencyMatches[0];
+    } else if (planItemMatches.length === 0 && idempotencyMatches.length > 1) {
+      return reject("live_custody_run_one_ambiguous_plan_item", { matches: idempotencyMatches.length });
+    } else if (planItemMatches.length > 0 || idempotencyMatches.length > 0) {
+      return reject("live_custody_run_one_plan_guard_mismatch", {
+        planItemMatches: planItemMatches.length,
+        idempotencyMatches: idempotencyMatches.length
+      });
+    } else {
+      return reject("plan_item_not_found", { planItemMatches: 0, idempotencyMatches: 0 });
+    }
+  }
+
+  const guardMismatch = (field: string, expected: unknown, actual: unknown): FreshRunOnePlanSelection =>
+    reject("live_custody_run_one_guard_mismatch", { field, expected, actual });
+  if (selected.kind !== input.expectKind) return guardMismatch("kind", input.expectKind, selected.kind);
+  if (selected.policyDigest !== input.expectPolicyDigest) {
+    return guardMismatch("policyDigest", input.expectPolicyDigest, selected.policyDigest);
+  }
+  if (input.expectDeploymentId !== undefined) {
+    const actualDeploymentId = liveCustodyPlanItemDeploymentId(selected);
+    if (actualDeploymentId !== input.expectDeploymentId) {
+      return guardMismatch("deploymentId", input.expectDeploymentId, actualDeploymentId ?? null);
+    }
+  }
+  const blockers = selected.blockers as unknown[];
+  if (blockers.length > 0) {
+    return reject("live_custody_plan_blocked", { field: "blockers", blockerCount: blockers.length });
+  }
+
+  return {
+    ok: true,
+    planItemId: selected.planItemId as string,
+    idempotencyKey: selected.idempotencyKey as string
+  };
+}
+
+function nonEmptyOpaqueString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function liveCustodyPlanItemDeploymentId(item: Record<string, unknown>): string | undefined {
+  const callSummary = objectRecord(item.callSummary);
+  return stringValue(callSummary.deploymentId)
+    ?? stringValue(objectRecord(callSummary.job).deploymentId)
+    ?? stringValue(objectRecord(item.expectedObservation).deploymentId);
 }
 
 export async function runSlipwayCustodyExecutionDiagnose(input: SlipwayCustodyExecutionDiagnoseInput, options: SlipwayCliOptions = {}): Promise<number> {

@@ -36,7 +36,7 @@ COMMANDS
   environment upload APP_REF --secrets-file PATH --yes
   execution list APP_REF
   execution run-one APP_REF --execution-id ID --expect-kind KIND --expect-policy-digest DIGEST --yes
-  execution run-one APP_REF --plan-item-id ID --idempotency-key KEY --expect-kind KIND --expect-policy-digest DIGEST --yes-spend --yes
+  execution run-one APP_REF --plan-item-id PREFLIGHT_ITEM_ID --idempotency-key OPAQUE_KEY_FROM_SAME_ITEM --expect-kind KIND --expect-policy-digest DIGEST --yes-spend --yes
   execution submit APP_REF --plan-item-id ID --idempotency-key KEY --yes-spend --yes
   execution observe APP_REF --execution-id ID
   execution diagnose APP_REF --execution-id ID
@@ -47,5 +47,6 @@ COMMANDS
 DESCRIPTION
   Live custody commands use the local proof liskov session created by
   \`${bin} liskov login\`. Execution submit requires both --yes and
-  --yes-spend.`);
+  --yes-spend. For run-one submit, copy planItemId and the opaque
+  idempotencyKey from the same custodial.live preflight --json item.`);
 }

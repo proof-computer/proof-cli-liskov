@@ -7,7 +7,7 @@ import path from "node:path";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const proofCliRoot = path.resolve(process.env.PROOF_CLI_ROOT ?? path.join(repoRoot, "..", "proof-cli"));
 const proofDevBin = path.join(proofCliRoot, "bin", "dev.js");
-const home = await mkdtemp(path.join(tmpdir(), "proof-cli-slipway-smoke-"));
+const home = await mkdtemp(path.join(tmpdir(), "proof-cli-liskov-smoke-"));
 
 try {
   const env = {
@@ -22,92 +22,96 @@ try {
   run(process.execPath, [proofDevBin, "plugins", "link", repoRoot], { cwd: proofCliRoot, env });
 
   const plugins = run(process.execPath, [proofDevBin, "plugins"], { cwd: proofCliRoot, env });
-  assertIncludes(plugins.stdout, "@proof-computer/proof-cli-slipway");
+  assertIncludes(plugins.stdout, "@proof-computer/proof-cli-liskov");
 
-  const help = run(process.execPath, [proofDevBin, "slipway", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(help.stdout, "Slipway application deployment commands");
-  assertIncludes(help.stdout, "slipway custody");
+  const help = run(process.execPath, [proofDevBin, "liskov", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(help.stdout, "Liskov application deployment commands");
+  assertIncludes(help.stdout, "liskov custody");
 
-  const loginHelp = run(process.execPath, [proofDevBin, "slipway", "login", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(loginHelp.stdout, "Start Slipway CLI login");
+  const loginHelp = run(process.execPath, [proofDevBin, "liskov", "login", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(loginHelp.stdout, "Start Liskov CLI login");
   assertIncludes(loginHelp.stdout, "--no-browser");
 
-  const applicationHelp = run(process.execPath, [proofDevBin, "slipway", "application", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationHelp.stdout, "Read Slipway Application state");
-  assertIncludes(applicationHelp.stdout, "slipway application deployment");
-  assertIncludes(applicationHelp.stdout, "slipway application blackbox");
+  const applicationHelp = run(process.execPath, [proofDevBin, "liskov", "application", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationHelp.stdout, "Read Liskov Application state");
+  assertIncludes(applicationHelp.stdout, "liskov application deployment");
+  assertIncludes(applicationHelp.stdout, "liskov application blackbox");
 
-  const applicationListHelp = run(process.execPath, [proofDevBin, "slipway", "application", "list", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationListHelp.stdout, "List readable Slipway Applications");
+  const applicationListHelp = run(process.execPath, [proofDevBin, "liskov", "application", "list", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationListHelp.stdout, "List readable Liskov Applications");
 
-  const applicationBackfillIdentitiesHelp = run(process.execPath, [proofDevBin, "slipway", "application", "backfill-identities", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationBackfillIdentitiesHelp.stdout, "Backfill Slipway Application identity fields");
+  const applicationBackfillIdentitiesHelp = run(process.execPath, [proofDevBin, "liskov", "application", "backfill-identities", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationBackfillIdentitiesHelp.stdout, "Backfill Liskov Application identity fields");
   assertIncludes(applicationBackfillIdentitiesHelp.stdout, "--yes");
 
-  const applicationDeleteHelp = run(process.execPath, [proofDevBin, "slipway", "application", "delete", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationDeleteHelp.stdout, "Tombstone a Slipway Application");
+  const applicationDeleteHelp = run(process.execPath, [proofDevBin, "liskov", "application", "delete", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationDeleteHelp.stdout, "Tombstone a Liskov Application");
   assertIncludes(applicationDeleteHelp.stdout, "--force");
   assertIncludes(applicationDeleteHelp.stdout, "--yes");
 
-  const applicationPauseHelp = run(process.execPath, [proofDevBin, "slipway", "application", "pause", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationPauseHelp.stdout, "Pause new Slipway work");
+  const applicationPauseHelp = run(process.execPath, [proofDevBin, "liskov", "application", "pause", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationPauseHelp.stdout, "Pause new Liskov work");
   assertIncludes(applicationPauseHelp.stdout, "--reason");
   assertIncludes(applicationPauseHelp.stdout, "--yes");
 
-  const applicationResumeHelp = run(process.execPath, [proofDevBin, "slipway", "application", "resume", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationResumeHelp.stdout, "Resume new Slipway work");
+  const applicationResumeHelp = run(process.execPath, [proofDevBin, "liskov", "application", "resume", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationResumeHelp.stdout, "Resume new Liskov work");
   assertIncludes(applicationResumeHelp.stdout, "--reason");
   assertIncludes(applicationResumeHelp.stdout, "--yes");
 
-  const applicationImportHelp = run(process.execPath, [proofDevBin, "slipway", "application", "import", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationImportHelp.stdout, "Import a Slipway Application policy");
+  const applicationImportHelp = run(process.execPath, [proofDevBin, "liskov", "application", "import", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationImportHelp.stdout, "Import a Liskov Application policy");
   assertIncludes(applicationImportHelp.stdout, "--github");
   assertIncludes(applicationImportHelp.stdout, "--server-fetch");
 
-  const applicationStatusHelp = run(process.execPath, [proofDevBin, "slipway", "application", "status", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationStatusHelp.stdout, "Read Slipway Application status");
+  const applicationStatusHelp = run(process.execPath, [proofDevBin, "liskov", "application", "status", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationStatusHelp.stdout, "Read Liskov Application status");
   assertIncludes(applicationStatusHelp.stdout, "APPLICATION_ID");
 
-  const applicationPlansHelp = run(process.execPath, [proofDevBin, "slipway", "application", "plans", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationPlansHelp.stdout, "Read Slipway Application execution plans");
+  const applicationPlansHelp = run(process.execPath, [proofDevBin, "liskov", "application", "plans", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationPlansHelp.stdout, "Read Liskov Application execution plans");
   assertIncludes(applicationPlansHelp.stdout, "APPLICATION_ID");
 
-  const applicationLockboxHelp = run(process.execPath, [proofDevBin, "slipway", "application", "lockbox", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationLockboxHelp.stdout, "Read Slipway Application Lockbox state");
-  assertIncludes(applicationLockboxHelp.stdout, "grant status");
+  const applicationLockboxHelp = run(process.execPath, [proofDevBin, "liskov", "application", "lockbox", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationLockboxHelp.stdout, "Read Liskov Application Lockbox state");
+  assertIncludes(applicationLockboxHelp.stdout, "grant-status");
 
-  const applicationLockboxGrantStatusHelp = run(process.execPath, [proofDevBin, "slipway", "application", "lockbox", "grant-status", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationLockboxGrantStatusHelp.stdout, "Read Slipway Application Lockbox grant status");
+  const applicationLockboxGrantStatusHelp = run(process.execPath, [proofDevBin, "liskov", "application", "lockbox", "grant-status", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationLockboxGrantStatusHelp.stdout, "Read Liskov Application Lockbox grant status");
   assertIncludes(applicationLockboxGrantStatusHelp.stdout, "APPLICATION_ID");
 
-  const applicationLockboxGrantStatusNativeHelp = run(process.execPath, [proofDevBin, "slipway", "application", "lockbox", "grant", "status", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationLockboxGrantStatusNativeHelp.stdout, "Read Slipway Application Lockbox grant status");
+  const applicationLockboxGrantStatusNativeHelp = run(process.execPath, [proofDevBin, "liskov", "application", "lockbox", "grant", "status", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationLockboxGrantStatusNativeHelp.stdout, "Read Liskov Application Lockbox grant status");
   assertIncludes(applicationLockboxGrantStatusNativeHelp.stdout, "APP_REF");
 
-  const applicationDeploymentImportHelp = run(process.execPath, [proofDevBin, "slipway", "application", "deployment", "import", "--help"], { cwd: proofCliRoot, env });
+  const applicationDeploymentImportHelp = run(process.execPath, [proofDevBin, "liskov", "application", "deployment", "import", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationDeploymentImportHelp.stdout, "Import an existing Acurast deployment");
   assertIncludes(applicationDeploymentImportHelp.stdout, "--origin");
   assertIncludes(applicationDeploymentImportHelp.stdout, "--yes");
 
-  const custodyHelp = run(process.execPath, [proofDevBin, "slipway", "custody", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(custodyHelp.stdout, "Operate Slipway live custody");
-  assertIncludes(custodyHelp.stdout, "slipway custody execution");
+  const custodyHelp = run(process.execPath, [proofDevBin, "liskov", "custody", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(custodyHelp.stdout, "Operate Liskov live custody");
+  assertIncludes(custodyHelp.stdout, "liskov custody execution");
 
-  const custodySubmitHelp = run(process.execPath, [proofDevBin, "slipway", "custody", "execution", "submit", "--help"], { cwd: proofCliRoot, env });
+  const custodySubmitHelp = run(process.execPath, [proofDevBin, "liskov", "custody", "execution", "submit", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(custodySubmitHelp.stdout, "Submit a live custody execution");
   assertIncludes(custodySubmitHelp.stdout, "--yes-spend");
 
-  const custodyMachineCatalogHelp = run(process.execPath, [proofDevBin, "slipway", "custody", "machine", "catalog", "--help"], { cwd: proofCliRoot, env });
+  const custodyRunOneHelp = run(process.execPath, [proofDevBin, "liskov", "custody", "execution", "run-one", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(custodyRunOneHelp.stdout, "Run exactly one guarded server-owned live custody transition");
+  assertIncludes(custodyRunOneHelp.stdout, "Opaque idempotencyKey copied unchanged");
+
+  const custodyMachineCatalogHelp = run(process.execPath, [proofDevBin, "liskov", "custody", "machine", "catalog", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(custodyMachineCatalogHelp.stdout, "Read Acurast machine-class catalog");
 
-  const whoamiHelp = run(process.execPath, [proofDevBin, "slipway", "whoami", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(whoamiHelp.stdout, "Read the current Slipway CLI session");
+  const whoamiHelp = run(process.execPath, [proofDevBin, "liskov", "whoami", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(whoamiHelp.stdout, "Read the current Liskov CLI session");
   assertIncludes(whoamiHelp.stdout, "--json");
 
-  const logoutHelp = run(process.execPath, [proofDevBin, "slipway", "logout", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(logoutHelp.stdout, "Remove the local Slipway CLI session");
+  const logoutHelp = run(process.execPath, [proofDevBin, "liskov", "logout", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(logoutHelp.stdout, "Remove the local Liskov CLI session");
 
-  console.log("Root proof Slipway plugin smoke passed.");
+  console.log("Root proof Liskov plugin smoke passed.");
 } finally {
   await rm(home, { recursive: true, force: true });
 }

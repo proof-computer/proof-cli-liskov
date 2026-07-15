@@ -1861,6 +1861,7 @@ describe("proof-cli Liskov runner", () => {
     }]);
     assert.match(out.text, /2 live custody plan item\(s\) for alpha\./u);
     assert.match(out.text, /Reclaim: 7 candidate\(s\), 2 reclaimable, 1 blocked, 1 failed, 1 already reclaimed, 1 already deregistered, 1 skipped by limit\./u);
+    assert.match(out.text, /copy both planItemId and the opaque idempotencyKey from the same custodial\.live actionPlan item/u);
     assert.equal(out.text.includes(token), false);
   });
 
@@ -1957,6 +1958,236 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(await runSlipwayApplicationActionPlanRetry({ applicationRef: "alpha", decisionId: "decision-1", reason: "retry", config: sessionFile, json: true }, options), 1);
     assert.match(out.text, /--yes/u);
     assert.match(out.text, /--yes-spend/u);
+  });
+
+  it("refreshes a clock-changed run-one plan id by its unchanged opaque idempotency key", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_run_one_refresh_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    const code = await runSlipwayCustodyExecutionRunOne({
+      applicationRef: "app-uid-1",
+      planItemId: "deploy-plan-from-earlier-clock",
+      idempotencyKey: "opaque-stable-key",
+      expectKind: "acurast.deploy",
+      expectPolicyDigest: "policy-digest-1",
+      config: sessionFile,
+      json: true,
+      yes: true,
+      yesSpend: true
+    }, {
+      fetchImpl: async (url, init) => {
+        requests.push({
+          url: String(url),
+          method: init?.method ?? "GET",
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
+        });
+        if ((init?.method ?? "GET") === "GET") {
+          return jsonResponse(runOnePreflight([
+            runOnePreflightPlan({
+              planItemId: "deploy-plan-from-current-clock",
+              idempotencyKey: "opaque-stable-key"
+            })
+          ]));
+        }
+        return jsonResponse({ ok: true, mode: "submit", attempt: { executionId: "exec-1", status: "submitted" } });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.deepEqual(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`), [
+      "GET /api/applications/app-uid-1/live-custody/preflight",
+      "POST /api/applications/app-uid-1/live-custody/executions/run-one"
+    ]);
+    assert.deepEqual(requests[1]?.body, {
+      expectedKind: "acurast.deploy",
+      expectedPolicyDigest: "policy-digest-1",
+      yes: true,
+      acknowledgement: "run-one",
+      planItemId: "deploy-plan-from-current-clock",
+      idempotencyKey: "opaque-stable-key",
+      yesSpend: true,
+      spendAcknowledgement: "yes-spend"
+    });
+    assert.equal(requests[1]?.authorization, `Bearer ${token}`);
+    assert.equal(out.text.includes(token), false);
+  });
+
+  it("rejects unsafe run-one preflight selections without making a run-one POST", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "slipway_run_one_rejection_token_do_not_print",
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const cases: Array<{
+      name: string;
+      items: Record<string, unknown>[];
+      input?: Partial<Parameters<typeof runSlipwayCustodyExecutionRunOne>[0]>;
+      reason: string;
+      field?: string;
+      counts?: Record<string, number>;
+    }> = [
+      {
+        name: "caller-generated replacement key",
+        items: [runOnePreflightPlan()],
+        input: { planItemId: "expired-clock-plan", idempotencyKey: "caller-generated-key" },
+        reason: "plan_item_not_found",
+        counts: { planItemMatches: 0, idempotencyMatches: 0 }
+      },
+      {
+        name: "plan/key pair mismatch",
+        items: [
+          runOnePreflightPlan({ planItemId: "plan-1", idempotencyKey: "key-1" }),
+          runOnePreflightPlan({ planItemId: "plan-2", idempotencyKey: "key-2" })
+        ],
+        input: { planItemId: "plan-1", idempotencyKey: "key-2" },
+        reason: "live_custody_run_one_plan_guard_mismatch",
+        counts: { planItemMatches: 1, idempotencyMatches: 1 }
+      },
+      {
+        name: "duplicate stable key",
+        items: [
+          runOnePreflightPlan({ planItemId: "fresh-plan-1", idempotencyKey: "duplicate-key" }),
+          runOnePreflightPlan({ planItemId: "fresh-plan-2", idempotencyKey: "duplicate-key" })
+        ],
+        input: { planItemId: "expired-plan", idempotencyKey: "duplicate-key" },
+        reason: "live_custody_run_one_ambiguous_plan_item",
+        counts: { matches: 2 }
+      },
+      {
+        name: "stale policy",
+        items: [runOnePreflightPlan({ policyDigest: "new-policy-digest" })],
+        reason: "live_custody_run_one_guard_mismatch",
+        field: "policyDigest"
+      },
+      {
+        name: "wrong kind",
+        items: [runOnePreflightPlan({ kind: "acurast.setEnvironment" })],
+        reason: "live_custody_run_one_guard_mismatch",
+        field: "kind"
+      },
+      {
+        name: "wrong deployment",
+        items: [runOnePreflightPlan({ deploymentId: "778" })],
+        input: { expectDeploymentId: "777" },
+        reason: "live_custody_run_one_guard_mismatch",
+        field: "deploymentId"
+      },
+      {
+        name: "blocked plan",
+        items: [runOnePreflightPlan({ blockers: [{ code: "missing_processor" }] })],
+        reason: "live_custody_plan_blocked",
+        field: "blockers",
+        counts: { blockerCount: 1 }
+      },
+      {
+        name: "malformed live plan",
+        items: [runOnePreflightPlan({ idempotencyKey: "" })],
+        reason: "invalid_live_custody_plan_item",
+        field: "actionPlan.items",
+        counts: { malformedCount: 1, livePlanCount: 1 }
+      },
+      {
+        name: "concurrent child creation removes the plan",
+        items: [],
+        reason: "plan_item_not_found",
+        counts: { planItemMatches: 0, idempotencyMatches: 0 }
+      }
+    ];
+
+    for (const testCase of cases) {
+      let requestCount = 0;
+      const out = writer();
+      const code = await runSlipwayCustodyExecutionRunOne({
+        applicationRef: "app-uid-1",
+        planItemId: "plan-1",
+        idempotencyKey: "key-1",
+        expectKind: "acurast.deploy",
+        expectPolicyDigest: "policy-digest-1",
+        config: sessionFile,
+        json: true,
+        yes: true,
+        yesSpend: true,
+        ...testCase.input
+      }, {
+        fetchImpl: async (_url, init) => {
+          requestCount += 1;
+          assert.equal(init?.method ?? "GET", "GET", `${testCase.name} must not POST`);
+          return jsonResponse(runOnePreflight(testCase.items));
+        },
+        stdout: out.write
+      });
+
+      assert.equal(code, 1, testCase.name);
+      assert.equal(requestCount, 1, testCase.name);
+      const parsed = JSON.parse(out.text) as Record<string, unknown>;
+      assert.equal(parsed.error, "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_PREFLIGHT_REJECTED", testCase.name);
+      assert.equal(parsed.reason, testCase.reason, testCase.name);
+      if (testCase.field) assert.equal(parsed.field, testCase.field, testCase.name);
+      for (const [field, value] of Object.entries(testCase.counts ?? {})) {
+        assert.equal(parsed[field], value, `${testCase.name}: ${field}`);
+      }
+      assert.equal(out.text.includes("slipway_run_one_rejection_token_do_not_print"), false, testCase.name);
+    }
+  });
+
+  it("reports UID/org authorization and preflight read failures without making a run-one POST", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "slipway_run_one_auth_token_do_not_print",
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    for (const response of [
+      jsonResponse({ ok: false, error: "unauthorized" }, 401),
+      jsonResponse({ ok: false, error: "application_not_authorized" }, 403),
+      new Response("not-json", { status: 502 })
+    ]) {
+      let requestCount = 0;
+      const out = writer();
+      const code = await runSlipwayCustodyExecutionRunOne({
+        applicationRef: "app-uid-1",
+        planItemId: "plan-1",
+        idempotencyKey: "key-1",
+        expectKind: "acurast.deploy",
+        expectPolicyDigest: "policy-digest-1",
+        config: sessionFile,
+        json: true,
+        yes: true,
+        yesSpend: true
+      }, {
+        fetchImpl: async (_url, init) => {
+          requestCount += 1;
+          assert.equal(init?.method ?? "GET", "GET");
+          return response;
+        },
+        stdout: out.write
+      });
+
+      assert.equal(code, 1);
+      assert.equal(requestCount, 1);
+      const parsed = JSON.parse(out.text) as Record<string, unknown>;
+      assert.equal(parsed.error, "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_PREFLIGHT_FAILED");
+      assert.equal(out.text.includes("slipway_run_one_auth_token_do_not_print"), false);
+      assert.equal(out.text.includes(sessionFile), false);
+    }
   });
 
   it("fails action-plan retry when the decision is no longer served", async () => {
@@ -2210,6 +2441,16 @@ describe("proof-cli Liskov runner", () => {
           authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
           body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
         });
+        if (String(url).endsWith("/api/applications/alpha/live-custody/preflight")) {
+          return jsonResponse(runOnePreflight([
+            runOnePreflightPlan({
+              planItemId: "set-env-1",
+              idempotencyKey: "idempotency-1",
+              kind: "acurast.setEnvironment",
+              deploymentId: "777"
+            })
+          ]));
+        }
         if (String(url).endsWith("/api/applications/alpha/action-plan")) {
           return jsonResponse({ ok: true, items: [setEnvironmentPlanItem()] });
         }
@@ -2232,11 +2473,12 @@ describe("proof-cli Liskov runner", () => {
 
     assert.equal(code, 0);
     assert.deepEqual(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`), [
+      "GET /api/applications/alpha/live-custody/preflight",
       "GET /api/applications/alpha/action-plan",
       "GET /api/applications/alpha",
       "POST /api/applications/alpha/live-custody/executions/run-one"
     ]);
-    assert.deepEqual(requests[2]?.body, {
+    assert.deepEqual(requests[3]?.body, {
       expectedKind: "acurast.setEnvironment",
       expectedPolicyDigest: "policy-digest-1",
       expectedDeploymentId: "777",
@@ -2248,7 +2490,7 @@ describe("proof-cli Liskov runner", () => {
       spendAcknowledgement: "yes-spend",
       environmentHandoff: handoff
     });
-    assert.equal(requests[2]?.authorization, `Bearer ${token}`);
+    assert.equal(requests[3]?.authorization, `Bearer ${token}`);
     assert.equal(out.text.includes(token), false);
     assert.equal(out.text.includes(secretValue), false);
   });
@@ -2303,6 +2545,16 @@ describe("proof-cli Liskov runner", () => {
           authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
           body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
         });
+        if (String(url).endsWith("/api/applications/alpha/live-custody/preflight")) {
+          return jsonResponse(runOnePreflight([
+            runOnePreflightPlan({
+              planItemId: "set-env-1",
+              idempotencyKey: "idempotency-1",
+              kind: "acurast.setEnvironment",
+              deploymentId: "777"
+            })
+          ]));
+        }
         if (String(url).endsWith("/api/applications/alpha/action-plan")) {
           return jsonResponse({ ok: true, items: [setEnvironmentPlanItem(variables)] });
         }
@@ -2326,12 +2578,13 @@ describe("proof-cli Liskov runner", () => {
 
     assert.equal(code, 0);
     assert.deepEqual(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`), [
+      "GET /api/applications/alpha/live-custody/preflight",
       "GET /api/applications/alpha/action-plan",
       "GET /api/applications/alpha",
       "GET /api/actions/set-env-1/submit-material",
       "POST /api/applications/alpha/live-custody/executions/run-one"
     ]);
-    assert.deepEqual(requests[3]?.body, {
+    assert.deepEqual(requests[4]?.body, {
       expectedKind: "acurast.setEnvironment",
       expectedPolicyDigest: "policy-digest-1",
       expectedDeploymentId: "777",
@@ -2343,7 +2596,7 @@ describe("proof-cli Liskov runner", () => {
       spendAcknowledgement: "yes-spend",
       environmentHandoff: handoff
     });
-    assert.equal(requests[3]?.authorization, `Bearer ${token}`);
+    assert.equal(requests[4]?.authorization, `Bearer ${token}`);
     assert.equal(out.text.includes(token), false);
     assert.equal(out.text.includes(secretValue), false);
     assert.equal(out.text.includes(bootstrapValue), false);
@@ -2384,6 +2637,16 @@ describe("proof-cli Liskov runner", () => {
           authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
           body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
         });
+        if ((init?.method ?? "GET") === "GET") {
+          return jsonResponse(runOnePreflight([
+            runOnePreflightPlan({
+              planItemId: "set-env-1",
+              idempotencyKey: "idempotency-1",
+              kind: "acurast.setEnvironment",
+              deploymentId: "777"
+            })
+          ]));
+        }
         return jsonResponse({ ok: true, mode: "submit", attempt: { executionId: "exec-1", status: "submitted", receipt: { deploymentId: "777" } } });
       },
       stdout: out.write
@@ -2391,9 +2654,10 @@ describe("proof-cli Liskov runner", () => {
 
     assert.equal(code, 0);
     assert.deepEqual(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`), [
+      "GET /api/applications/alpha/live-custody/preflight",
       "POST /api/applications/alpha/live-custody/executions/run-one"
     ]);
-    assert.deepEqual(requests[0]?.body, {
+    assert.deepEqual(requests[1]?.body, {
       expectedKind: "acurast.setEnvironment",
       expectedPolicyDigest: "policy-digest-1",
       expectedDeploymentId: "777",
@@ -2404,7 +2668,7 @@ describe("proof-cli Liskov runner", () => {
       yesSpend: true,
       spendAcknowledgement: "yes-spend"
     });
-    assert.equal(requests[0]?.authorization, `Bearer ${token}`);
+    assert.equal(requests[1]?.authorization, `Bearer ${token}`);
     assert.equal(out.text.includes(token), false);
   });
 
@@ -2820,6 +3084,37 @@ function setEnvironmentPlanItem(
       expectedProcessors: ["processor-1"],
       envNames: variables.map((variable) => variable.name),
       variables
+    }
+  };
+}
+
+function runOnePreflightPlan(overrides: {
+  planItemId?: string;
+  idempotencyKey?: string;
+  kind?: string;
+  policyDigest?: string;
+  deploymentId?: string;
+  blockers?: unknown[];
+} = {}): Record<string, unknown> {
+  return {
+    planItemId: overrides.planItemId ?? "plan-1",
+    idempotencyKey: overrides.idempotencyKey ?? "key-1",
+    kind: overrides.kind ?? "acurast.deploy",
+    policyDigest: overrides.policyDigest ?? "policy-digest-1",
+    executorMode: "custodial.live",
+    blockers: overrides.blockers ?? [],
+    callSummary: {
+      ...(overrides.deploymentId === undefined ? {} : { deploymentId: overrides.deploymentId })
+    }
+  };
+}
+
+function runOnePreflight(items: Record<string, unknown>[]): Record<string, unknown> {
+  return {
+    ok: true,
+    actionPlan: {
+      count: items.length,
+      items
     }
   };
 }

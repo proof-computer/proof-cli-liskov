@@ -23,6 +23,7 @@ proof liskov application lockbox grant-status proof-docs --json
 proof liskov application blackbox configure proof-docs --yes
 proof liskov custody account ensure proof-docs --chain acurast --yes
 proof liskov custody preflight proof-docs --json
+proof liskov custody execution run-one proof-docs --plan-item-id PLAN_ITEM_ID_FROM_ONE_ITEM --idempotency-key OPAQUE_KEY_FROM_SAME_ITEM --expect-kind acurast.deploy --expect-policy-digest POLICY_DIGEST_FROM_SAME_ITEM --yes-spend --yes
 proof liskov custody environment upload proof-docs --secrets-file .env.local --yes
 proof liskov custody execution list proof-docs --json
 proof liskov custody execution submit proof-docs --plan-item-id ID --idempotency-key KEY --yes-spend --yes
@@ -56,6 +57,16 @@ Pause, resume, delete, and identity backfill dry-run by default and require
 require `--yes`; live execution submit also requires `--yes-spend`. The plugin does
 not expose the old direct manual Acurast spend fallback; diagnostics and
 machine catalog reads stay server-side.
+
+For guarded `custody execution run-one` submit mode, first run `custody
+preflight APP_REF --json`. Choose one `actionPlan.items[]` entry whose
+`executorMode` is `custodial.live`, then copy both its `planItemId` and its
+opaque `idempotencyKey` unchanged into the run-one command. Never generate or
+replace the key. After both confirmation flags are present, the CLI fetches a
+fresh UID-scoped preflight, validates the pair plus the expected kind, policy
+digest, optional deployment, and blockers, and only then sends the guarded
+submit. If a timestamp-derived plan ID changed, the unchanged unique returned
+key may select the refreshed ID; the server remains the final authority.
 
 `proof liskov application runtime-image workflow APP_REF` writes a manual
 GitHub Actions workflow for the stage 1-2 PRoot runtime-image upload path. The

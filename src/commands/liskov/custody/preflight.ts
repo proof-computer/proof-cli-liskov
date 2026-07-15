@@ -6,7 +6,7 @@ export default class SlipwayCustodyPreflight extends Command {
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true })
   };
-  static description = "Read live custody preflight state for a Liskov Application.";
+  static description = "Read live custody preflight state. For run-one submit, copy planItemId and the opaque idempotencyKey from the same custodial.live actionPlan item.";
   static examples = [
     "<%= config.bin %> liskov custody preflight proof-docs --json"
   ];
