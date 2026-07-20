@@ -7,6 +7,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  runSlipwayAdminDeploySpendResolve,
   runSlipwayAdminExecutorOperationReconcile,
   runSlipwayApplicationBackfillIdentities,
   runSlipwayApplicationBlackboxConfigure,
@@ -1616,6 +1617,75 @@ describe("proof-cli Liskov runner", () => {
     const body = JSON.parse(out.text) as { dryRun: boolean; operationId: string };
     assert.equal(body.dryRun, true);
     assert.equal(body.operationId, "op-1");
+  });
+
+  it("resolves deploy-spend review holds with exact evidence and dry-run default", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const adminToken = "deploy_spend_admin_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "session_token_do_not_print",
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const requests: Array<{ authorization?: string; body?: unknown; url: string }> = [];
+    const out = writer();
+    const sha = "a".repeat(64);
+    const code = await runSlipwayAdminDeploySpendResolve({
+      reserveId: "deploy-reserve:abc",
+      adminToken,
+      config: sessionFile,
+      expectOrganization: "org-1",
+      expectApplication: "app-1",
+      expectDeployment: "dep-1",
+      expectExecution: "exec-1",
+      expectBillingTransaction: "deploy-spend:abc",
+      expectStatus: "review_required",
+      finalUsdMicros: 25_000,
+      evidenceRef: "case:123",
+      evidenceSha256: sha,
+      reason: "manual adjudication",
+      json: true
+    }, {
+      fetchImpl: async (url, init) => {
+        requests.push({
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: JSON.parse(String(init?.body)),
+          url: String(url)
+        });
+        return jsonResponse({
+          ok: true,
+          dryRun: true,
+          eligible: true,
+          resolved: false,
+          idempotentReplay: false,
+          reserveId: "deploy-reserve:abc",
+          blockers: []
+        });
+      },
+      stdout: out.write
+    });
+    assert.equal(code, 0);
+    assert.deepEqual(requests, [{
+      authorization: `Bearer ${adminToken}`,
+      body: {
+        expectOrganization: "org-1",
+        expectApplication: "app-1",
+        expectDeployment: "dep-1",
+        expectExecution: "exec-1",
+        expectBillingTransaction: "deploy-spend:abc",
+        expectStatus: "review_required",
+        finalUsdMicros: 25_000,
+        evidenceRef: "case:123",
+        evidenceSha256: sha,
+        reason: "manual adjudication",
+        confirm: false
+      },
+      url: "https://slipway.test/api/admin/billing/deploy-spend/deploy-reserve%3Aabc/resolve"
+    }]);
+    assert.equal(out.text.includes(adminToken), false);
+    assert.equal((JSON.parse(out.text) as { dryRun: boolean }).dryRun, true);
   });
 
   it("mints Application DevTools view keys without printing the session token", async () => {

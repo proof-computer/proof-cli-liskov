@@ -283,6 +283,25 @@ export interface SlipwayAdminExecutorOperationReconcileInput {
   json?: boolean;
 }
 
+export interface SlipwayAdminDeploySpendResolveInput {
+  reserveId: string;
+  expectOrganization: string;
+  expectApplication: string;
+  expectDeployment: string;
+  expectExecution: string;
+  expectBillingTransaction: string;
+  expectStatus: string;
+  finalUsdMicros: number;
+  evidenceRef: string;
+  evidenceSha256: string;
+  reason: string;
+  yes?: boolean;
+  adminToken?: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationRuntimeImageWorkflowInput {
   applicationRef: string;
   liskovUrl?: string;
@@ -1818,6 +1837,77 @@ export async function runSlipwayAdminExecutorOperationReconcile(
     : body.idempotentReplay
       ? `Executor operation ${input.operationId} was already reconciled.`
       : `Reconciled executor operation ${input.operationId}; its unsubmitted placeholder is parked.`);
+  return 0;
+}
+
+export async function runSlipwayAdminDeploySpendResolve(
+  input: SlipwayAdminDeploySpendResolveInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  const reason = input.reason?.trim();
+  const evidenceRef = input.evidenceRef?.trim();
+  const evidenceSha256 = input.evidenceSha256?.trim();
+  if (!reason || !evidenceRef || !/^[0-9a-f]{64}$/.test(evidenceSha256 ?? "")
+      || !Number.isSafeInteger(input.finalUsdMicros) || input.finalUsdMicros < 0) {
+    const error = "SLIPWAY_ADMIN_DEPLOY_SPEND_RESOLVE_INPUT_INVALID";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      reserveId: input.reserveId
+    }, `Error (${error}): reason/evidence are required, evidence SHA-256 must be lowercase hex, and final USD micros must be a non-negative safe integer.`);
+    return 1;
+  }
+  const request = await authenticatedSlipwayJsonRequest<SlipwayGenericResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/admin/billing/deploy-spend/${encodeURIComponent(input.reserveId)}/resolve`,
+    body: {
+      expectOrganization: input.expectOrganization,
+      expectApplication: input.expectApplication,
+      expectDeployment: input.expectDeployment,
+      expectExecution: input.expectExecution,
+      expectBillingTransaction: input.expectBillingTransaction,
+      expectStatus: input.expectStatus,
+      finalUsdMicros: input.finalUsdMicros,
+      evidenceRef,
+      evidenceSha256,
+      reason,
+      confirm: input.yes === true
+    },
+    authToken: resolveAdminToken({ token: input.adminToken, env: options.env ?? process.env }),
+    requestErrorCode: "SLIPWAY_ADMIN_DEPLOY_SPEND_RESOLVE_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not resolve Liskov deploy-spend review"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  const body = request.body;
+  if (body?.ok !== true) {
+    const blockers = Array.isArray(body?.blockers)
+      ? body.blockers.filter((value): value is string => typeof value === "string")
+      : [];
+    const error = request.response.status === 401
+      ? "SLIPWAY_SESSION_UNAUTHORIZED"
+      : request.response.status === 403
+        ? "SLIPWAY_PLATFORM_ADMIN_REQUIRED"
+        : "SLIPWAY_ADMIN_DEPLOY_SPEND_RESOLVE_FAILED";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      blockers,
+      reserveId: input.reserveId,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, `Error (${error}): deploy-spend reserve ${input.reserveId} is not eligible${blockers.length ? ` (${blockers.join(", ")})` : ""}.`);
+    return 1;
+  }
+  writeStructuredOrHuman(options, input.json, body, body.dryRun
+    ? `Dry run: deploy-spend reserve ${input.reserveId} is eligible. Pass --yes to resolve it.`
+    : body.idempotentReplay
+      ? `Deploy-spend reserve ${input.reserveId} was already resolved identically.`
+      : `Resolved deploy-spend reserve ${input.reserveId} at ${input.finalUsdMicros} USD micros.`);
   return 0;
 }
 

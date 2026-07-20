@@ -35,6 +35,7 @@ proof liskov custody machine catalog --network mainnet --json
 proof liskov application backfill-identities
 proof liskov application delete proof-docs --reason retired --yes
 proof liskov admin executor-operation reconcile op-123 --expect-application slipway-diagnostic --expect-kind runtime_replacement --expect-deployment dep-123 --expect-job job-123 --expect-status pending --reason "terminalize unsubmitted replacement" --json
+proof liskov admin deploy-spend resolve reserve-123 --expect-organization org-1 --expect-application app-1 --expect-deployment dep-1 --expect-execution exec-1 --expect-billing-transaction tx-1 --expect-status review_required --final-usd-micros 25000 --evidence-ref case:123 --evidence-sha256 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --reason "reviewed chain evidence" --json
 proof liskov whoami --json
 proof liskov logout
 ```

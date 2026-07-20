@@ -116,6 +116,13 @@ try {
   assertIncludes(reconcileHelp.stdout, "--expect-job");
   assertIncludes(reconcileHelp.stdout, "--yes");
 
+  const deploySpendResolveHelp = run(process.execPath, [proofDevBin, "liskov", "admin", "deploy-spend", "resolve", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(deploySpendResolveHelp.stdout, "Resolve a deploy-spend review hold");
+  assertIncludes(deploySpendResolveHelp.stdout, "--expect-billing-transaction");
+  assertIncludes(deploySpendResolveHelp.stdout, "--final-usd-micros");
+  assertIncludes(deploySpendResolveHelp.stdout, "--evidence-sha256");
+  assertIncludes(deploySpendResolveHelp.stdout, "--yes");
+
   const whoamiHelp = run(process.execPath, [proofDevBin, "liskov", "whoami", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(whoamiHelp.stdout, "Read the current Liskov CLI session");
   assertIncludes(whoamiHelp.stdout, "--json");

@@ -9,6 +9,6 @@ export default class SlipwayAdmin extends Command {
   static summary = "Liskov platform-admin operations.";
 
   async run(): Promise<void> {
-    this.log("Use `proof liskov admin processor list --help` or `proof liskov admin executor-operation reconcile --help`.");
+    this.log("Use `proof liskov admin processor list --help`, `proof liskov admin executor-operation reconcile --help`, or `proof liskov admin deploy-spend resolve --help`.");
   }
 }
