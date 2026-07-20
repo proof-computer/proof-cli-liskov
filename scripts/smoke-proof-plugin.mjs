@@ -39,6 +39,7 @@ try {
 
   const applicationListHelp = run(process.execPath, [proofDevBin, "liskov", "application", "list", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationListHelp.stdout, "List readable Liskov Applications");
+  assertIncludes(applicationListHelp.stdout, "--deleted");
 
   const applicationBackfillIdentitiesHelp = run(process.execPath, [proofDevBin, "liskov", "application", "backfill-identities", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationBackfillIdentitiesHelp.stdout, "Backfill Liskov Application identity fields");
@@ -46,6 +47,7 @@ try {
 
   const applicationDeleteHelp = run(process.execPath, [proofDevBin, "liskov", "application", "delete", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationDeleteHelp.stdout, "Tombstone a Liskov Application");
+  assertIncludes(applicationDeleteHelp.stdout, "--acknowledge-live-resources");
   assertIncludes(applicationDeleteHelp.stdout, "--force");
   assertIncludes(applicationDeleteHelp.stdout, "--yes");
 

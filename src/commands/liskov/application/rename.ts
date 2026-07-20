@@ -7,7 +7,7 @@ export default class SlipwayApplicationRename extends Command {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true }),
     display_name: Args.string({ description: "New human display name for the Application.", required: true })
   };
-  static description = "Rename a Liskov Application's display name (re-derives its slug and republishes the policy).";
+  static description = "Change a Liskov Application's display name without changing its identity or policy.";
   static examples = [
     "<%= config.bin %> liskov application rename slipway-diagnostic 'Liskov Diagnostic'",
     "<%= config.bin %> liskov application rename slipway-diagnostic 'Liskov Diagnostic' --yes",
@@ -21,7 +21,7 @@ export default class SlipwayApplicationRename extends Command {
     "slipway-url": Flags.string({ description: "Liskov service URL." }),
     yes: Flags.boolean({ char: "y", description: "Confirm the rename. Without this flag the server returns a dry run." })
   };
-  static summary = "Rename a Liskov Application's display name.";
+  static summary = "Change a Liskov Application's display name.";
 
   async run(): Promise<void> {
     const { args, flags } = await this.parse(SlipwayApplicationRename);

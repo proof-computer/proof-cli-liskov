@@ -6,11 +6,13 @@ export default class SlipwayApplicationList extends Command {
   static description = "List readable Liskov Applications.";
   static examples = [
     "<%= config.bin %> liskov application list",
+    "<%= config.bin %> liskov application list --deleted",
     "<%= config.bin %> liskov application list --json",
     "<%= config.bin %> liskov application list --slipway-url https://slipway.proof.computer"
   ];
   static flags: Interfaces.FlagInput = {
     config: Flags.string({ description: "Path to the local Liskov session file." }),
+    deleted: Flags.boolean({ description: "List tombstoned Applications only." }),
     help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
     "slipway-url": Flags.string({ description: "Liskov service URL." })
@@ -21,6 +23,7 @@ export default class SlipwayApplicationList extends Command {
     const { flags } = await this.parse(SlipwayApplicationList);
     const code = await runSlipwayApplicationList({
       config: flags.config as string | undefined,
+      deleted: flags.deleted as boolean | undefined,
       json: flags.json as boolean | undefined,
       slipwayUrl: flags["slipway-url"] as string | undefined
     }, {

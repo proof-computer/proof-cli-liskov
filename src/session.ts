@@ -98,6 +98,7 @@ export interface SlipwayApplicationStatusInput {
 }
 
 export interface SlipwayApplicationListInput {
+  deleted?: boolean;
   slipwayUrl?: string;
   config?: string;
   json?: boolean;
@@ -107,6 +108,7 @@ export interface SlipwayApplicationDeleteInput {
   applicationRef: string;
   owner?: string;
   reason?: string;
+  acknowledgeLiveResources?: boolean;
   force?: boolean;
   yes?: boolean;
   slipwayUrl?: string;
@@ -601,10 +603,13 @@ interface PublicSlipwayApplicationRefCandidate {
   repository?: string;
 }
 
-interface SlipwayApplicationDeleteBlocker {
-  code?: string;
-  message?: string;
-  count?: number;
+interface SlipwayApplicationDeleteImpact {
+  activeDeploymentCount?: number;
+  liveJobCount?: number;
+  pendingOperationCount?: number;
+  hasLiveOrPendingResources?: boolean;
+  stopsFuturePlanning?: boolean;
+  existingResourcesContinue?: boolean;
 }
 
 interface PublicSelfCustodySigner {
@@ -652,9 +657,9 @@ interface SlipwayApplicationDeleteResponse {
   ok?: boolean;
   dryRun?: boolean;
   deleted?: boolean;
-  force?: boolean;
+  changed?: boolean;
   application?: PublicSlipwayApplicationSummary;
-  blockers?: SlipwayApplicationDeleteBlocker[];
+  impact?: SlipwayApplicationDeleteImpact;
   error?: string;
   reason?: string;
   candidates?: PublicSlipwayApplicationRefCandidate[];
@@ -698,8 +703,6 @@ interface SlipwayApplicationSetRepositoryResponse {
 
 interface SlipwayApplicationRenameRefs {
   displayName?: string | null;
-  applicationName?: string | null;
-  expectedPolicyPath?: string | null;
 }
 
 interface SlipwayApplicationRenameResponse {
@@ -708,7 +711,7 @@ interface SlipwayApplicationRenameResponse {
   changed?: boolean;
   from?: SlipwayApplicationRenameRefs;
   to?: SlipwayApplicationRenameRefs;
-  policy?: { policyVersionId?: string; [key: string]: unknown };
+  application?: PublicSlipwayApplicationSummary;
   error?: string;
   reason?: string;
   candidates?: PublicSlipwayApplicationRefCandidate[];
@@ -1101,7 +1104,7 @@ export async function runSlipwayApplicationList(input: SlipwayApplicationListInp
     config: input.config,
     slipwayUrl: input.slipwayUrl,
     json: input.json,
-    path: "/api/applications",
+    path: input.deleted === true ? "/api/applications?includeDeleted=true" : "/api/applications",
     requestErrorCode: "SLIPWAY_APPLICATION_LIST_FAILED",
     notFoundMessage: "No Liskov CLI session is stored locally.",
     fetchFailedMessage: "could not list Liskov Applications"
@@ -1122,11 +1125,18 @@ export async function runSlipwayApplicationList(input: SlipwayApplicationListInp
     return 1;
   }
 
+  const output = input.deleted === true
+    ? {
+        ...body,
+        count: body.applications.filter((application) => application.status === "deleted" || typeof application.deletedAtMs === "number").length,
+        applications: body.applications.filter((application) => application.status === "deleted" || typeof application.deletedAtMs === "number")
+      }
+    : body;
   writeStructuredOrHuman(
     options,
     input.json,
-    body,
-    formatApplicationList(body)
+    output,
+    formatApplicationList(output)
   );
   return 0;
 }
@@ -1171,6 +1181,15 @@ export async function runSlipwayApplicationBackfillIdentities(input: SlipwayAppl
 }
 
 export async function runSlipwayApplicationDelete(input: SlipwayApplicationDeleteInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const reason = input.reason?.trim();
+  if (input.yes === true && !reason) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_DELETE_REASON_REQUIRED",
+      applicationRef: input.applicationRef
+    }, "Error (SLIPWAY_APPLICATION_DELETE_REASON_REQUIRED): confirmed deletion requires a non-empty --reason.");
+    return 1;
+  }
   const request = await authenticatedSlipwayJsonRequest<SlipwayApplicationDeleteResponse>({
     config: input.config,
     slipwayUrl: input.slipwayUrl,
@@ -1179,8 +1198,9 @@ export async function runSlipwayApplicationDelete(input: SlipwayApplicationDelet
     path: applicationDeletePath(input.applicationRef, input.owner),
     body: {
       confirm: input.yes === true,
-      force: input.force === true,
-      reason: input.reason
+      acknowledgeLiveResources: input.acknowledgeLiveResources === true,
+      force: input.force === true ? true : undefined,
+      reason
     },
     requestErrorCode: "SLIPWAY_APPLICATION_DELETE_FAILED",
     notFoundMessage: "No Liskov CLI session is stored locally.",
@@ -4205,18 +4225,19 @@ function formatApplicationBackfillIdentities(body: SlipwayApplicationBackfillIde
 
 function formatApplicationDelete(body: SlipwayApplicationDeleteResponse): string {
   const target = formatApplicationLabel(body.application);
-  const blockers = body.blockers ?? [];
+  const impact = body.impact ?? {};
   const header = body.dryRun === true
     ? `Dry run: ${target} would be tombstoned.`
     : body.deleted === true
       ? `Deleted ${target}.`
       : `${target} is already deleted.`;
   const lines = [header];
-  if (blockers.length > 0) {
-    lines.push(`Blockers: ${blockers.map(formatDeleteBlocker).join("; ")}`);
-    if (body.dryRun === true && body.force !== true) {
-      lines.push("Use --force --yes to tombstone despite these blockers.");
-    }
+  lines.push(
+    `Impact: ${impact.activeDeploymentCount ?? 0} active/current deployment(s), ${impact.liveJobCount ?? 0} live job(s), ${impact.pendingOperationCount ?? 0} pending/running executor operation(s).`,
+    "Deletion stops future planning; existing jobs, grants, ingress, logs, submitted operations, and accounting continue unchanged."
+  );
+  if (body.dryRun === true && impact.hasLiveOrPendingResources === true) {
+    lines.push("Confirm with --acknowledge-live-resources --reason TEXT --yes after reviewing these live resources.");
   }
   return lines.join("\n");
 }
@@ -4261,22 +4282,15 @@ function formatApplicationSetRepository(applicationRef: string, body: SlipwayApp
 function formatApplicationRename(applicationRef: string, body: SlipwayApplicationRenameResponse): string {
   const toName = body.to?.displayName ?? "(unknown)";
   const fromName = body.from?.displayName ?? "(unknown)";
-  const slug = body.to?.applicationName ?? undefined;
-  const policyPath = body.to?.expectedPolicyPath ?? (slug ? `.liskov/${slug}.policy.json` : undefined);
   if (body.changed === false) {
     return body.dryRun === true
       ? `Dry run: ${applicationRef} is already named "${toName}".`
       : `${applicationRef} is already named "${toName}".`;
   }
   if (body.dryRun === true) {
-    const lines = [`Dry run: ${applicationRef} would be renamed "${fromName}" → "${toName}"${slug ? ` (slug ${slug})` : ""}.`];
-    if (policyPath) lines.push(`Then rename the repo policy file to ${policyPath}, update its source.path, and re-import.`);
-    return lines.join("\n");
+    return `Dry run: ${applicationRef} display name would change "${fromName}" → "${toName}".`;
   }
-  const version = body.policy?.policyVersionId;
-  const lines = [`Renamed ${applicationRef} to "${toName}"${slug ? ` (slug ${slug})` : ""}${version ? ` (policy ${version})` : ""}.`];
-  if (policyPath) lines.push(`Now rename the repo policy file to ${policyPath}, update its source.path, commit, and re-import.`);
-  return lines.join("\n");
+  return `Changed ${applicationRef} display name to "${toName}".`;
 }
 
 function formatApplicationDevtoolsViewKey(body: unknown, input: SlipwayApplicationDevtoolsViewKeyInput): string {
@@ -4330,12 +4344,6 @@ function formatApplicationAmbiguity(applicationRef: string, candidates: PublicSl
   }
   lines.push("Use an Application uid/name, or pass --owner OWNER with the legacy id.");
   return lines.join("\n");
-}
-
-function formatDeleteBlocker(blocker: SlipwayApplicationDeleteBlocker): string {
-  const label = blocker.code ?? "unknown";
-  const count = typeof blocker.count === "number" ? ` (${blocker.count})` : "";
-  return `${label}${count}`;
 }
 
 function formatApplicationLabel(

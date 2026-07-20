@@ -257,6 +257,43 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.applications[1]?.deleteReason, "test cleanup");
   });
 
+  it("lists only tombstones with the deleted Application view", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "deleted-list-token",
+      savedAtMs: 0
+    }, { config: sessionFile });
+    let requestedUrl = "";
+    const out = writer();
+    const code = await runSlipwayApplicationList({
+      config: sessionFile,
+      deleted: true,
+      json: true
+    }, {
+      fetchImpl: async (url) => {
+        requestedUrl = String(url);
+        return jsonResponse({
+          ok: true,
+          count: 2,
+          applications: [
+            { applicationUid: "app-active", applicationName: "active", status: "active" },
+            { applicationUid: "app-deleted", applicationName: "deleted", status: "deleted", deletedAtMs: 42 }
+          ]
+        });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.equal(requestedUrl, "https://slipway.test/api/applications?includeDeleted=true");
+    const parsed = JSON.parse(out.text) as { count: number; applications: Array<{ applicationUid: string }> };
+    assert.equal(parsed.count, 1);
+    assert.deepEqual(parsed.applications.map((application) => application.applicationUid), ["app-deleted"]);
+  });
+
   it("dry-runs Application identity backfill with the stored session bearer without printing it", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
@@ -345,7 +382,6 @@ describe("proof-cli Liskov runner", () => {
           ok: true,
           dryRun: true,
           deleted: false,
-          force: false,
           application: {
             applicationUid: "app-1111111111111111",
             applicationName: "alpha",
@@ -353,10 +389,14 @@ describe("proof-cli Liskov runner", () => {
             ownerAddress: "5owner",
             status: "active"
           },
-          blockers: [{
-            code: "application_active",
-            message: "Application status is active"
-          }]
+          impact: {
+            activeDeploymentCount: 1,
+            liveJobCount: 2,
+            pendingOperationCount: 1,
+            hasLiveOrPendingResources: true,
+            stopsFuturePlanning: true,
+            existingResourcesContinue: true
+          }
         });
       },
       stdout: out.write
@@ -368,18 +408,39 @@ describe("proof-cli Liskov runner", () => {
       method: "DELETE",
       authorization: `Bearer ${token}`,
       body: {
+        acknowledgeLiveResources: false,
         confirm: false,
-        force: false,
         reason: "cleanup"
       }
     }]);
     assert.equal(out.text.includes(token), false);
-    const parsed = JSON.parse(out.text) as { ok: boolean; dryRun: boolean; application: { applicationUid: string; applicationName: string }; blockers: Array<{ code: string }> };
+    const parsed = JSON.parse(out.text) as { ok: boolean; dryRun: boolean; application: { applicationUid: string; applicationName: string }; impact: { liveJobCount: number } };
     assert.equal(parsed.ok, true);
     assert.equal(parsed.dryRun, true);
     assert.equal(parsed.application.applicationUid, "app-1111111111111111");
     assert.equal(parsed.application.applicationName, "alpha");
-    assert.equal(parsed.blockers[0]?.code, "application_active");
+    assert.equal(parsed.impact.liveJobCount, 2);
+  });
+
+  it("requires a reason before confirmed Application deletion", async () => {
+    const out = writer();
+    let calls = 0;
+    const code = await runSlipwayApplicationDelete({
+      applicationRef: "app-1111111111111111",
+      yes: true,
+      json: true
+    }, {
+      fetchImpl: async () => {
+        calls += 1;
+        return jsonResponse({ ok: true });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 1);
+    assert.equal(calls, 0);
+    const parsed = JSON.parse(out.text) as { error: string };
+    assert.equal(parsed.error, "SLIPWAY_APPLICATION_DELETE_REASON_REQUIRED");
   });
 
   it("renders ambiguous Application delete candidates without printing the bearer token", async () => {
@@ -436,8 +497,8 @@ describe("proof-cli Liskov runner", () => {
       method: "DELETE",
       authorization: `Bearer ${token}`,
       body: {
+        acknowledgeLiveResources: false,
         confirm: false,
-        force: false
       }
     }]);
     assert.equal(out.text.includes(token), false);
@@ -723,13 +784,14 @@ describe("proof-cli Liskov runner", () => {
           ok: true,
           dryRun: body.confirm !== true,
           changed: true,
-          from: { displayName: "Slipway diagnostic", applicationName: "slipway-diagnostic" },
-          to: {
-            displayName: body.displayName,
-            applicationName: "liskov-diagnostic",
-            expectedPolicyPath: ".liskov/liskov-diagnostic.policy.json"
-          },
-          policy: body.confirm === true ? { policyVersionId: "slipway-diagnostic-v23" } : undefined
+          from: { displayName: "Slipway diagnostic" },
+          to: { displayName: body.displayName },
+          application: {
+            applicationUid: "app-1111111111111111",
+            applicationName: "slipway-diagnostic",
+            applicationId: "legacy-diagnostic",
+            displayName: body.displayName
+          }
         });
       },
       stdout: out.write
@@ -764,12 +826,13 @@ describe("proof-cli Liskov runner", () => {
       body: { displayName: "Liskov Diagnostic", confirm: true }
     }]);
     assert.equal(out.text.includes(token), false);
-    const outputs = out.text.trim().split(/\n(?=\{)/u).map((line) => JSON.parse(line) as { ok: boolean; dryRun: boolean; to: { applicationName: string }; policy?: { policyVersionId?: string } });
+    const outputs = out.text.trim().split(/\n(?=\{)/u).map((line) => JSON.parse(line) as { ok: boolean; dryRun: boolean; to: { displayName: string }; application: { applicationName: string } });
     assert.equal(outputs[0]?.ok, true);
     assert.equal(outputs[0]?.dryRun, true);
-    assert.equal(outputs[0]?.to.applicationName, "liskov-diagnostic");
+    assert.equal(outputs[0]?.to.displayName, "Liskov Diagnostic");
+    assert.equal(outputs[0]?.application.applicationName, "slipway-diagnostic");
     assert.equal(outputs[1]?.dryRun, false);
-    assert.equal(outputs[1]?.policy?.policyVersionId, "slipway-diagnostic-v23");
+    assert.equal(outputs[1]?.application.applicationName, "slipway-diagnostic");
   });
 
   it("rejects an empty rename display name before making any request", async () => {
