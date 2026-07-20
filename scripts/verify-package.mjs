@@ -23,6 +23,8 @@ const requiredArtifacts = [
   "dist/commands/liskov/application/lockbox/setup-pr.js",
   "dist/commands/liskov/application/plans.js",
   "dist/commands/liskov/application/status.js",
+  "dist/commands/liskov/admin/executor-operation.js",
+  "dist/commands/liskov/admin/executor-operation/reconcile.js",
   "dist/commands/liskov/custody.js",
   "dist/commands/liskov/custody/account.js",
   "dist/commands/liskov/custody/account/ensure.js",

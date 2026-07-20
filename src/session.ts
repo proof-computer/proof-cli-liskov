@@ -149,6 +149,8 @@ export interface SlipwayApplicationRenameInput {
 
 export interface SlipwayApplicationPublishInput {
   applicationRef: string;
+  paused?: boolean;
+  reason?: string;
   yes?: boolean;
   slipwayUrl?: string;
   config?: string;
@@ -259,6 +261,21 @@ export interface SlipwayAdminProcessorListInput {
 export interface SlipwayAdminProcessorClearGreylistInput {
   processorId: string;
   reason?: string;
+  yes?: boolean;
+  adminToken?: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayAdminExecutorOperationReconcileInput {
+  operationId: string;
+  expectApplication: string;
+  expectKind: string;
+  expectDeployment: string;
+  expectJob: string;
+  expectStatus: string;
+  reason: string;
   yes?: boolean;
   adminToken?: string;
   slipwayUrl?: string;
@@ -1368,6 +1385,23 @@ export async function runSlipwayApplicationRename(input: SlipwayApplicationRenam
 }
 
 export async function runSlipwayApplicationPublish(input: SlipwayApplicationPublishInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const reason = input.reason?.trim();
+  if (input.paused && !reason) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_PUBLISH_PAUSED_REASON_REQUIRED",
+      applicationRef: input.applicationRef
+    }, "Error (SLIPWAY_APPLICATION_PUBLISH_PAUSED_REASON_REQUIRED): --paused requires a non-empty --reason.");
+    return 1;
+  }
+  if (!input.paused && reason) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_PUBLISH_REASON_WITHOUT_PAUSED",
+      applicationRef: input.applicationRef
+    }, "Error (SLIPWAY_APPLICATION_PUBLISH_REASON_WITHOUT_PAUSED): --reason is only valid with --paused.");
+    return 1;
+  }
   if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_PUBLISH_CONFIRMATION_REQUIRED", "Application publish");
   return runSlipwayJsonCommand({
     config: input.config,
@@ -1375,13 +1409,15 @@ export async function runSlipwayApplicationPublish(input: SlipwayApplicationPubl
     json: input.json,
     method: "POST",
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/publish`,
-    body: {},
+    body: input.paused ? { postPublishStatus: "paused", reason } : {},
     errorCode: "SLIPWAY_APPLICATION_PUBLISH_FAILED",
     fetchFailedMessage: "could not publish Liskov Application",
     human: (body) => {
       const policy = objectRecord(objectRecord(body).policy);
       const version = stringValue(policy.policyVersionId) ?? stringValue(policy.versionId);
-      return `Published ${version ? `policy ${version}` : "active policy"} for ${input.applicationRef}.`;
+      return input.paused
+        ? `Published ${version ? `policy ${version}` : "policy"} for ${input.applicationRef}; Application is paused.`
+        : `Published ${version ? `policy ${version}` : "active policy"} for ${input.applicationRef}.`;
     }
   }, options);
 }
@@ -1718,6 +1754,70 @@ export async function runSlipwayAdminProcessorClearGreylist(input: SlipwayAdminP
     : body.cleared
       ? `Cleared greylist for processor ${input.processorId}.`
       : `No greylist to clear for processor ${input.processorId}.`);
+  return 0;
+}
+
+export async function runSlipwayAdminExecutorOperationReconcile(
+  input: SlipwayAdminExecutorOperationReconcileInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  const reason = input.reason?.trim();
+  if (!reason) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_ADMIN_EXECUTOR_OPERATION_RECONCILE_REASON_REQUIRED",
+      operationId: input.operationId
+    }, "Error (SLIPWAY_ADMIN_EXECUTOR_OPERATION_RECONCILE_REASON_REQUIRED): --reason must not be empty.");
+    return 1;
+  }
+  const request = await authenticatedSlipwayJsonRequest<SlipwayGenericResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/admin/executor-operations/${encodeURIComponent(input.operationId)}/reconcile`,
+    body: {
+      expectApplication: input.expectApplication,
+      expectKind: input.expectKind,
+      expectDeployment: input.expectDeployment,
+      expectJob: input.expectJob,
+      expectStatus: input.expectStatus,
+      reason,
+      confirm: input.yes === true
+    },
+    authToken: resolveAdminToken({ token: input.adminToken, env: options.env ?? process.env }),
+    requestErrorCode: "SLIPWAY_ADMIN_EXECUTOR_OPERATION_RECONCILE_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not reconcile Liskov executor operation"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  const body = request.body;
+  if (body?.ok !== true) {
+    const blockers = Array.isArray(body?.blockers)
+      ? body.blockers.filter((value): value is string => typeof value === "string")
+      : [];
+    const error = request.response.status === 401
+      ? "SLIPWAY_SESSION_UNAUTHORIZED"
+      : request.response.status === 403
+        ? "SLIPWAY_PLATFORM_ADMIN_REQUIRED"
+        : "SLIPWAY_ADMIN_EXECUTOR_OPERATION_RECONCILE_FAILED";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      reason: body?.reason ?? body?.error,
+      blockers,
+      operationId: input.operationId,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, `Error (${error}): executor operation ${input.operationId} is not eligible for reconciliation${blockers.length ? ` (${blockers.join(", ")})` : ""}.`);
+    return 1;
+  }
+  writeStructuredOrHuman(options, input.json, body, body.dryRun
+    ? `Dry run: executor operation ${input.operationId} is eligible. Pass --yes to reconcile it.`
+    : body.idempotentReplay
+      ? `Executor operation ${input.operationId} was already reconciled.`
+      : `Reconciled executor operation ${input.operationId}; its unsubmitted placeholder is parked.`);
   return 0;
 }
 

@@ -1,5 +1,6 @@
 export {
   DEFAULT_SLIPWAY_URL,
+  runSlipwayAdminExecutorOperationReconcile,
   runSlipwayAdminProcessorClearGreylist,
   runSlipwayAdminProcessorList,
   runSlipwayApplicationActionPlan,
@@ -48,6 +49,7 @@ export {
   runSlipwayWhoami,
   saveSlipwaySession,
   type SlipwayAdminProcessorClearGreylistInput,
+  type SlipwayAdminExecutorOperationReconcileInput,
   type SlipwayAdminProcessorListInput,
   type SlipwayApplicationActionPlanInput,
   type SlipwayApplicationActionPlanRetryInput,

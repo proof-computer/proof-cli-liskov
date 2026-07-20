@@ -10,6 +10,7 @@ proof liskov application list
 proof liskov application status proof-docs
 proof liskov application plans proof-docs --json
 proof liskov application publish proof-docs --yes
+proof liskov application publish proof-docs --paused --reason "failure-matrix initialization" --yes
 proof liskov application pause proof-docs --reason "funding pending" --yes
 proof liskov application resume proof-docs --reason "funded" --yes
 proof liskov application devtools view-key proof-docs 66059 --json
@@ -33,6 +34,7 @@ proof liskov custody execution recover proof-docs --execution-id ID --reason "op
 proof liskov custody machine catalog --network mainnet --json
 proof liskov application backfill-identities
 proof liskov application delete proof-docs --reason retired --yes
+proof liskov admin executor-operation reconcile op-123 --expect-application slipway-diagnostic --expect-kind runtime_replacement --expect-deployment dep-123 --expect-job job-123 --expect-status pending --reason "terminalize unsubmitted replacement" --json
 proof liskov whoami --json
 proof liskov logout
 ```
@@ -57,6 +59,13 @@ Pause, resume, delete, and identity backfill dry-run by default and require
 require `--yes`; live execution submit also requires `--yes-spend`. The plugin does
 not expose the old direct manual Acurast spend fallback; diagnostics and
 machine catalog reads stay server-side.
+
+`application publish --paused --reason TEXT --yes` publishes and pauses in one
+server transaction, so the executor cannot observe an intermediate active
+Application. The platform-admin executor-operation reconciliation command is a
+dry-run unless `--yes`; it requires exact identity expectations and refuses any
+placeholder with lease, proposal, chain/contact evidence, a later replacement,
+or non-terminal billing correlation.
 
 For guarded `custody execution run-one` submit mode, first run `custody
 preflight APP_REF --json`. Choose one `actionPlan.items[]` entry whose

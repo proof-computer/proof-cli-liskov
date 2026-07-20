@@ -30,7 +30,7 @@ COMMANDS
   login
   application import --github owner/repo:path@ref [--server-fetch] [--publish]
   application list
-  application publish APP_REF --yes
+  application publish APP_REF [--paused --reason TEXT] --yes
   application pause APP_REF --yes
   application resume APP_REF --yes
   application status APPLICATION_ID
@@ -58,6 +58,7 @@ COMMANDS
   custody execution recover APP_REF --execution-id ID --reason TEXT --yes
   custody execution retry APP_REF --execution-id ID --reason TEXT --yes
   custody machine catalog
+  admin executor-operation reconcile OPERATION_ID --expect-application APP --expect-kind KIND --expect-deployment DEPLOYMENT --expect-job JOB --expect-status STATUS --reason TEXT [--yes]
   whoami
   logout
 

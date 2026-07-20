@@ -54,6 +54,11 @@ try {
   assertIncludes(applicationPauseHelp.stdout, "--reason");
   assertIncludes(applicationPauseHelp.stdout, "--yes");
 
+  const applicationPublishHelp = run(process.execPath, [proofDevBin, "liskov", "application", "publish", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationPublishHelp.stdout, "--paused");
+  assertIncludes(applicationPublishHelp.stdout, "--reason");
+  assertIncludes(applicationPublishHelp.stdout, "--yes");
+
   const applicationResumeHelp = run(process.execPath, [proofDevBin, "liskov", "application", "resume", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationResumeHelp.stdout, "Resume new Liskov work");
   assertIncludes(applicationResumeHelp.stdout, "--reason");
@@ -104,6 +109,13 @@ try {
   const custodyMachineCatalogHelp = run(process.execPath, [proofDevBin, "liskov", "custody", "machine", "catalog", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(custodyMachineCatalogHelp.stdout, "Read Acurast machine-class catalog");
 
+  const reconcileHelp = run(process.execPath, [proofDevBin, "liskov", "admin", "executor-operation", "reconcile", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(reconcileHelp.stdout, "Reconcile a provably unsubmitted replacement operation");
+  assertIncludes(reconcileHelp.stdout, "--expect-application");
+  assertIncludes(reconcileHelp.stdout, "--expect-deployment");
+  assertIncludes(reconcileHelp.stdout, "--expect-job");
+  assertIncludes(reconcileHelp.stdout, "--yes");
+
   const whoamiHelp = run(process.execPath, [proofDevBin, "liskov", "whoami", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(whoamiHelp.stdout, "Read the current Liskov CLI session");
   assertIncludes(whoamiHelp.stdout, "--json");
@@ -127,6 +139,8 @@ function run(command, args, options) {
     throw new Error([
       `Command failed: ${command} ${args.join(" ")}`,
       `exit: ${result.status}`,
+      `signal: ${result.signal}`,
+      result.error ? `spawn error: ${result.error.message}` : "",
       result.stdout,
       result.stderr
     ].filter(Boolean).join("\n"));

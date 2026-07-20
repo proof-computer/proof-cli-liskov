@@ -32,7 +32,7 @@ COMMANDS
   import --github owner/repo:path@ref [--server-fetch] [--publish]
   import --file PATH [--publish]
   list
-  publish APP_REF --yes
+  publish APP_REF [--paused --reason TEXT] --yes
   pause APP_REF [--owner OWNER] [--reason TEXT] [--yes]
   resume APP_REF [--owner OWNER] [--reason TEXT] [--yes]
   status APPLICATION_ID

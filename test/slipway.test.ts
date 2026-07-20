@@ -7,6 +7,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  runSlipwayAdminExecutorOperationReconcile,
   runSlipwayApplicationBackfillIdentities,
   runSlipwayApplicationBlackboxConfigure,
   runSlipwayApplicationActivity,
@@ -1350,6 +1351,25 @@ describe("proof-cli Liskov runner", () => {
         }
       },
       {
+        name: "publish paused",
+        run: () => runSlipwayApplicationPublish({
+          applicationRef: "alpha",
+          config: sessionFile,
+          json: true,
+          paused: true,
+          reason: "matrix initialization",
+          yes: true
+        }, sharedOptions()),
+        expected: {
+          url: "https://slipway.test/api/applications/alpha/publish",
+          method: "POST",
+          body: {
+            postPublishStatus: "paused",
+            reason: "matrix initialization"
+          }
+        }
+      },
+      {
         name: "deployment import",
         run: () => runSlipwayApplicationDeploymentImport({
           applicationRef: "alpha",
@@ -1513,6 +1533,89 @@ describe("proof-cli Liskov runner", () => {
     const codes = await Promise.all(commands);
     assert.deepEqual(codes, [1, 1, 1, 1, 1, 1, 1]);
     assert.match(out.text, /CONFIRMATION_REQUIRED/u);
+  });
+
+  it("validates publish-paused reason before confirmation or network I/O", async () => {
+    const out = writer();
+    const code = await runSlipwayApplicationPublish({
+      applicationRef: "alpha",
+      json: true,
+      paused: true,
+      reason: "   ",
+      yes: true
+    }, {
+      fetchImpl: async () => {
+        throw new Error("network should not be called");
+      },
+      stdout: out.write
+    });
+    assert.equal(code, 1);
+    const body = JSON.parse(out.text) as { error: string };
+    assert.equal(body.error, "SLIPWAY_APPLICATION_PUBLISH_PAUSED_REASON_REQUIRED");
+  });
+
+  it("reconciles executor operations with exact guards, dry-run default, JSON-only stdout, and token redaction", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const sessionToken = "slipway_reconcile_session_token_do_not_print";
+    const adminToken = "slipway_reconcile_admin_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken,
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const requests: Array<{ authorization?: string; body?: unknown; url: string }> = [];
+    const out = writer();
+    const code = await runSlipwayAdminExecutorOperationReconcile({
+      adminToken,
+      config: sessionFile,
+      expectApplication: "slipway-diagnostic",
+      expectDeployment: "dep-1",
+      expectJob: "job-1",
+      expectKind: "runtime_replacement",
+      expectStatus: "pending",
+      json: true,
+      operationId: "op-1",
+      reason: "terminalize unsubmitted replacement"
+    }, {
+      fetchImpl: async (url, init) => {
+        requests.push({
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: JSON.parse(String(init?.body)),
+          url: String(url)
+        });
+        return jsonResponse({
+          ok: true,
+          dryRun: true,
+          eligible: true,
+          reconciled: false,
+          idempotentReplay: false,
+          operationId: "op-1",
+          blockers: []
+        });
+      },
+      stdout: out.write
+    });
+    assert.equal(code, 0);
+    assert.deepEqual(requests, [{
+      authorization: `Bearer ${adminToken}`,
+      body: {
+        expectApplication: "slipway-diagnostic",
+        expectDeployment: "dep-1",
+        expectJob: "job-1",
+        expectKind: "runtime_replacement",
+        expectStatus: "pending",
+        reason: "terminalize unsubmitted replacement",
+        confirm: false
+      },
+      url: "https://slipway.test/api/admin/executor-operations/op-1/reconcile"
+    }]);
+    assert.equal(out.text.includes(adminToken), false);
+    assert.equal(out.text.includes(sessionToken), false);
+    const body = JSON.parse(out.text) as { dryRun: boolean; operationId: string };
+    assert.equal(body.dryRun, true);
+    assert.equal(body.operationId, "op-1");
   });
 
   it("mints Application DevTools view keys without printing the session token", async () => {
