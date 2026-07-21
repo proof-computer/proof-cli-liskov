@@ -2101,6 +2101,65 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(out.text.includes(token), false);
   });
 
+  it("requests and labels the paused read-only custody preflight preview", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_paused_preflight_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method: string; authorization?: string }> = [];
+    const out = writer();
+    const code = await runSlipwayCustodyPreflight({
+      applicationRef: "alpha",
+      config: sessionFile,
+      previewPaused: true
+    }, {
+      fetchImpl: async (url, init) => {
+        requests.push({
+          url: String(url),
+          method: init?.method ?? "GET",
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization
+        });
+        return jsonResponse({
+          ok: true,
+          mode: "paused_preview",
+          readOnly: true,
+          submitAllowed: false,
+          actionPlan: { count: 0, items: [] },
+          pausedPreview: {
+            status: "ready",
+            readOnly: true,
+            submitAllowed: false,
+            itemCount: 1,
+            readyCount: 1,
+            items: [{
+              planItemId: "preview-plan-1",
+              previewOnly: true,
+              submitAllowed: false,
+              selection: { processorIds: ["5PreviewProcessor"] }
+            }]
+          }
+        });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications/alpha/live-custody/preflight?previewPaused=true",
+      method: "GET",
+      authorization: `Bearer ${token}`
+    }]);
+    assert.match(out.text, /Paused read-only preflight for alpha: ready; 1\/1 deploy item\(s\) ready\. Submission is disabled\./u);
+    assert.equal(out.text.includes("preview-plan-1"), false);
+    assert.equal(out.text.includes(token), false);
+  });
+
   it("prints assignment dossier risk in human custody diagnosis output", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");

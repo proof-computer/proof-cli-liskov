@@ -407,6 +407,7 @@ export interface SlipwayCustodyAccountEnsureInput {
 
 export interface SlipwayCustodyPreflightInput {
   applicationRef: string;
+  previewPaused?: boolean;
   slipwayUrl?: string;
   config?: string;
   json?: boolean;
@@ -2281,11 +2282,12 @@ export async function runSlipwayCustodyAccountEnsure(input: SlipwayCustodyAccoun
 }
 
 export async function runSlipwayCustodyPreflight(input: SlipwayCustodyPreflightInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const previewQuery = input.previewPaused === true ? "?previewPaused=true" : "";
   const request = await authenticatedSlipwayRequest<SlipwayLiveCustodyCommandResponse>({
     config: input.config,
     slipwayUrl: input.slipwayUrl,
     json: input.json,
-    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/preflight`,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/preflight${previewQuery}`,
     requestErrorCode: "SLIPWAY_CUSTODY_PREFLIGHT_FAILED",
     notFoundMessage: "No Liskov CLI session is stored locally.",
     fetchFailedMessage: "could not read Liskov live custody preflight"
@@ -2297,6 +2299,13 @@ export async function runSlipwayCustodyPreflight(input: SlipwayCustodyPreflightI
     errorCode: "SLIPWAY_CUSTODY_PREFLIGHT_FAILED",
     json: input.json,
     human: (body) => {
+      if (stringValue(objectRecord(body).mode) === "paused_preview") {
+        const preview = objectRecord(objectRecord(body).pausedPreview);
+        const status = stringValue(preview.status) ?? "unknown";
+        const itemCount = numberValue(preview.itemCount) ?? arrayValue(preview.items).length;
+        const readyCount = numberValue(preview.readyCount) ?? 0;
+        return `Paused read-only preflight for ${input.applicationRef}: ${status}; ${readyCount}/${itemCount} deploy item(s) ready. Submission is disabled.`;
+      }
       const actionPlan = objectRecord(objectRecord(body).actionPlan);
       const count = numberValue(actionPlan.count) ?? arrayValue(actionPlan.items).length;
       const selectionInstruction = count > 0
