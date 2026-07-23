@@ -474,6 +474,8 @@ export interface SlipwayCustodyExecutionRunOneInput {
   expectKind: string;
   expectPolicyDigest: string;
   expectDeploymentId?: string;
+  requireEnvironmentBootstrap?: boolean;
+  requireOneGeneration?: boolean;
   yes?: boolean;
   yesSpend?: boolean;
   secretsFile?: string;
@@ -2566,6 +2568,26 @@ export async function runSlipwayCustodyExecutionRunOne(input: SlipwayCustodyExec
       if (!prepared.ok) return prepared.exitCode;
       if (prepared.handoffs.length > 0) body.environmentHandoff = prepared.handoffs[0];
     }
+    const recoveryCommand = `proof liskov custody execution run-one ${input.applicationRef} --execution-id ${preflight.expectedExecutionId} --expect-kind ${input.expectKind} --expect-policy-digest ${input.expectPolicyDigest} --yes --json`;
+    emitError(
+      options,
+      `Run-one provisional recovery handle: ${preflight.expectedExecutionId}. If the submit response is interrupted, observe it without resubmitting: ${recoveryCommand}`
+    );
+    return runSlipwayJsonCommand({
+      config: input.config,
+      slipwayUrl: input.slipwayUrl,
+      json: input.json,
+      method: "POST",
+      path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions/run-one`,
+      body,
+      errorCode: "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_FAILED",
+      fetchFailedMessage: "could not run one Liskov live custody execution",
+      requestFailureDetails: {
+        recoveryExecutionId: preflight.expectedExecutionId,
+        recoveryCommand
+      },
+      human: runOneHuman(input)
+    }, options);
   }
   return runSlipwayJsonCommand({
     config: input.config,
@@ -2576,22 +2598,26 @@ export async function runSlipwayCustodyExecutionRunOne(input: SlipwayCustodyExec
     body,
     errorCode: "SLIPWAY_CUSTODY_EXECUTION_RUN_ONE_FAILED",
     fetchFailedMessage: "could not run one Liskov live custody execution",
-    human: (responseBody) => {
-      const bodyRecord = objectRecord(responseBody);
-      const attempt = objectRecord(bodyRecord.attempt);
-      const receipt = objectRecord(attempt.receipt);
-      const executionId = stringValue(attempt.executionId) ?? input.executionId ?? input.planItemId ?? "unknown";
-      const status = stringValue(attempt.status) ?? "updated";
-      const deploymentId = stringValue(receipt.deploymentId);
-      const outcome = stringValue(bodyRecord.waiting) ?? (bodyRecord.recovered === true ? "recovered" : stringValue(bodyRecord.mode) ?? (bodyRecord.replayed === true ? "replayed" : "run"));
-      const deployment = deploymentId ? ` deployment ${deploymentId}` : "";
-      return `Run-one ${executionId}: ${status}${deployment} (${outcome}).`;
-    }
+    human: runOneHuman(input)
   }, options);
 }
 
+function runOneHuman(input: SlipwayCustodyExecutionRunOneInput): (responseBody: unknown) => string {
+  return (responseBody) => {
+    const bodyRecord = objectRecord(responseBody);
+    const attempt = objectRecord(bodyRecord.attempt);
+    const receipt = objectRecord(attempt.receipt);
+    const executionId = stringValue(attempt.executionId) ?? input.executionId ?? input.planItemId ?? "unknown";
+    const status = stringValue(attempt.status) ?? "updated";
+    const deploymentId = stringValue(receipt.deploymentId);
+    const outcome = stringValue(bodyRecord.waiting) ?? (bodyRecord.recovered === true ? "recovered" : stringValue(bodyRecord.mode) ?? (bodyRecord.replayed === true ? "replayed" : "run"));
+    const deployment = deploymentId ? ` deployment ${deploymentId}` : "";
+    return `Run-one ${executionId}: ${status}${deployment} (${outcome}).`;
+  };
+}
+
 type FreshRunOnePlanSelection =
-  | { ok: true; planItemId: string; idempotencyKey: string }
+  | { ok: true; planItemId: string; idempotencyKey: string; expectedExecutionId: string }
   | { ok: false; exitCode: number };
 
 async function selectFreshRunOnePlanItem(
@@ -2662,6 +2688,31 @@ async function selectFreshRunOnePlanItem(
   }
   if (!response.ok || preflight?.ok !== true) {
     return fail(stringValue(preflight?.reason) ?? stringValue(preflight?.error) ?? "preflight_request_failed", response.status);
+  }
+
+  const lifecyclePolicy = objectRecord(preflight.lifecyclePolicy);
+  if (input.requireEnvironmentBootstrap) {
+    const ready = lifecyclePolicy.activePolicyFound === true
+      && lifecyclePolicy.serverEnvironmentRequired === true
+      && lifecyclePolicy.setEnvironmentEnabled === true
+      && lifecyclePolicy.environmentReady === true;
+    if (!ready) {
+      return reject("environment_bootstrap_not_ready", {
+        field: "lifecyclePolicy",
+        activePolicyFound: lifecyclePolicy.activePolicyFound ?? null,
+        serverEnvironmentRequired: lifecyclePolicy.serverEnvironmentRequired ?? null,
+        setEnvironmentEnabled: lifecyclePolicy.setEnvironmentEnabled ?? null,
+        environmentReady: lifecyclePolicy.environmentReady ?? null
+      });
+    }
+  }
+  if (input.requireOneGeneration
+    && (lifecyclePolicy.oneGenerationFenced !== true || lifecyclePolicy.maxGenerations !== 1)) {
+    return reject("one_generation_fence_not_ready", {
+      field: "lifecyclePolicy",
+      maxGenerations: lifecyclePolicy.maxGenerations ?? null,
+      oneGenerationFenced: lifecyclePolicy.oneGenerationFenced ?? null
+    });
   }
 
   const actionPlan = preflight.actionPlan;
@@ -2735,8 +2786,13 @@ async function selectFreshRunOnePlanItem(
   return {
     ok: true,
     planItemId: selected.planItemId as string,
-    idempotencyKey: selected.idempotencyKey as string
+    idempotencyKey: selected.idempotencyKey as string,
+    expectedExecutionId: liveCustodyExecutionId(selected.idempotencyKey as string)
   };
+}
+
+function liveCustodyExecutionId(idempotencyKey: string): string {
+  return `live-execution:${createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 32)}`;
 }
 
 function nonEmptyOpaqueString(value: unknown): value is string {
@@ -3231,6 +3287,7 @@ async function authenticatedSlipwayJsonRequest<T>(
     requestErrorCode: string;
     notFoundMessage: string;
     fetchFailedMessage: string;
+    requestFailureDetails?: Record<string, unknown>;
   },
   options: SlipwayCliOptions
 ): Promise<
@@ -3275,7 +3332,8 @@ async function authenticatedSlipwayJsonRequest<T>(
       error: input.requestErrorCode,
       message: errorMessage(error),
       slipwayUrl,
-      sessionFile
+      sessionFile,
+      ...input.requestFailureDetails
     }, `Error (${input.requestErrorCode}): ${input.fetchFailedMessage} at ${slipwayUrl}.`);
     return { ok: false, exitCode: 1 };
   }
@@ -3299,6 +3357,7 @@ async function runSlipwayJsonCommand(
     body: unknown;
     errorCode: string;
     fetchFailedMessage: string;
+    requestFailureDetails?: Record<string, unknown>;
     human: (body: unknown) => string;
   },
   options: SlipwayCliOptions
@@ -3312,7 +3371,8 @@ async function runSlipwayJsonCommand(
     body: withoutUndefinedDeep(input.body),
     requestErrorCode: input.errorCode,
     notFoundMessage: "No Liskov CLI session is stored locally.",
-    fetchFailedMessage: input.fetchFailedMessage
+    fetchFailedMessage: input.fetchFailedMessage,
+    requestFailureDetails: input.requestFailureDetails
   }, options);
   if (!request.ok) return request.exitCode;
   return writeCommandResponse({

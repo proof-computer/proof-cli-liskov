@@ -2454,6 +2454,101 @@ describe("proof-cli Liskov runner", () => {
     }
   });
 
+  it("requires explicit canary lifecycle proof and emits a deterministic recovery handle", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_run_one_canary_token_do_not_print";
+    const idempotencyKey = "opaque-canary-key-do-not-print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const invoke = async (lifecyclePolicy: Record<string, unknown>) => {
+      let requestCount = 0;
+      const out = writer();
+      const err = writer();
+      const code = await runSlipwayCustodyExecutionRunOne({
+        applicationRef: "app-uid-1",
+        planItemId: "plan-1",
+        idempotencyKey,
+        expectKind: "acurast.deploy",
+        expectPolicyDigest: "policy-digest-1",
+        requireEnvironmentBootstrap: true,
+        requireOneGeneration: true,
+        config: sessionFile,
+        json: true,
+        yes: true,
+        yesSpend: true
+      }, {
+        fetchImpl: async (_url, init) => {
+          requestCount += 1;
+          if ((init?.method ?? "GET") === "GET") {
+            return jsonResponse({
+              ...runOnePreflight([runOnePreflightPlan({ idempotencyKey })]),
+              lifecyclePolicy
+            });
+          }
+          throw new Error("response interrupted after acceptance became possible");
+        },
+        stdout: out.write,
+        stderr: err.write
+      });
+      return { code, err, out, requestCount };
+    };
+
+    const missingEnvironment = await invoke({
+      activePolicyFound: true,
+      serverEnvironmentRequired: true,
+      setEnvironmentEnabled: false,
+      environmentReady: false,
+      maxGenerations: 1,
+      oneGenerationFenced: true
+    });
+    assert.equal(missingEnvironment.code, 1);
+    assert.equal(missingEnvironment.requestCount, 1);
+    assert.equal(
+      (JSON.parse(missingEnvironment.out.text) as Record<string, unknown>).reason,
+      "environment_bootstrap_not_ready"
+    );
+
+    const missingGenerationFence = await invoke({
+      activePolicyFound: true,
+      serverEnvironmentRequired: true,
+      setEnvironmentEnabled: true,
+      environmentReady: true,
+      maxGenerations: null,
+      oneGenerationFenced: false
+    });
+    assert.equal(missingGenerationFence.code, 1);
+    assert.equal(missingGenerationFence.requestCount, 1);
+    assert.equal(
+      (JSON.parse(missingGenerationFence.out.text) as Record<string, unknown>).reason,
+      "one_generation_fence_not_ready"
+    );
+
+    const interrupted = await invoke({
+      activePolicyFound: true,
+      serverEnvironmentRequired: true,
+      setEnvironmentEnabled: true,
+      environmentReady: true,
+      maxGenerations: 1,
+      oneGenerationFenced: true
+    });
+    const expectedExecutionId = `live-execution:${createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 32)}`;
+    const interruptedBody = JSON.parse(interrupted.out.text) as Record<string, unknown>;
+    assert.equal(interrupted.code, 1);
+    assert.equal(interrupted.requestCount, 2);
+    assert.equal(interruptedBody.recoveryExecutionId, expectedExecutionId);
+    assert.match(String(interruptedBody.recoveryCommand), new RegExp(expectedExecutionId, "u"));
+    assert.match(interrupted.err.text, new RegExp(expectedExecutionId, "u"));
+    assert.equal(interrupted.out.text.includes(idempotencyKey), false);
+    assert.equal(interrupted.err.text.includes(idempotencyKey), false);
+    assert.equal(interrupted.out.text.includes(token), false);
+  });
+
   it("reports UID/org authorization and preflight read failures without making a run-one POST", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");

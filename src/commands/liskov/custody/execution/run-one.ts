@@ -10,7 +10,7 @@ export default class SlipwayCustodyExecutionRunOne extends Command {
   static examples = [
     "<%= config.bin %> liskov custody execution run-one proof-docs --execution-id live-execution:abc --expect-kind acurast.deploy --expect-policy-digest sha256:abc --expect-deployment-id 75824 --yes --json",
     "<%= config.bin %> liskov custody preflight proof-docs --json",
-    "<%= config.bin %> liskov custody execution run-one proof-docs --plan-item-id PLAN_ITEM_ID_FROM_ONE_ITEM --idempotency-key OPAQUE_KEY_FROM_SAME_ITEM --expect-kind acurast.deploy --expect-policy-digest sha256:abc --yes --yes-spend"
+    "<%= config.bin %> liskov custody execution run-one proof-docs --plan-item-id PLAN_ITEM_ID_FROM_ONE_ITEM --idempotency-key OPAQUE_KEY_FROM_SAME_ITEM --expect-kind acurast.deploy --expect-policy-digest sha256:abc --require-environment-bootstrap --require-one-generation --yes --yes-spend"
   ];
   static flags: Interfaces.FlagInput = {
     config: Flags.string({ description: "Path to the local Liskov session file." }),
@@ -23,6 +23,8 @@ export default class SlipwayCustodyExecutionRunOne extends Command {
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
     network: Flags.string({ description: "Acurast network for optional environment handoff.", options: ["mainnet", "testnet", "canary"] }),
     "plan-item-id": Flags.string({ description: "planItemId copied from one custodial.live preflight --json item together with its idempotencyKey." }),
+    "require-environment-bootstrap": Flags.boolean({ description: "Require preflight proof that a server-delivered environment and setEnvironment bootstrap are enabled." }),
+    "require-one-generation": Flags.boolean({ description: "Require preflight proof that runtime.maxGenerations is exactly 1." }),
     "repo-dir": Flags.string({ description: "Repository directory for future local action providers." }),
     "rpc-url": Flags.string({ description: "Acurast RPC URL for optional environment handoff." }),
     "secrets-file": Flags.string({ description: "Local dotenv file for acurast.setEnvironment submit mode." }),
@@ -45,6 +47,8 @@ export default class SlipwayCustodyExecutionRunOne extends Command {
       json: flags.json as boolean | undefined,
       network: flags.network as never,
       planItemId: flags["plan-item-id"] as string | undefined,
+      requireEnvironmentBootstrap: flags["require-environment-bootstrap"] as boolean | undefined,
+      requireOneGeneration: flags["require-one-generation"] as boolean | undefined,
       repoDir: flags["repo-dir"] as string | undefined,
       rpcUrl: flags["rpc-url"] as string | undefined,
       secretsFile: flags["secrets-file"] as string | undefined,
