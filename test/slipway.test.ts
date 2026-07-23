@@ -1955,6 +1955,15 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(await runSlipwayCustodyAccountEnsure({ applicationRef: "alpha", chain: "acurast", config: sessionFile, json: true, yes: true }, options), 0);
     assert.equal(await runSlipwayCustodyPreflight({ applicationRef: "alpha", config: sessionFile, json: true }, options), 0);
     assert.equal(await runSlipwayCustodyExecutionList({ applicationRef: "alpha", config: sessionFile, json: true }, options), 0);
+    assert.equal(await runSlipwayCustodyExecutionList({
+      applicationRef: "alpha",
+      config: sessionFile,
+      json: true,
+      limit: 25,
+      offset: 5,
+      statuses: ["submitted", "observed"],
+      reasons: ["chain_pending"]
+    }, options), 0);
     assert.equal(await runSlipwayCustodyExecutionObserve({ applicationRef: "alpha", executionId: "exec-1", config: sessionFile, json: true }, options), 0);
     assert.equal(await runSlipwayCustodyExecutionRunOne({
       applicationRef: "alpha",
@@ -1984,6 +1993,11 @@ describe("proof-cli Liskov runner", () => {
       body: undefined
     }, {
       url: "https://slipway.test/api/applications/alpha/live-custody/executions",
+      method: "GET",
+      authorization: `Bearer ${token}`,
+      body: undefined
+    }, {
+      url: "https://slipway.test/api/applications/alpha/live-custody/executions?limit=25&offset=5&status=submitted&status=observed&reason=chain_pending",
       method: "GET",
       authorization: `Bearer ${token}`,
       body: undefined

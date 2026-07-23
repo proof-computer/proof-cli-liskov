@@ -434,6 +434,10 @@ export interface SlipwayCustodyEnvironmentUploadInput {
 
 export interface SlipwayCustodyExecutionListInput {
   applicationRef: string;
+  limit?: number;
+  offset?: number;
+  statuses?: readonly string[];
+  reasons?: readonly string[];
   slipwayUrl?: string;
   config?: string;
   json?: boolean;
@@ -574,6 +578,7 @@ interface PublicSlipwayCliLogin {
 }
 
 interface PublicSlipwayApplicationSummary {
+  organizationId?: string;
   applicationUid?: string;
   applicationName?: string;
   applicationId?: string;
@@ -2420,11 +2425,17 @@ export async function runSlipwayCustodyEnvironmentUpload(input: SlipwayCustodyEn
 }
 
 export async function runSlipwayCustodyExecutionList(input: SlipwayCustodyExecutionListInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const query = new URLSearchParams();
+  if (input.limit !== undefined) query.set("limit", String(input.limit));
+  if (input.offset !== undefined) query.set("offset", String(input.offset));
+  for (const status of input.statuses ?? []) query.append("status", status);
+  for (const reason of input.reasons ?? []) query.append("reason", reason);
+  const queryString = query.toString();
   const request = await authenticatedSlipwayRequest<SlipwayLiveCustodyCommandResponse>({
     config: input.config,
     slipwayUrl: input.slipwayUrl,
     json: input.json,
-    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions`,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/executions${queryString ? `?${queryString}` : ""}`,
     requestErrorCode: "SLIPWAY_CUSTODY_EXECUTION_LIST_FAILED",
     notFoundMessage: "No Liskov CLI session is stored locally.",
     fetchFailedMessage: "could not list Liskov live custody executions"
