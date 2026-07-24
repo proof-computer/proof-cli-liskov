@@ -2478,6 +2478,7 @@ describe("proof-cli Liskov runner", () => {
         expectPolicyDigest: "policy-digest-1",
         requireEnvironmentBootstrap: true,
         minimumEnvironmentRunwayMs: 580_000,
+        minimumRuntimeDurationMs: 3_600_000,
         requireOneGeneration: true,
         requireZeroRetries: true,
         config: sessionFile,
@@ -2569,6 +2570,29 @@ describe("proof-cli Liskov runner", () => {
       "environment_bootstrap_runway_too_short"
     );
 
+    const shortRuntimeDuration = await invoke({
+      activePolicyFound: true,
+      serverEnvironmentRequired: true,
+      setEnvironmentEnabled: true,
+      environmentReady: true,
+      maxGenerations: 1,
+      oneGenerationFenced: true,
+      maxAutoRetries: 0,
+      maxRuntimeReplaces: 0,
+      zeroRecoveryRetriesFenced: true,
+      environmentBootstrapRunwayMs: 580_000,
+      runtimeDurationMs: 60_000
+    });
+    assert.equal(shortRuntimeDuration.code, 1);
+    assert.equal(shortRuntimeDuration.requestCount, 1);
+    const shortRuntimeDurationBody = JSON.parse(
+      shortRuntimeDuration.out.text
+    ) as Record<string, unknown>;
+    assert.equal(shortRuntimeDurationBody.reason, "runtime_duration_too_short");
+    assert.equal(shortRuntimeDurationBody.field, "lifecyclePolicy.runtimeDurationMs");
+    assert.equal(shortRuntimeDurationBody.minimumRuntimeDurationMs, 3_600_000);
+    assert.equal(shortRuntimeDurationBody.runtimeDurationMs, 60_000);
+
     const interrupted = await invoke({
       activePolicyFound: true,
       serverEnvironmentRequired: true,
@@ -2579,7 +2603,8 @@ describe("proof-cli Liskov runner", () => {
       maxAutoRetries: 0,
       maxRuntimeReplaces: 0,
       zeroRecoveryRetriesFenced: true,
-      environmentBootstrapRunwayMs: 580_000
+      environmentBootstrapRunwayMs: 580_000,
+      runtimeDurationMs: 3_600_000
     });
     const expectedExecutionId = `live-execution:${createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 32)}`;
     const interruptedBody = JSON.parse(interrupted.out.text) as Record<string, unknown>;

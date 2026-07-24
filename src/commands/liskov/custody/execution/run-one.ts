@@ -10,7 +10,7 @@ export default class SlipwayCustodyExecutionRunOne extends Command {
   static examples = [
     "<%= config.bin %> liskov custody execution run-one proof-docs --execution-id live-execution:abc --expect-kind acurast.deploy --expect-policy-digest sha256:abc --expect-deployment-id 75824 --yes --json",
     "<%= config.bin %> liskov custody preflight proof-docs --json",
-    "<%= config.bin %> liskov custody execution run-one proof-docs --plan-item-id PLAN_ITEM_ID_FROM_ONE_ITEM --idempotency-key OPAQUE_KEY_FROM_SAME_ITEM --expect-kind acurast.deploy --expect-policy-digest sha256:abc --require-environment-bootstrap --minimum-environment-runway-ms 580000 --require-one-generation --require-zero-retries --yes --yes-spend"
+    "<%= config.bin %> liskov custody execution run-one proof-docs --plan-item-id PLAN_ITEM_ID_FROM_ONE_ITEM --idempotency-key OPAQUE_KEY_FROM_SAME_ITEM --expect-kind acurast.deploy --expect-policy-digest sha256:abc --require-environment-bootstrap --minimum-environment-runway-ms 580000 --minimum-runtime-duration-ms 3600000 --require-one-generation --require-zero-retries --yes --yes-spend"
   ];
   static flags: Interfaces.FlagInput = {
     config: Flags.string({ description: "Path to the local Liskov session file." }),
@@ -25,6 +25,7 @@ export default class SlipwayCustodyExecutionRunOne extends Command {
     "plan-item-id": Flags.string({ description: "planItemId copied from one custodial.live preflight --json item together with its idempotencyKey." }),
     "require-environment-bootstrap": Flags.boolean({ description: "Require preflight proof that a server-delivered environment and setEnvironment bootstrap are enabled." }),
     "minimum-environment-runway-ms": Flags.integer({ min: 0, description: "Require at least this much pre-start setEnvironment runway." }),
+    "minimum-runtime-duration-ms": Flags.integer({ min: 0, description: "Require at least this much scheduled runtime for startup and protocol evidence." }),
     "require-one-generation": Flags.boolean({ description: "Require preflight proof that runtime.maxGenerations is exactly 1." }),
     "require-zero-retries": Flags.boolean({ description: "Require both automatic launch retries and runtime replacements to be capped at zero." }),
     "repo-dir": Flags.string({ description: "Repository directory for future local action providers." }),
@@ -51,6 +52,7 @@ export default class SlipwayCustodyExecutionRunOne extends Command {
       planItemId: flags["plan-item-id"] as string | undefined,
       requireEnvironmentBootstrap: flags["require-environment-bootstrap"] as boolean | undefined,
       minimumEnvironmentRunwayMs: flags["minimum-environment-runway-ms"] as number | undefined,
+      minimumRuntimeDurationMs: flags["minimum-runtime-duration-ms"] as number | undefined,
       requireOneGeneration: flags["require-one-generation"] as boolean | undefined,
       requireZeroRetries: flags["require-zero-retries"] as boolean | undefined,
       repoDir: flags["repo-dir"] as string | undefined,

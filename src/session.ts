@@ -478,6 +478,7 @@ export interface SlipwayCustodyExecutionRunOneInput {
   requireOneGeneration?: boolean;
   requireZeroRetries?: boolean;
   minimumEnvironmentRunwayMs?: number;
+  minimumRuntimeDurationMs?: number;
   yes?: boolean;
   yesSpend?: boolean;
   secretsFile?: string;
@@ -2734,6 +2735,16 @@ async function selectFreshRunOnePlanItem(
         field: "lifecyclePolicy.environmentBootstrapRunwayMs",
         minimumEnvironmentRunwayMs: input.minimumEnvironmentRunwayMs,
         environmentBootstrapRunwayMs: actual ?? null
+      });
+    }
+  }
+  if (input.minimumRuntimeDurationMs !== undefined) {
+    const actual = numberValue(lifecyclePolicy.runtimeDurationMs);
+    if (actual === undefined || actual < input.minimumRuntimeDurationMs) {
+      return reject("runtime_duration_too_short", {
+        field: "lifecyclePolicy.runtimeDurationMs",
+        minimumRuntimeDurationMs: input.minimumRuntimeDurationMs,
+        runtimeDurationMs: actual ?? null
       });
     }
   }
