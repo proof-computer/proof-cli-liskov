@@ -476,6 +476,8 @@ export interface SlipwayCustodyExecutionRunOneInput {
   expectDeploymentId?: string;
   requireEnvironmentBootstrap?: boolean;
   requireOneGeneration?: boolean;
+  requireZeroRetries?: boolean;
+  minimumEnvironmentRunwayMs?: number;
   yes?: boolean;
   yesSpend?: boolean;
   secretsFile?: string;
@@ -2713,6 +2715,27 @@ async function selectFreshRunOnePlanItem(
       maxGenerations: lifecyclePolicy.maxGenerations ?? null,
       oneGenerationFenced: lifecyclePolicy.oneGenerationFenced ?? null
     });
+  }
+  if (input.requireZeroRetries
+    && (lifecyclePolicy.zeroRecoveryRetriesFenced !== true
+      || lifecyclePolicy.maxAutoRetries !== 0
+      || lifecyclePolicy.maxRuntimeReplaces !== 0)) {
+    return reject("zero_recovery_retries_not_ready", {
+      field: "lifecyclePolicy",
+      maxAutoRetries: lifecyclePolicy.maxAutoRetries ?? null,
+      maxRuntimeReplaces: lifecyclePolicy.maxRuntimeReplaces ?? null,
+      zeroRecoveryRetriesFenced: lifecyclePolicy.zeroRecoveryRetriesFenced ?? null
+    });
+  }
+  if (input.minimumEnvironmentRunwayMs !== undefined) {
+    const actual = numberValue(lifecyclePolicy.environmentBootstrapRunwayMs);
+    if (actual === undefined || actual < input.minimumEnvironmentRunwayMs) {
+      return reject("environment_bootstrap_runway_too_short", {
+        field: "lifecyclePolicy.environmentBootstrapRunwayMs",
+        minimumEnvironmentRunwayMs: input.minimumEnvironmentRunwayMs,
+        environmentBootstrapRunwayMs: actual ?? null
+      });
+    }
   }
 
   const actionPlan = preflight.actionPlan;

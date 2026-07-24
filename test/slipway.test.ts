@@ -2477,7 +2477,9 @@ describe("proof-cli Liskov runner", () => {
         expectKind: "acurast.deploy",
         expectPolicyDigest: "policy-digest-1",
         requireEnvironmentBootstrap: true,
+        minimumEnvironmentRunwayMs: 580_000,
         requireOneGeneration: true,
+        requireZeroRetries: true,
         config: sessionFile,
         json: true,
         yes: true,
@@ -2529,13 +2531,55 @@ describe("proof-cli Liskov runner", () => {
       "one_generation_fence_not_ready"
     );
 
+    const missingZeroRetryFence = await invoke({
+      activePolicyFound: true,
+      serverEnvironmentRequired: true,
+      setEnvironmentEnabled: true,
+      environmentReady: true,
+      maxGenerations: 1,
+      oneGenerationFenced: true,
+      maxAutoRetries: 5,
+      maxRuntimeReplaces: 2,
+      zeroRecoveryRetriesFenced: false,
+      environmentBootstrapRunwayMs: 580_000
+    });
+    assert.equal(missingZeroRetryFence.code, 1);
+    assert.equal(missingZeroRetryFence.requestCount, 1);
+    assert.equal(
+      (JSON.parse(missingZeroRetryFence.out.text) as Record<string, unknown>).reason,
+      "zero_recovery_retries_not_ready"
+    );
+
+    const shortEnvironmentRunway = await invoke({
+      activePolicyFound: true,
+      serverEnvironmentRequired: true,
+      setEnvironmentEnabled: true,
+      environmentReady: true,
+      maxGenerations: 1,
+      oneGenerationFenced: true,
+      maxAutoRetries: 0,
+      maxRuntimeReplaces: 0,
+      zeroRecoveryRetriesFenced: true,
+      environmentBootstrapRunwayMs: 160_000
+    });
+    assert.equal(shortEnvironmentRunway.code, 1);
+    assert.equal(shortEnvironmentRunway.requestCount, 1);
+    assert.equal(
+      (JSON.parse(shortEnvironmentRunway.out.text) as Record<string, unknown>).reason,
+      "environment_bootstrap_runway_too_short"
+    );
+
     const interrupted = await invoke({
       activePolicyFound: true,
       serverEnvironmentRequired: true,
       setEnvironmentEnabled: true,
       environmentReady: true,
       maxGenerations: 1,
-      oneGenerationFenced: true
+      oneGenerationFenced: true,
+      maxAutoRetries: 0,
+      maxRuntimeReplaces: 0,
+      zeroRecoveryRetriesFenced: true,
+      environmentBootstrapRunwayMs: 580_000
     });
     const expectedExecutionId = `live-execution:${createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 32)}`;
     const interruptedBody = JSON.parse(interrupted.out.text) as Record<string, unknown>;

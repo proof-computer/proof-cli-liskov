@@ -106,7 +106,8 @@ try {
 
   const custodyRunOneHelp = run(process.execPath, [proofDevBin, "liskov", "custody", "execution", "run-one", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(custodyRunOneHelp.stdout, "Run exactly one guarded server-owned live custody transition");
-  assertIncludes(custodyRunOneHelp.stdout, "Opaque idempotencyKey copied unchanged");
+  assertIncludes(custodyRunOneHelp.stdout, "idempotencyKey copied");
+  assertIncludes(custodyRunOneHelp.stdout, "never generate one");
 
   const custodyMachineCatalogHelp = run(process.execPath, [proofDevBin, "liskov", "custody", "machine", "catalog", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(custodyMachineCatalogHelp.stdout, "Read Acurast machine-class catalog");
