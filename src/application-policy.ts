@@ -481,16 +481,35 @@ export function migrateApplicationPolicyV3(value: unknown): {
   const selection = object(acurast.processorSelection) ?? {};
   const budgetCaps = object(acurast.budgetCaps) ?? {};
   const blackbox = object(v3.blackbox) ?? {};
-  const durationMs = typeof runtime.durationMs === "number" ? runtime.durationMs : 1_800_000;
-  const maxRetries = typeof recovery.maxAutoRetries === "number" ? recovery.maxAutoRetries : 5;
+  const schedule = object(v3.schedule) ?? {};
+  const durationMs = typeof runtime.durationMs === "number"
+    ? runtime.durationMs
+    : (typeof schedule.durationMs === "number" ? schedule.durationMs : 1_800_000);
+  const parallelismValue = typeof runtime.desiredCount === "number"
+    ? runtime.desiredCount
+    : (typeof v3.replicas === "number" ? v3.replicas : 1);
+  const parallelism = Math.min(64, Math.max(1, parallelismValue));
+  const maxRetriesValue = typeof recovery.maxAutoRetries === "number" ? recovery.maxAutoRetries : 5;
+  const maxRetries = Math.min(10, maxRetriesValue);
   const maxRuntimeReplaces = typeof recovery.maxRuntimeReplaces === "number"
-    ? recovery.maxRuntimeReplaces
+    ? Math.min(10, recovery.maxRuntimeReplaces)
     : 2;
+  const startDelayMs = typeof acurast.startDelayMs === "number" ? acurast.startDelayMs : undefined;
+  const maxStartDelayMs = typeof acurast.maxStartDelayMs === "number"
+    ? acurast.maxStartDelayMs
+    : undefined;
+  const migratedStartDelayMs = startDelayMs !== undefined
+    && maxStartDelayMs !== undefined
+    && startDelayMs > maxStartDelayMs
+    ? maxStartDelayMs
+    : startDelayMs;
   const pinnedProcessors = Array.isArray(acurast.pinnedProcessors)
     ? acurast.pinnedProcessors.filter((entry): entry is string => typeof entry === "string")
     : [];
   const selectionControls = {
-    excludeManagers: Array.isArray(selection.excludeManagers)
+    excludeManagers: selection.excludeManagers === undefined
+      ? undefined
+      : Array.isArray(selection.excludeManagers)
       ? selection.excludeManagers.filter((entry): entry is string => typeof entry === "string")
       : [],
     allowUnknownManager: selection.allowUnknownManager === true,
@@ -500,7 +519,7 @@ export function migrateApplicationPolicyV3(value: unknown): {
     candidateLimit: selection.candidateLimit,
     scanLimit: selection.scanLimit
   };
-  const processorSelection = selection.mode === "static" || pinnedProcessors.length > 0
+  const processorSelection = selection.mode === "static"
     ? {
         mode: "static",
         processorIds: pinnedProcessors,
@@ -529,7 +548,7 @@ export function migrateApplicationPolicyV3(value: unknown): {
         name: variable.name,
         required: variable.required === true,
         managed: variable.source === "managed",
-        default: typeof variable.value === "string" ? variable.value : undefined
+        default: variable.value
       }];
     });
   const secrets = (Array.isArray(object(v3.secrets)?.declarations)
@@ -581,14 +600,17 @@ export function migrateApplicationPolicyV3(value: unknown): {
       }
     },
     deployment: {
-      parallelism: typeof runtime.desiredCount === "number" ? runtime.desiredCount : 1,
+      parallelism,
       schedule: {
         durationMs,
-        startDelayMs: acurast.startDelayMs,
-        maxStartDelayMs: acurast.maxStartDelayMs
+        startDelayMs: migratedStartDelayMs,
+        maxStartDelayMs
       },
       placement: {
-        requirements: { trustProfile: ATTESTED_RUNTIME_PROFILE },
+        requirements: {
+          trustProfile: ATTESTED_RUNTIME_PROFILE,
+          machine: object(acurast.machine)
+        },
         processorSelection
       },
       lifecycle: {
@@ -636,7 +658,7 @@ export function migrateApplicationPolicyV3(value: unknown): {
       level: "warning",
       code: "mandatory_trust_added",
       message: "v4 requires proof.liskov.attested-runtime.v1 and signed diagnostics",
-      pointer: "/runtime/bootstrap"
+      pointer: "/runtime/bootstrap/trustProfile"
     },
     {
       level: "warning",
@@ -659,6 +681,22 @@ export function migrateApplicationPolicyV3(value: unknown): {
       pointer: "/runtime/replacementRunwayMs"
     });
   }
+  if (startDelayMs !== undefined && maxStartDelayMs !== undefined && startDelayMs > maxStartDelayMs) {
+    warnings.push({
+      level: "warning",
+      code: "legacy_start_delay_clamped",
+      message: "v3 startDelayMs exceeded maxStartDelayMs and was reduced to that explicit maximum",
+      pointer: "/deployment/schedule/startDelayMs"
+    });
+  }
+  if (v3.ha !== undefined || acurast.spread !== undefined) {
+    warnings.push({
+      level: "warning",
+      code: "placement_review_required",
+      message: "legacy ha/spread hints require review before authoring v4 topology constraints",
+      pointer: "/deployment/placement/topologyConstraints"
+    });
+  }
   if (automation?.autoPublish !== undefined) {
     warnings.push({
       level: "warning",
@@ -673,14 +711,6 @@ export function migrateApplicationPolicyV3(value: unknown): {
       code: "open_market_manager_binding_ignored",
       message: "v3 managerId is not an open-market constraint and requires review",
       pointer: "/acurast/managerId"
-    });
-  }
-  if (maxRuntimeReplaces > 0) {
-    warnings.push({
-      level: "warning",
-      code: "runtime_recovery_review_required",
-      message: "the v3 replacement cap was expanded into explicit v4 recovery defaults and remains capability-gated",
-      pointer: "/deployment/lifecycle/recovery/runtimeFailure"
     });
   }
   return { policy, warnings };
