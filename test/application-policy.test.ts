@@ -106,7 +106,20 @@ describe("local application-policy v4 tools", () => {
         }
       },
       source: { path: ".liskov/policy.json" },
-      acurast: { recovery: { maxAutoRetries: 0, maxRuntimeReplaces: 0 } }
+      acurast: {
+        managerId: "9470",
+        processorSelection: {
+          mode: "open-market",
+          excludeManagers: ["untrusted-manager"],
+          allowUnknownManager: true,
+          requireScheduleClear: true,
+          requireConsumerAccess: true,
+          maxHeartbeatAgeSeconds: 60,
+          candidateLimit: 16,
+          scanLimit: 32
+        },
+        recovery: { maxAutoRetries: 0, maxRuntimeReplaces: 0 }
+      }
     };
     const first = migrateApplicationPolicyV3(input);
     const second = migrateApplicationPolicyV3(input);
@@ -118,9 +131,23 @@ describe("local application-policy v4 tools", () => {
     );
     assert.ok(first.warnings.some((warning) => warning.code === "legacy_replacement_runway_ignored"));
     assert.ok(first.warnings.some((warning) => warning.code === "automatic_publication_removed"));
+    assert.ok(first.warnings.some((warning) => warning.code === "open_market_manager_binding_ignored"));
     assert.equal(
       ((first.policy.build as Record<string, unknown>).github as Record<string, unknown>).repository,
       "proof-computer/uptime-prober"
+    );
+    assert.deepEqual(
+      ((first.policy.deployment as Record<string, unknown>).placement as Record<string, unknown>).processorSelection,
+      {
+        mode: "open_market",
+        excludeManagers: ["untrusted-manager"],
+        allowUnknownManager: true,
+        requireScheduleClear: true,
+        requireConsumerAccess: true,
+        maxHeartbeatAgeSeconds: 60,
+        candidateLimit: 16,
+        scanLimit: 32
+      }
     );
     assert.equal(validateApplicationPolicyV4(first.policy).length, 0);
   });

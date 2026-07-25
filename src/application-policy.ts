@@ -281,29 +281,42 @@ export function validateApplicationPolicyV4(value: unknown): PolicyValidationErr
     checkEnum(constraint.strength, ["required", "preferred"], `${at}/strength`, errors);
   }
   const selection = checkOptionalObject(placement, "processorSelection", "/deployment/placement", [
-    "mode", "managerId", "processorIds", "requireScheduleClear", "requireConsumerAccess", "candidateLimit"
+    "mode", "managerId", "processorIds", "excludeManagers", "allowUnknownManager",
+    "requireScheduleClear", "requireConsumerAccess", "maxHeartbeatAgeSeconds",
+    "candidateLimit", "scanLimit"
   ], errors);
+  const selectionControls = [
+    "excludeManagers", "allowUnknownManager", "requireScheduleClear", "requireConsumerAccess",
+    "maxHeartbeatAgeSeconds", "candidateLimit", "scanLimit"
+  ];
   if (selection.mode !== undefined) checkEnum(selection.mode, ["open_market", "manager", "static"], "/deployment/placement/processorSelection/mode", errors);
   if (selection.mode === "open_market") {
-    checkObject(placement.processorSelection, "/deployment/placement/processorSelection", ["mode"], errors, ["mode"]);
+    checkObject(placement.processorSelection, "/deployment/placement/processorSelection", [
+      "mode", ...selectionControls
+    ], errors, ["mode"]);
   } else if (selection.mode === "manager") {
-    checkObject(placement.processorSelection, "/deployment/placement/processorSelection", ["mode", "managerId"], errors, ["mode", "managerId"]);
+    checkObject(placement.processorSelection, "/deployment/placement/processorSelection", [
+      "mode", "managerId", ...selectionControls
+    ], errors, ["mode", "managerId"]);
     if (typeof selection.managerId !== "string" || !selection.managerId.trim()) {
       errors.push({ code: "invalid_policy", message: "managerId must be non-empty", pointer: "/deployment/placement/processorSelection/managerId" });
     }
   } else if (selection.mode === "static") {
     checkObject(placement.processorSelection, "/deployment/placement/processorSelection", [
-      "mode", "processorIds", "managerId", "requireScheduleClear", "requireConsumerAccess", "candidateLimit"
+      "mode", "processorIds", "managerId", ...selectionControls
     ], errors, ["mode", "processorIds"]);
     checkStringArray(selection.processorIds, "/deployment/placement/processorSelection/processorIds", errors);
     checkOptionalString(selection.managerId, "/deployment/placement/processorSelection/managerId", errors);
-    for (const key of ["requireScheduleClear", "requireConsumerAccess"]) {
-      if (selection[key] !== undefined && typeof selection[key] !== "boolean") {
-        errors.push({ code: "invalid_policy", message: "must be a boolean", pointer: `/deployment/placement/processorSelection/${key}` });
-      }
-    }
-    checkInteger(selection.candidateLimit, "/deployment/placement/processorSelection/candidateLimit", errors, 1, 4_294_967_295);
   }
+  checkStringArray(selection.excludeManagers, "/deployment/placement/processorSelection/excludeManagers", errors);
+  for (const key of ["allowUnknownManager", "requireScheduleClear", "requireConsumerAccess"]) {
+    if (selection[key] !== undefined && typeof selection[key] !== "boolean") {
+      errors.push({ code: "invalid_policy", message: "must be a boolean", pointer: `/deployment/placement/processorSelection/${key}` });
+    }
+  }
+  checkInteger(selection.maxHeartbeatAgeSeconds, "/deployment/placement/processorSelection/maxHeartbeatAgeSeconds", errors, 1);
+  checkInteger(selection.candidateLimit, "/deployment/placement/processorSelection/candidateLimit", errors, 1, 4_294_967_295);
+  checkInteger(selection.scanLimit, "/deployment/placement/processorSelection/scanLimit", errors, 1, 4_294_967_295);
 
   const lifecycle = checkObject(deployment.lifecycle, "/deployment/lifecycle", [
     "renewal", "update", "recovery"
@@ -476,18 +489,27 @@ export function migrateApplicationPolicyV3(value: unknown): {
   const pinnedProcessors = Array.isArray(acurast.pinnedProcessors)
     ? acurast.pinnedProcessors.filter((entry): entry is string => typeof entry === "string")
     : [];
+  const selectionControls = {
+    excludeManagers: Array.isArray(selection.excludeManagers)
+      ? selection.excludeManagers.filter((entry): entry is string => typeof entry === "string")
+      : [],
+    allowUnknownManager: selection.allowUnknownManager === true,
+    requireScheduleClear: selection.requireScheduleClear === true,
+    requireConsumerAccess: selection.requireConsumerAccess === true,
+    maxHeartbeatAgeSeconds: selection.maxHeartbeatAgeSeconds,
+    candidateLimit: selection.candidateLimit,
+    scanLimit: selection.scanLimit
+  };
   const processorSelection = selection.mode === "static" || pinnedProcessors.length > 0
     ? {
         mode: "static",
         processorIds: pinnedProcessors,
         managerId: acurast.managerId,
-        requireScheduleClear: selection.requireScheduleClear === true,
-        requireConsumerAccess: selection.requireConsumerAccess === true,
-        candidateLimit: selection.candidateLimit
+        ...selectionControls
       }
     : selection.mode === "manager"
-      ? { mode: "manager", managerId: acurast.managerId }
-      : { mode: "open_market" };
+      ? { mode: "manager", managerId: acurast.managerId, ...selectionControls }
+      : { mode: "open_market", ...selectionControls };
   const githubBuild = automation
     ? {
         repository: typeof automation.repository === "string" ? automation.repository : source.repository,
@@ -643,6 +665,14 @@ export function migrateApplicationPolicyV3(value: unknown): {
       code: "automatic_publication_removed",
       message: "build.github is preserved, but publication remains a separate server-authorized action",
       pointer: "/artifactAutomation/github/autoPublish"
+    });
+  }
+  if (!["manager", "static"].includes(String(selection.mode)) && acurast.managerId !== undefined) {
+    warnings.push({
+      level: "warning",
+      code: "open_market_manager_binding_ignored",
+      message: "v3 managerId is not an open-market constraint and requires review",
+      pointer: "/acurast/managerId"
     });
   }
   if (maxRuntimeReplaces > 0) {
