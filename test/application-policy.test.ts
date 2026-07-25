@@ -47,9 +47,18 @@ describe("local application-policy v4 tools", () => {
   it("validates the first-public contract and rejects unknown fields with pointers", () => {
     assert.deepEqual(validateApplicationPolicyV4(policy()), []);
     const unknown = policy();
-    ((unknown.deployment as Record<string, unknown>).lifecycle as Record<string, unknown>).surprise = true;
+    const deployment = unknown.deployment as Record<string, unknown>;
+    (deployment.lifecycle as Record<string, unknown>).surprise = true;
+    deployment.placement = {
+      requirements: {
+        machine: { catalogVersion: "server-owned" }
+      }
+    };
     assert.ok(validateApplicationPolicyV4(unknown).some((error) =>
       error.code === "unknown_field" && error.pointer === "/deployment/lifecycle/surprise"));
+    assert.ok(validateApplicationPolicyV4(unknown).some((error) =>
+      error.code === "unknown_field"
+      && error.pointer === "/deployment/placement/requirements/machine/catalogVersion"));
   });
 
   it("preserves explicit recovery zeroes and reports typed-but-disabled capabilities", () => {
@@ -167,5 +176,64 @@ describe("local application-policy v4 tools", () => {
       }
     );
     assert.equal(validateApplicationPolicyV4(first.policy).length, 0);
+  });
+
+  it("removes server-owned machine/runtime-image metadata without losing execution identity", () => {
+    const migration = migrateApplicationPolicyV3({
+      domain: "proof.slipway.application-policy.v3",
+      applicationId: "runtime-image-smoke",
+      artifact: {
+        mode: "runtime-image",
+        cid: "bafy-bootstrap",
+        digest: "sha256:bundle",
+        runtimeImage: {
+          sessionId: "server-session",
+          imageUrl: "s3://private/runtime-image.tar"
+        }
+      },
+      runtime: {
+        command: "node index.js",
+        durationMs: 1_800_000
+      },
+      acurast: {
+        machine: {
+          class: "confidential",
+          minimums: { memoryMiB: 1024 },
+          catalogVersion: "catalog-v7",
+          metricPoolNames: ["tee"],
+          minEligibleProcessors: 3
+        },
+        recovery: { maxRuntimeReplaces: 0 }
+      }
+    });
+    const artifact = migration.policy.artifact as Record<string, unknown>;
+    assert.deepEqual(artifact, {
+      kind: "runtime_image",
+      cid: "bafy-bootstrap",
+      digest: "sha256:bundle",
+      encryption: { mode: "none" }
+    });
+    const deployment = migration.policy.deployment as Record<string, unknown>;
+    const placement = deployment.placement as Record<string, unknown>;
+    const requirements = placement.requirements as Record<string, unknown>;
+    assert.deepEqual(requirements.machine, {
+      class: "confidential",
+      minimums: { memoryMiB: 1024 }
+    });
+    assert.deepEqual(
+      migration.warnings.map(({ code, pointer }) => ({ code, pointer }))
+        .filter(({ code }) => code.startsWith("legacy_machine_") || code.startsWith("legacy_runtime_image_")),
+      [
+        {
+          code: "legacy_machine_resolution_removed",
+          pointer: "/deployment/placement/requirements/machine"
+        },
+        {
+          code: "legacy_runtime_image_metadata_removed",
+          pointer: "/artifact/runtimeImage"
+        }
+      ]
+    );
+    assert.equal(validateApplicationPolicyV4(migration.policy).length, 0);
   });
 });

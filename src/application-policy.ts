@@ -473,6 +473,16 @@ export function migrateApplicationPolicyV3(value: unknown): {
   const runtime = object(v3.runtime) ?? {};
   const acurast = object(v3.acurast) ?? {};
   const artifact = object(v3.artifact) ?? {};
+  const legacyMachine = object(acurast.machine);
+  const migratedMachine = legacyMachine
+    ? {
+        class: legacyMachine.class,
+        minimums: object(legacyMachine.minimums)
+      }
+    : undefined;
+  const migratedRuntimeImage = typeof artifact.runtimeImage === "string"
+    ? artifact.runtimeImage
+    : undefined;
   const recovery = object(acurast.recovery) ?? {};
   const metadata = object(v3.metadata) ?? {};
   const resources = object(runtime.resources) ?? {};
@@ -579,7 +589,7 @@ export function migrateApplicationPolicyV3(value: unknown): {
       kind: artifact.mode === "runtime-image" ? "runtime_image" : "ipfs",
       cid: artifact.cid,
       digest: artifact.digest,
-      runtimeImage: artifact.runtimeImage,
+      runtimeImage: migratedRuntimeImage,
       encryption: { mode: artifact.requiredEncryptionMode === "aes-256-gcm" ? "aes256_gcm" : "none" }
     },
     build: { github: githubBuild },
@@ -609,7 +619,7 @@ export function migrateApplicationPolicyV3(value: unknown): {
       placement: {
         requirements: {
           trustProfile: ATTESTED_RUNTIME_PROFILE,
-          machine: object(acurast.machine)
+          machine: migratedMachine
         },
         processorSelection
       },
@@ -695,6 +705,23 @@ export function migrateApplicationPolicyV3(value: unknown): {
       code: "placement_review_required",
       message: "legacy ha/spread hints require review before authoring v4 topology constraints",
       pointer: "/deployment/placement/topologyConstraints"
+    });
+  }
+  if (legacyMachine && Object.keys(legacyMachine).some((key) =>
+    !["class", "minimums"].includes(key))) {
+    warnings.push({
+      level: "warning",
+      code: "legacy_machine_resolution_removed",
+      message: "server-resolved machine catalog metadata was removed; class and minimums were retained",
+      pointer: "/deployment/placement/requirements/machine"
+    });
+  }
+  if (object(artifact.runtimeImage)) {
+    warnings.push({
+      level: "warning",
+      code: "legacy_runtime_image_metadata_removed",
+      message: "server-owned runtime-image metadata was removed; artifact kind, CID, and digest were retained",
+      pointer: "/artifact/runtimeImage"
     });
   }
   if (automation?.autoPublish !== undefined) {
