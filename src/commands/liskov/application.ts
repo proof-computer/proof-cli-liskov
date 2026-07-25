@@ -34,6 +34,8 @@ COMMANDS
   list
   publish APP_REF [--paused --reason TEXT] --yes
   pause APP_REF [--owner OWNER] [--reason TEXT] [--yes]
+  policy validate --file PATH [--json]
+  policy migrate --file PATH --output PATH [--json]
   resume APP_REF [--owner OWNER] [--reason TEXT] [--yes]
   status APPLICATION_ID
   plans APPLICATION_ID
