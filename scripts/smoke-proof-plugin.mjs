@@ -41,6 +41,11 @@ try {
   assertIncludes(applicationListHelp.stdout, "List readable Liskov Applications");
   assertIncludes(applicationListHelp.stdout, "--deleted");
 
+  const organizationUseHelp = run(process.execPath, [proofDevBin, "liskov", "organization", "use", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(organizationUseHelp.stdout, "Select the active organization");
+  assertIncludes(organizationUseHelp.stdout, "ORG_ID");
+  assertIncludes(organizationUseHelp.stdout, "--json");
+
   const applicationBackfillIdentitiesHelp = run(process.execPath, [proofDevBin, "liskov", "application", "backfill-identities", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationBackfillIdentitiesHelp.stdout, "Backfill Liskov Application identity fields");
   assertIncludes(applicationBackfillIdentitiesHelp.stdout, "--yes");

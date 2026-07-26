@@ -14,16 +14,21 @@ import {
   isOrganizationListResponse,
   isOrganizationServiceCreditsResponse,
   isOrganizationTransactionsResponse,
+  isOrganizationUseResponse,
   organizationBillingPath,
   organizationListPath,
   organizationServiceCreditsPath,
-  organizationTransactionsPath
+  organizationTransactionsPath,
+  organizationUsePath,
+  type LiskovOrganizationSummary,
+  type LiskovOrganizationUseResponse
 } from "./organization-client.js";
 import {
   formatOrganizationBilling,
   formatOrganizationList,
   formatOrganizationServiceCredits,
-  formatOrganizationTransactions
+  formatOrganizationTransactions,
+  formatOrganizationUse
 } from "./organization-output.js";
 
 export const DEFAULT_SLIPWAY_URL = "https://liskov.proof.computer";
@@ -127,6 +132,13 @@ export interface SlipwayApplicationListInput {
 }
 
 export interface SlipwayOrganizationListInput {
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayOrganizationUseInput {
+  organizationId: string;
   slipwayUrl?: string;
   config?: string;
   json?: boolean;
@@ -603,6 +615,8 @@ export type PublicSlipwayIdentity =
 interface SlipwayApiSessionResponse {
   ok?: boolean;
   session?: PublicSlipwaySession;
+  organization?: LiskovOrganizationSummary;
+  organizations?: LiskovOrganizationSummary[];
   error?: string;
   reason?: string;
 }
@@ -1120,8 +1134,15 @@ export async function runSlipwayWhoami(input: SlipwayWhoamiInput, options: Slipw
     ok: true,
     slipwayUrl,
     sessionFile,
-    session: body.session
-  }, `Logged in to ${slipwayUrl} as ${formatSessionIdentity(body.session)}.`);
+    session: body.session,
+    organization: body.organization,
+    organizations: body.organizations
+  }, [
+    `Logged in to ${slipwayUrl} as ${formatSessionIdentity(body.session)}.`,
+    body.organization
+      ? `Active organization: ${body.organization.name} (${body.organization.id}, ${body.organization.slug}, role ${body.organization.role}).`
+      : undefined
+  ].filter((line): line is string => line !== undefined).join(" "));
   return 0;
 }
 
@@ -1214,6 +1235,46 @@ export async function runSlipwayOrganizationList(
     validate: isOrganizationListResponse,
     format: formatOrganizationList
   }, options);
+}
+
+export async function runSlipwayOrganizationUse(
+  input: SlipwayOrganizationUseInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  const errorCode = "SLIPWAY_ORGANIZATION_USE_FAILED";
+  const request = await authenticatedSlipwayJsonRequest<LiskovOrganizationUseResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: organizationUsePath(),
+    body: { organizationId: input.organizationId },
+    requestErrorCode: errorCode,
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not select the active Liskov organization"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  if (!request.response.ok || request.body?.ok === false) {
+    return writeCommandResponse({
+      body: request.body,
+      response: request.response,
+      errorCode,
+      json: input.json,
+      human: () => "Liskov organization selection failed.",
+      options
+    });
+  }
+  if (!isOrganizationUseResponse(request.body)) {
+    return writeMalformedReadResponse(errorCode, request.response, input.json, options);
+  }
+  return writeCommandResponse({
+    body: request.body,
+    response: request.response,
+    errorCode,
+    json: input.json,
+    human: () => formatOrganizationUse(request.body!),
+    options
+  });
 }
 
 export async function runSlipwayOrganizationBilling(

@@ -1,7 +1,7 @@
 import { Command } from "@oclif/core";
 
 export default class LiskovOrganization extends Command {
-  static description = "Read Liskov organization and billing state.";
+  static description = "Select or read Liskov organization and billing state.";
   static strict = false;
   static summary = "Read Liskov organization and billing state.";
 
@@ -20,18 +20,20 @@ export default class LiskovOrganization extends Command {
 }
 
 function printOrganizationHelp(bin: string): void {
-  console.log(`Liskov organization read commands.
+  console.log(`Liskov organization commands.
 
 USAGE
   $ ${bin} liskov organization <command> [options]
 
 COMMANDS
   list
+  use ORG_ID
   billing ORG_ID
   service-credits ORG_ID
   billing transactions ORG_ID [--limit N] [--before MS]
 
 DESCRIPTION
-  These commands are read-only and use the local proof liskov session created
-  by \`${bin} liskov login\`.`);
+  These commands use the local proof liskov session created by
+  \`${bin} liskov login\`. The use command changes only that session's selected
+  organization; billing and list commands are read-only.`);
 }

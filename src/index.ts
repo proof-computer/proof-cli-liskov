@@ -51,6 +51,7 @@ export {
   runSlipwayOrganizationList,
   runSlipwayOrganizationServiceCredits,
   runSlipwayOrganizationTransactions,
+  runSlipwayOrganizationUse,
   runSlipwayWhoami,
   saveSlipwaySession,
   type SlipwayAdminProcessorClearGreylistInput,
@@ -105,6 +106,7 @@ export {
   type SlipwayOrganizationListInput,
   type SlipwayOrganizationServiceCreditsInput,
   type SlipwayOrganizationTransactionsInput,
+  type SlipwayOrganizationUseInput,
   type SlipwaySessionFile,
   type SlipwaySetEnvironmentAction,
   type SlipwayWhoamiInput

@@ -3,8 +3,14 @@ import type {
   LiskovOrganizationListResponse,
   LiskovOrganizationServiceCreditsResponse,
   LiskovOrganizationTransactionsResponse,
+  LiskovOrganizationUseResponse,
   LiskovServiceCredits
 } from "./organization-client.js";
+
+export function formatOrganizationUse(body: LiskovOrganizationUseResponse): string {
+  const org = body.organization;
+  return `Using Liskov organization ${org.name} (${org.id}, ${org.slug}, role ${org.role}).`;
+}
 
 export function formatOrganizationList(body: LiskovOrganizationListResponse): string {
   if (body.organizations.length === 0) return "No Liskov organizations found.";

@@ -29,6 +29,7 @@ USAGE
 COMMANDS
   login
   organization list
+  organization use ORG_ID
   organization billing ORG_ID
   organization service-credits ORG_ID
   organization billing transactions ORG_ID [--limit N] [--before MS]

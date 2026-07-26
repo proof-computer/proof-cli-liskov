@@ -33,6 +33,14 @@ export interface LiskovOrganizationListResponse {
   [key: string]: unknown;
 }
 
+export interface LiskovOrganizationUseResponse {
+  ok?: boolean;
+  principalId?: string;
+  organization: LiskovOrganizationSummary;
+  organizations: LiskovOrganizationSummary[];
+  [key: string]: unknown;
+}
+
 export interface LiskovOrganizationBillingResponse {
   ok?: boolean;
   organization: LiskovOrganizationSummary;
@@ -62,6 +70,10 @@ export function organizationListPath(): string {
   return "/api/organizations";
 }
 
+export function organizationUsePath(): string {
+  return "/api/session/organization";
+}
+
 export function organizationBillingPath(organizationId: string): string {
   return `/api/organizations/${encodeURIComponent(organizationId)}/billing`;
 }
@@ -84,6 +96,15 @@ export function organizationTransactionsPath(
 export function isOrganizationListResponse(value: unknown): value is LiskovOrganizationListResponse {
   const body = record(value);
   return body?.ok === true &&
+    Array.isArray(body.organizations) &&
+    body.organizations.every(isOrganizationSummary);
+}
+
+export function isOrganizationUseResponse(value: unknown): value is LiskovOrganizationUseResponse {
+  const body = record(value);
+  return body?.ok === true &&
+    (body.principalId === undefined || typeof body.principalId === "string") &&
+    isOrganizationSummary(body.organization) &&
     Array.isArray(body.organizations) &&
     body.organizations.every(isOrganizationSummary);
 }
