@@ -4,6 +4,28 @@ import { access, mkdir, readFile, rm, writeFile, chmod } from "node:fs/promises"
 import { homedir } from "node:os";
 import path from "node:path";
 
+import {
+  isExecutionHistoryResponse,
+  formatExecutionHistory,
+  type LiskovExecutionHistoryResponse
+} from "./execution-history.js";
+import {
+  isOrganizationBillingResponse,
+  isOrganizationListResponse,
+  isOrganizationServiceCreditsResponse,
+  isOrganizationTransactionsResponse,
+  organizationBillingPath,
+  organizationListPath,
+  organizationServiceCreditsPath,
+  organizationTransactionsPath
+} from "./organization-client.js";
+import {
+  formatOrganizationBilling,
+  formatOrganizationList,
+  formatOrganizationServiceCredits,
+  formatOrganizationTransactions
+} from "./organization-output.js";
+
 export const DEFAULT_SLIPWAY_URL = "https://liskov.proof.computer";
 const DEFAULT_RUNTIME_IMAGE_WORKFLOW_OUTPUT = ".github/workflows/liskov-runtime-image.yml";
 const DEFAULT_RUNTIME_IMAGE_WORKFLOW_NAME = "Liskov Runtime Image Upload";
@@ -99,6 +121,35 @@ export interface SlipwayApplicationStatusInput {
 
 export interface SlipwayApplicationListInput {
   deleted?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayOrganizationListInput {
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayOrganizationBillingInput {
+  organizationId: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayOrganizationServiceCreditsInput {
+  organizationId: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayOrganizationTransactionsInput {
+  organizationId: string;
+  limit?: number;
+  beforeMs?: number;
   slipwayUrl?: string;
   config?: string;
   json?: boolean;
@@ -1150,6 +1201,112 @@ export async function runSlipwayApplicationList(input: SlipwayApplicationListInp
     formatApplicationList(output)
   );
   return 0;
+}
+
+export async function runSlipwayOrganizationList(
+  input: SlipwayOrganizationListInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  return runSlipwayOrganizationRead(input, {
+    path: organizationListPath(),
+    errorCode: "SLIPWAY_ORGANIZATION_LIST_FAILED",
+    fetchFailedMessage: "could not list Liskov organizations",
+    validate: isOrganizationListResponse,
+    format: formatOrganizationList
+  }, options);
+}
+
+export async function runSlipwayOrganizationBilling(
+  input: SlipwayOrganizationBillingInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  return runSlipwayOrganizationRead(input, {
+    path: organizationBillingPath(input.organizationId),
+    errorCode: "SLIPWAY_ORGANIZATION_BILLING_FAILED",
+    fetchFailedMessage: "could not read Liskov organization billing",
+    validate: isOrganizationBillingResponse,
+    format: formatOrganizationBilling
+  }, options);
+}
+
+export async function runSlipwayOrganizationServiceCredits(
+  input: SlipwayOrganizationServiceCreditsInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  return runSlipwayOrganizationRead(input, {
+    path: organizationServiceCreditsPath(input.organizationId),
+    errorCode: "SLIPWAY_ORGANIZATION_SERVICE_CREDITS_FAILED",
+    fetchFailedMessage: "could not read Liskov organization Service Credits",
+    validate: isOrganizationServiceCreditsResponse,
+    format: formatOrganizationServiceCredits
+  }, options);
+}
+
+export async function runSlipwayOrganizationTransactions(
+  input: SlipwayOrganizationTransactionsInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  return runSlipwayOrganizationRead(input, {
+    path: organizationTransactionsPath(input.organizationId, {
+      limit: input.limit,
+      beforeMs: input.beforeMs
+    }),
+    errorCode: "SLIPWAY_ORGANIZATION_TRANSACTIONS_FAILED",
+    fetchFailedMessage: "could not list Liskov organization billing transactions",
+    validate: isOrganizationTransactionsResponse,
+    format: (body) => formatOrganizationTransactions(input.organizationId, body)
+  }, options);
+}
+
+async function runSlipwayOrganizationRead<
+  T extends { ok?: boolean; error?: string; reason?: string; [key: string]: unknown }
+>(
+  input: { config?: string; slipwayUrl?: string; json?: boolean },
+  command: {
+    path: string;
+    errorCode: string;
+    fetchFailedMessage: string;
+    validate: (value: unknown) => value is T;
+    format: (body: T) => string;
+  },
+  options: SlipwayCliOptions
+): Promise<number> {
+  const request = await authenticatedSlipwayRequest<T>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: command.path,
+    requestErrorCode: command.errorCode,
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: command.fetchFailedMessage
+  }, options);
+  if (!request.ok) return request.exitCode;
+  if (!request.response.ok || request.body?.ok === false) {
+    return writeCommandResponse({
+      body: request.body,
+      response: request.response,
+      errorCode: command.errorCode,
+      json: input.json,
+      human: () => "Liskov organization read failed.",
+      options
+    });
+  }
+  if (!command.validate(request.body)) {
+    return writeMalformedReadResponse(
+      command.errorCode,
+      request.response,
+      input.json,
+      options
+    );
+  }
+  return writeCommandResponse({
+    body: request.body,
+    response: request.response,
+    errorCode: command.errorCode,
+    json: input.json,
+    human: () => command.format(request.body!),
+    options
+  });
 }
 
 export async function runSlipwayApplicationBackfillIdentities(input: SlipwayApplicationBackfillIdentitiesInput, options: SlipwayCliOptions = {}): Promise<number> {
@@ -2436,7 +2593,7 @@ export async function runSlipwayCustodyExecutionList(input: SlipwayCustodyExecut
   for (const status of input.statuses ?? []) query.append("status", status);
   for (const reason of input.reasons ?? []) query.append("reason", reason);
   const queryString = query.toString();
-  const request = await authenticatedSlipwayRequest<SlipwayLiveCustodyCommandResponse>({
+  const request = await authenticatedSlipwayRequest<LiskovExecutionHistoryResponse>({
     config: input.config,
     slipwayUrl: input.slipwayUrl,
     json: input.json,
@@ -2446,12 +2603,30 @@ export async function runSlipwayCustodyExecutionList(input: SlipwayCustodyExecut
     fetchFailedMessage: "could not list Liskov live custody executions"
   }, options);
   if (!request.ok) return request.exitCode;
+  if (!request.response.ok || request.body?.ok === false) {
+    return writeCommandResponse({
+      body: request.body,
+      response: request.response,
+      errorCode: "SLIPWAY_CUSTODY_EXECUTION_LIST_FAILED",
+      json: input.json,
+      human: () => "Liskov live custody execution history read failed.",
+      options
+    });
+  }
+  if (!isExecutionHistoryResponse(request.body)) {
+    return writeMalformedReadResponse(
+      "SLIPWAY_CUSTODY_EXECUTION_LIST_FAILED",
+      request.response,
+      input.json,
+      options
+    );
+  }
   return writeCommandResponse({
     body: request.body,
     response: request.response,
     errorCode: "SLIPWAY_CUSTODY_EXECUTION_LIST_FAILED",
     json: input.json,
-    human: (body) => `${arrayValue(objectRecord(body).attempts).length} live custody execution(s) for ${input.applicationRef}.`,
+    human: () => formatExecutionHistory(input.applicationRef, request.body!),
     options
   });
 }
@@ -3420,7 +3595,7 @@ async function runSlipwayJsonCommand(
 }
 
 function writeCommandResponse(input: {
-  body: SlipwayLiveCustodyCommandResponse | undefined;
+  body: { ok?: boolean; error?: string; reason?: string; [key: string]: unknown } | undefined;
   response: Response;
   errorCode: string;
   json?: boolean;
@@ -3439,6 +3614,21 @@ function writeCommandResponse(input: {
   }
   writeStructuredOrHuman(input.options, input.json, input.body, input.human(input.body));
   return 0;
+}
+
+function writeMalformedReadResponse(
+  error: string,
+  response: Response,
+  json: boolean | undefined,
+  options: SlipwayCliOptions
+): number {
+  writeStructuredOrHuman(options, json, {
+    ok: false,
+    error,
+    status: response.status,
+    reason: "malformed_response"
+  }, `Error (${error}): Liskov returned a malformed response.`);
+  return 1;
 }
 
 function writeConfirmationRequired(
@@ -4311,6 +4501,7 @@ function formatApplicationList(body: SlipwayApplicationListResponse): string {
       policyVersionId ? `policy ${policyVersionId}` : undefined,
       application.source?.repository ? `repo ${application.source.repository}` : undefined,
       application.ownerAddress ? `owner ${application.ownerAddress}` : undefined,
+      application.organizationId ? `org ${application.organizationId}` : undefined,
       application.applicationUid && application.applicationUid !== primary ? `uid ${application.applicationUid}` : undefined,
       application.duplicateLegacyId ? "duplicate legacy id" : undefined,
       typeof application.deletedAtMs === "number" ? `deleted ${new Date(application.deletedAtMs).toISOString()}` : undefined

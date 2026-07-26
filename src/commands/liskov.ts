@@ -28,6 +28,10 @@ USAGE
 
 COMMANDS
   login
+  organization list
+  organization billing ORG_ID
+  organization service-credits ORG_ID
+  organization billing transactions ORG_ID [--limit N] [--before MS]
   application import --github owner/repo:path@ref [--server-fetch] [--publish]
   application list
   application publish APP_REF [--paused --reason TEXT] --yes

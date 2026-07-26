@@ -5,6 +5,10 @@ Private oclif plugin for Liskov commands under the root `proof` CLI.
 ```sh
 proof liskov --help
 proof liskov login --no-browser
+proof liskov organization list
+proof liskov organization billing org-123
+proof liskov organization service-credits org-123
+proof liskov organization billing transactions org-123 --limit 25 --before 1719230000000
 proof liskov application import --github proof-computer/docs:.slipway/application-policy.json@main --server-fetch
 proof liskov application list
 proof liskov application status proof-docs
@@ -46,6 +50,12 @@ never prints token material. Application mutation and live custody commands are
 private/internal plugin commands that use the saved GitHub App CLI session and
 the server's readable-Application checks. The private `liskov:ops` sr25519
 login remains an operator recovery path, not the normal builder-facing command.
+
+Organization, billing, Service Credit, and billing-transaction commands are
+read-only projections of the existing Liskov routes. Their `--json` output is
+the raw response object. Human transaction rows omit provider references and
+memos. Execution-history reads remain unbounded when pagination flags are
+omitted; human output reports returned count, total, and next offset.
 
 Application deletion is a logical Liskov tombstone. It removes the Application
 from normal management/read surfaces but does not stop Acurast jobs, revoke

@@ -45,6 +45,10 @@ import {
   runSlipwayCustodyPreflight,
   runSlipwayLogin,
   runSlipwayLogout,
+  runSlipwayOrganizationBilling,
+  runSlipwayOrganizationList,
+  runSlipwayOrganizationServiceCredits,
+  runSlipwayOrganizationTransactions,
   runSlipwayWhoami,
   saveSlipwaySession
 } from "../src/index.js";
@@ -255,6 +259,255 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.applications[1]?.artifact.status, "missing");
     assert.equal(parsed.applications[1]?.deletedAtMs, 123);
     assert.equal(parsed.applications[1]?.deleteReason, "test cleanup");
+  });
+
+  it("shows organization and UID in human Application list output", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "application_human_list_token",
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const out = writer();
+    assert.equal(await runSlipwayApplicationList({ config: sessionFile }, {
+      fetchImpl: async () => jsonResponse({
+        ok: true,
+        count: 1,
+        applications: [{
+          organizationId: "org-1",
+          applicationUid: "app-0123456789abcdef",
+          applicationName: "alpha",
+          applicationId: "legacy-alpha",
+          status: "active"
+        }]
+      }),
+      stdout: out.write
+    }), 0);
+    assert.match(out.text, /org org-1/u);
+    assert.match(out.text, /uid app-0123456789abcdef/u);
+  });
+
+  it("preserves raw JSON for organization and billing reads with exact query passthrough", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "organization_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const organizations = {
+      ok: true,
+      organizations: [{
+        id: "org-1",
+        name: "Example Org",
+        slug: "example-org",
+        isPersonal: false,
+        avatarColor: "tide",
+        role: "owner"
+      }]
+    };
+    const billing = {
+      ok: true,
+      organization: organizations.organizations[0],
+      plan: { id: "starter", name: "Starter" },
+      usage: { applications: 2, users: 1, meteredSeats: 0 },
+      nextCharge: { totalUsd: 0 },
+      serviceCredits: {
+        availableUsd: 10,
+        reservedUsd: 2,
+        usedUsd: 3,
+        promoUsd: 4
+      },
+      transactions: []
+    };
+    const credits = {
+      ok: true,
+      organizationId: "org-1",
+      generatedAtMs: 1_719_230_000_000,
+      serviceCredits: billing.serviceCredits
+    };
+    const transactions = {
+      ok: true,
+      transactions: [{
+        txId: "tx-1",
+        orgId: "org-1",
+        applicationId: "app-1",
+        kind: "credit_issued",
+        asset: "USD",
+        amount: "10.000000",
+        status: "settled",
+        txRef: "private-provider-reference",
+        memo: "private billing memo",
+        createdAtMs: 1_719_230_000_000
+      }]
+    };
+    const expected = new Map([
+      ["https://slipway.test/api/organizations", organizations],
+      ["https://slipway.test/api/organizations/org-1/billing", billing],
+      ["https://slipway.test/api/organizations/org-1/service-credits", credits],
+      ["https://slipway.test/api/organizations/org-1/billing/transactions?limit=25&before=1719230000000", transactions]
+    ]);
+    const requested: string[] = [];
+    const fetchImpl = async (url: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
+      const href = String(url);
+      requested.push(href);
+      assert.equal((init?.headers as Record<string, string>).authorization, `Bearer ${token}`);
+      return jsonResponse(expected.get(href));
+    };
+
+    for (const [run, body] of [
+      [
+        () => runSlipwayOrganizationList({ config: sessionFile, json: true }, { fetchImpl, stdout: current.write }),
+        organizations
+      ],
+      [
+        () => runSlipwayOrganizationBilling({ organizationId: "org-1", config: sessionFile, json: true }, { fetchImpl, stdout: current.write }),
+        billing
+      ],
+      [
+        () => runSlipwayOrganizationServiceCredits({ organizationId: "org-1", config: sessionFile, json: true }, { fetchImpl, stdout: current.write }),
+        credits
+      ],
+      [
+        () => runSlipwayOrganizationTransactions({
+          organizationId: "org-1",
+          limit: 25,
+          beforeMs: 1_719_230_000_000,
+          config: sessionFile,
+          json: true
+        }, { fetchImpl, stdout: current.write }),
+        transactions
+      ]
+    ] as const) {
+      var current = writer();
+      assert.equal(await run(), 0);
+      assert.equal(current.text, `${JSON.stringify(body)}\n`);
+      assert.equal(current.text.includes(token), false);
+    }
+    assert.deepEqual(requested, [...expected.keys()]);
+  });
+
+  it("formats organization and execution history reads without leaking private fields", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "human_read_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const out = writer();
+    const fetchImpl = async (url: URL | RequestInfo): Promise<Response> => {
+      if (String(url).endsWith("/billing")) {
+        return jsonResponse({
+          ok: true,
+          organization: {
+            id: "org-1",
+            name: "Example Org",
+            slug: "example-org",
+            isPersonal: false,
+            role: "owner"
+          },
+          plan: { id: "starter", name: "Starter" },
+          nextCharge: { totalUsd: 0 },
+          serviceCredits: {
+            availableUsd: 10,
+            reservedUsd: 2,
+            usedUsd: 3,
+            promoUsd: 4
+          }
+        });
+      }
+      if (String(url).includes("/billing/transactions")) {
+        return jsonResponse({
+          ok: true,
+          transactions: [{
+            txId: "tx-safe",
+            orgId: "org-1",
+            applicationId: "app-safe",
+            kind: "deploy_spend",
+            asset: "USD",
+            amount: "-1.250000",
+            status: "reserved",
+            txRef: "provider-secret-reference",
+            memo: "private memo",
+            createdAtMs: 1_719_230_000_000
+          }]
+        });
+      }
+      return jsonResponse({
+        ok: true,
+        attempts: [{
+          executionId: "exec-safe",
+          planItemId: "plan-safe",
+          idempotencyKey: "secret-idempotency-key",
+          status: "reviewed_failed",
+          operatorReviewReason: "chain pending",
+          updatedAtMs: 1_719_230_000_000,
+          receipt: { signedPayload: "private-chain-payload" }
+        }],
+        count: 1,
+        total: 3,
+        nextOffset: 2
+      });
+    };
+    assert.equal(await runSlipwayOrganizationBilling({
+      organizationId: "org-1",
+      config: sessionFile
+    }, { fetchImpl, stdout: out.write }), 0);
+    assert.equal(await runSlipwayOrganizationTransactions({
+      organizationId: "org-1",
+      config: sessionFile
+    }, { fetchImpl, stdout: out.write }), 0);
+    assert.equal(await runSlipwayCustodyExecutionList({
+      applicationRef: "app-safe",
+      config: sessionFile
+    }, { fetchImpl, stdout: out.write }), 0);
+    assert.match(out.text, /tx-safe/u);
+    assert.match(out.text, /exec-safe/u);
+    assert.match(out.text, /Next charge: \$0\.00/u);
+    assert.match(out.text, /returned 1, total 3, next offset 2/u);
+    assert.match(out.text, /chain pending/u);
+    assert.doesNotMatch(out.text, /provider-secret-reference|private memo|secret-idempotency-key|private-chain-payload/u);
+    assert.equal(out.text.includes(token), false);
+  });
+
+  it("handles unauthorized, forbidden, and malformed organization responses without token leakage", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "organization_error_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    for (const [status, responseBody, expectedError] of [
+      [401, { ok: false, error: "unauthorized" }, "SLIPWAY_SESSION_UNAUTHORIZED"],
+      [403, { ok: false, error: "not_a_member" }, "SLIPWAY_ORGANIZATION_LIST_FAILED"],
+      [200, { ok: true, organizations: "not-an-array" }, "SLIPWAY_ORGANIZATION_LIST_FAILED"]
+    ] as const) {
+      const out = writer();
+      const code = await runSlipwayOrganizationList({
+        config: sessionFile,
+        json: true
+      }, {
+        fetchImpl: async () => jsonResponse(responseBody, status),
+        stdout: out.write
+      });
+      assert.equal(code, 1);
+      const parsed = JSON.parse(out.text) as { error: string; reason?: string };
+      assert.equal(parsed.error, expectedError);
+      if (status === 200) assert.equal(parsed.reason, "malformed_response");
+      assert.equal(out.text.includes(token), false);
+    }
   });
 
   it("lists only tombstones with the deleted Application view", async () => {
@@ -1942,6 +2195,8 @@ describe("proof-cli Liskov runner", () => {
           ok: true,
           account: { accountRef: "live-custody:acurast:test", chain: "acurast", address: "5hot" },
           attempts: [{ executionId: "exec-1", status: "submitted" }],
+          count: 1,
+          total: 1,
           attempt: { executionId: "exec-1", status: "observed" },
           child: { childSessionId: "child-1", status: "proposal_expired" },
           actionPlan: { count: 1, items: [{ planItemId: "plan-1" }] },
