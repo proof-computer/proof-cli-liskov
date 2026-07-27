@@ -10,11 +10,13 @@ proof liskov organization use org-123
 proof liskov organization billing org-123
 proof liskov organization service-credits org-123
 proof liskov organization billing transactions org-123 --limit 25 --before 1719230000000
+proof liskov application manifest validate --file .slipway/application-policy.json
 proof liskov application import --github proof-computer/docs:.slipway/application-policy.json@main --server-fetch
 proof liskov application list
 proof liskov application status proof-docs
 proof liskov application plans proof-docs --json
-proof liskov application publish proof-docs --yes
+proof liskov application publish proof-docs --artifact-version av-... --dry-run
+proof liskov application publish proof-docs --artifact-version av-... --yes
 proof liskov application publish proof-docs --paused --reason "failure-matrix initialization" --yes
 proof liskov application pause proof-docs --reason "funding pending" --yes
 proof liskov application resume proof-docs --reason "funded" --yes
@@ -77,6 +79,12 @@ Pause, resume, delete, and identity backfill dry-run by default and require
 require `--yes`; live execution submit also requires `--yes-spend`. The plugin does
 not expose the old direct manual Acurast spend fallback; diagnostics and
 machine catalog reads stay server-side.
+
+Application import accepts authored manifests only, never publishes, and
+returns both `authoredDigest` and `releaseIntentDigest`. Build-release
+publication selects an exact `--artifact-version`; `--dry-run` calls the
+read-only publication preflight. Actual publication observes preflight first
+and submits its `authoredDigest` as the race fence.
 
 `application publish --paused --reason TEXT --yes` publishes and pauses in one
 server transaction, so the executor cannot observe an intermediate active

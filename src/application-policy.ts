@@ -1,16 +1,11 @@
-export const APPLICATION_POLICY_SCHEMA = "proof.liskov.application-policy";
-export const APPLICATION_POLICY_VERSION = 4;
+import { createHash } from "node:crypto";
+
+export const APPLICATION_MANIFEST_SCHEMA = "proof.liskov.application-manifest";
+export const APPLICATION_MANIFEST_VERSION = 4;
 export const ATTESTED_RUNTIME_PROFILE = "proof.liskov.attested-runtime.v1";
 
 export interface PolicyValidationError {
-  code: "invalid_policy" | "unknown_field" | "unsupported_policy_feature" | "entitlement_exceeded";
-  message: string;
-  pointer: string;
-}
-
-export interface PolicyMigrationWarning {
-  level: "warning";
-  code: string;
+  code: "invalid_manifest" | "unknown_field" | "unsupported_policy_feature" | "entitlement_exceeded";
   message: string;
   pointer: string;
 }
@@ -36,7 +31,7 @@ function checkObject(
 ): JsonObject {
   const result = object(value);
   if (!result) {
-    errors.push({ code: "invalid_policy", message: "must be an object", pointer: at });
+    errors.push({ code: "invalid_manifest", message: "must be an object", pointer: at });
     return {};
   }
   for (const key of Object.keys(result)) {
@@ -46,7 +41,7 @@ function checkObject(
   }
   for (const key of required) {
     if (!(key in result)) {
-      errors.push({ code: "invalid_policy", message: `missing required field ${key}`, pointer: pointer(at, key) });
+      errors.push({ code: "invalid_manifest", message: `missing required field ${key}`, pointer: pointer(at, key) });
     }
   }
   return result;
@@ -59,7 +54,7 @@ function checkEnum(
   errors: PolicyValidationError[]
 ): void {
   if (typeof value !== "string" || !allowed.includes(value)) {
-    errors.push({ code: "invalid_policy", message: `must be one of ${allowed.join(", ")}`, pointer: at });
+    errors.push({ code: "invalid_manifest", message: `must be one of ${allowed.join(", ")}`, pointer: at });
   }
 }
 
@@ -84,7 +79,7 @@ function checkArrayObjects(
 ): JsonObject[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) {
-    errors.push({ code: "invalid_policy", message: "must be an array", pointer: at });
+    errors.push({ code: "invalid_manifest", message: "must be an array", pointer: at });
     return [];
   }
   return value.map((item, index) => checkObject(item, `${at}/${index}`, allowed, errors, required));
@@ -92,14 +87,14 @@ function checkArrayObjects(
 
 function checkOptionalString(value: unknown, at: string, errors: PolicyValidationError[]): void {
   if (value !== undefined && typeof value !== "string") {
-    errors.push({ code: "invalid_policy", message: "must be a string", pointer: at });
+    errors.push({ code: "invalid_manifest", message: "must be a string", pointer: at });
   }
 }
 
 function checkStringArray(value: unknown, at: string, errors: PolicyValidationError[]): void {
   if (value === undefined) return;
   if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string")) {
-    errors.push({ code: "invalid_policy", message: "must be an array of strings", pointer: at });
+    errors.push({ code: "invalid_manifest", message: "must be an array of strings", pointer: at });
   }
 }
 
@@ -113,48 +108,212 @@ function checkInteger(
 ): void {
   if (value === undefined && optional) return;
   if (!Number.isSafeInteger(value) || (value as number) < min || (value as number) > max) {
-    errors.push({ code: "invalid_policy", message: `must be an integer in ${min}..=${max}`, pointer: at });
+    errors.push({ code: "invalid_manifest", message: `must be an integer in ${min}..=${max}`, pointer: at });
   }
 }
 
-export function validateApplicationPolicyV4(value: unknown): PolicyValidationError[] {
+function checkNonEmptyString(value: unknown, at: string, errors: PolicyValidationError[]): void {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    errors.push({ code: "invalid_manifest", message: "must be a non-empty string", pointer: at });
+  }
+}
+
+function checkSha256(value: unknown, at: string, errors: PolicyValidationError[]): void {
+  if (typeof value !== "string" || !/^sha256:[0-9a-f]{64}$/u.test(value)) {
+    errors.push({
+      code: "invalid_manifest",
+      message: "must be sha256: followed by 64 lowercase hexadecimal characters",
+      pointer: at
+    });
+  }
+}
+
+function checkIpfsUri(value: unknown, at: string, errors: PolicyValidationError[]): void {
+  if (typeof value !== "string" || !/^ipfs:\/\/[A-Za-z0-9]+$/u.test(value)) {
+    errors.push({ code: "invalid_manifest", message: "must be a canonical non-empty ipfs:// URI", pointer: at });
+  }
+}
+
+function checkDuplicateStrings(value: unknown, at: string, errors: PolicyValidationError[]): void {
+  if (!Array.isArray(value)) return;
+  const seen = new Map<string, number>();
+  value.forEach((entry, index) => {
+    if (typeof entry !== "string") return;
+    if (!entry.trim()) {
+      errors.push({ code: "invalid_manifest", message: "set members must be non-empty", pointer: `${at}/${index}` });
+    }
+    const first = seen.get(entry);
+    if (first !== undefined) {
+      errors.push({
+        code: "invalid_manifest",
+        message: `duplicate keyed entry; first declared at index ${first}`,
+        pointer: `${at}/${index}`
+      });
+    } else {
+      seen.set(entry, index);
+    }
+  });
+}
+
+function checkDuplicateKeys(
+  values: JsonObject[],
+  key: string,
+  at: string,
+  errors: PolicyValidationError[]
+): void {
+  const seen = new Map<unknown, number>();
+  values.forEach((entry, index) => {
+    const value = entry[key];
+    const first = seen.get(value);
+    if (first !== undefined) {
+      errors.push({
+        code: "invalid_manifest",
+        message: `duplicate keyed entry; first declared at index ${first}`,
+        pointer: `${at}/${index}`
+      });
+    } else {
+      seen.set(value, index);
+    }
+  });
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  const record = object(value);
+  if (record) {
+    return `{${Object.keys(record).sort().map((key) =>
+      `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function canonicalDigest(value: unknown): string {
+  return createHash("sha256").update(canonicalJson(value)).digest("hex");
+}
+
+export function authoredDigest(manifest: unknown): string {
+  return canonicalDigest(manifest);
+}
+
+export function releaseIntentDigest(manifest: unknown): string {
+  const root = object(manifest) ?? {};
+  const release = structuredClone(root.release);
+  const releaseObject = object(release);
+  const builder = object(releaseObject?.builder);
+  if (releaseObject?.mode === "build" && Array.isArray(builder?.allowedRefs)) {
+    builder.allowedRefs = [...builder.allowedRefs].sort();
+  }
+  return canonicalDigest({
+    schema: "proof.liskov.release-intent",
+    schemaVersion: APPLICATION_MANIFEST_VERSION,
+    applicationId: root.applicationId,
+    release
+  });
+}
+
+export function validateApplicationManifestV4(value: unknown): PolicyValidationError[] {
   const errors: PolicyValidationError[] = [];
   const root = checkObject(value, "", [
     "schema", "schemaVersion", "applicationId", "applicationUid", "metadata",
-    "artifact", "build", "runtime", "deployment", "ingress", "observability", "configuration"
-  ], errors, ["schema", "schemaVersion", "applicationId", "deployment"]);
-  if (root.schema !== APPLICATION_POLICY_SCHEMA) {
-    errors.push({ code: "invalid_policy", message: `schema must be ${APPLICATION_POLICY_SCHEMA}`, pointer: "/schema" });
+    "release", "runtime", "deployment", "ingress", "observability", "configuration"
+  ], errors, ["schema", "schemaVersion", "applicationId", "release", "deployment"]);
+  if (root.schema !== APPLICATION_MANIFEST_SCHEMA) {
+    errors.push({ code: "invalid_manifest", message: `schema must be ${APPLICATION_MANIFEST_SCHEMA}`, pointer: "/schema" });
   }
-  if (root.schemaVersion !== APPLICATION_POLICY_VERSION) {
-    errors.push({ code: "invalid_policy", message: "schemaVersion must be 4", pointer: "/schemaVersion" });
+  if (root.schemaVersion !== APPLICATION_MANIFEST_VERSION) {
+    errors.push({ code: "invalid_manifest", message: "schemaVersion must be 4", pointer: "/schemaVersion" });
   }
   if (typeof root.applicationId !== "string" || !root.applicationId.trim()) {
-    errors.push({ code: "invalid_policy", message: "applicationId must be non-empty", pointer: "/applicationId" });
+    errors.push({ code: "invalid_manifest", message: "applicationId must be non-empty", pointer: "/applicationId" });
   }
   if (root.applicationUid !== undefined && (typeof root.applicationUid !== "string" || !root.applicationUid.trim())) {
-    errors.push({ code: "invalid_policy", message: "applicationUid must be non-empty when present", pointer: "/applicationUid" });
+    errors.push({ code: "invalid_manifest", message: "applicationUid must be non-empty when present", pointer: "/applicationUid" });
   }
 
   const metadata = checkOptionalObject(root, "metadata", "", ["appType", "labels", "description"], errors);
   checkOptionalString(metadata.appType, "/metadata/appType", errors);
   checkOptionalString(metadata.description, "/metadata/description", errors);
   checkStringArray(metadata.labels, "/metadata/labels", errors);
-  const artifact = checkOptionalObject(root, "artifact", "", ["kind", "cid", "digest", "encryption", "runtimeImage"], errors);
-  if (artifact.kind !== undefined) checkEnum(artifact.kind, ["ipfs", "runtime_image"], "/artifact/kind", errors);
-  for (const key of ["cid", "digest", "runtimeImage"]) checkOptionalString(artifact[key], `/artifact/${key}`, errors);
-  const encryption = checkOptionalObject(artifact, "encryption", "/artifact", ["mode"], errors);
-  if (encryption.mode !== undefined) checkEnum(encryption.mode, ["none", "aes256_gcm"], "/artifact/encryption/mode", errors);
-  const build = checkOptionalObject(root, "build", "", ["github"], errors);
-  const github = checkOptionalObject(build, "github", "/build", ["repository", "allowedRefs", "workflowRef", "path"], errors, ["repository"]);
-  for (const key of ["repository", "workflowRef", "path"]) checkOptionalString(github[key], `/build/github/${key}`, errors);
-  checkStringArray(github.allowedRefs, "/build/github/allowedRefs", errors);
+  const release = checkObject(root.release, "/release", ["mode", "artifact", "builder"], errors, ["mode", "artifact"]);
+  checkEnum(release.mode, ["build", "pinned"], "/release/mode", errors);
+  if (release.mode === "build") {
+    checkObject(root.release, "/release", ["mode", "artifact", "builder"], errors, ["mode", "artifact", "builder"]);
+    const artifact = checkObject(release.artifact, "/release/artifact", ["kind", "encryption"], errors, ["kind"]);
+    checkEnum(artifact.kind, ["ipfs_bundle", "runtime_image"], "/release/artifact/kind", errors);
+    if (artifact.kind === "ipfs_bundle") {
+      checkObject(release.artifact, "/release/artifact", ["kind", "encryption"], errors, ["kind", "encryption"]);
+      const encryption = checkObject(artifact.encryption, "/release/artifact/encryption", ["mode"], errors, ["mode"]);
+      checkEnum(encryption.mode, ["none", "aes256_gcm"], "/release/artifact/encryption/mode", errors);
+    } else if (artifact.kind === "runtime_image") {
+      checkObject(release.artifact, "/release/artifact", ["kind"], errors, ["kind"]);
+    }
+    const builder = checkObject(release.builder, "/release/builder", [
+      "kind", "repository", "allowedRefs", "workflowRef", "manifestPath"
+    ], errors, ["kind", "repository", "allowedRefs", "workflowRef", "manifestPath"]);
+    checkEnum(builder.kind, ["github"], "/release/builder/kind", errors);
+    checkNonEmptyString(builder.repository, "/release/builder/repository", errors);
+    if (typeof builder.repository === "string" && !/^[^/\s]+\/[^/\s]+$/u.test(builder.repository)) {
+      errors.push({ code: "invalid_manifest", message: "repository must be an owner/repository identifier", pointer: "/release/builder/repository" });
+    }
+    checkStringArray(builder.allowedRefs, "/release/builder/allowedRefs", errors);
+    if (!Array.isArray(builder.allowedRefs) || builder.allowedRefs.length === 0) {
+      errors.push({ code: "invalid_manifest", message: "allowedRefs must contain at least one exact Git ref", pointer: "/release/builder/allowedRefs" });
+    } else {
+      builder.allowedRefs.forEach((reference, index) => {
+        if (typeof reference === "string" && (!reference.startsWith("refs/") || reference.trim() !== reference || /\s/u.test(reference))) {
+          errors.push({ code: "invalid_manifest", message: "allowed refs must be exact refs/... values", pointer: `/release/builder/allowedRefs/${index}` });
+        }
+      });
+    }
+    checkDuplicateStrings(builder.allowedRefs, "/release/builder/allowedRefs", errors);
+    checkNonEmptyString(builder.manifestPath, "/release/builder/manifestPath", errors);
+    if (typeof builder.manifestPath === "string"
+      && (builder.manifestPath.startsWith("/") || builder.manifestPath.includes("\\")
+        || builder.manifestPath.split("/").some((part) => !part || part === "." || part === ".."))) {
+      errors.push({ code: "invalid_manifest", message: "manifestPath must be a safe relative repository path", pointer: "/release/builder/manifestPath" });
+    }
+    checkNonEmptyString(builder.workflowRef, "/release/builder/workflowRef", errors);
+    if (typeof builder.repository === "string" && typeof builder.workflowRef === "string" && Array.isArray(builder.allowedRefs)) {
+      const prefix = `${builder.repository}/.github/workflows/`;
+      const at = builder.workflowRef.lastIndexOf("@");
+      const workflowPath = builder.workflowRef.slice(prefix.length, at);
+      const workflowRef = builder.workflowRef.slice(at + 1);
+      if (!builder.workflowRef.startsWith(prefix) || at <= prefix.length
+        || (!workflowPath.endsWith(".yml") && !workflowPath.endsWith(".yaml"))
+        || !builder.allowedRefs.includes(workflowRef)) {
+        errors.push({ code: "invalid_manifest", message: "workflowRef must name an exact workflow in repository at one allowed ref", pointer: "/release/builder/workflowRef" });
+      }
+    }
+  } else if (release.mode === "pinned") {
+    checkObject(root.release, "/release", ["mode", "artifact"], errors, ["mode", "artifact"]);
+    const artifact = checkObject(release.artifact, "/release/artifact", [
+      "kind", "cid", "digest", "encryption", "imageDigest", "bootstrapCid", "bootstrapDigest"
+    ], errors, ["kind"]);
+    checkEnum(artifact.kind, ["ipfs_bundle", "runtime_image"], "/release/artifact/kind", errors);
+    if (artifact.kind === "ipfs_bundle") {
+      checkObject(release.artifact, "/release/artifact", ["kind", "cid", "digest", "encryption"], errors, [
+        "kind", "cid", "digest", "encryption"
+      ]);
+      checkIpfsUri(artifact.cid, "/release/artifact/cid", errors);
+      checkSha256(artifact.digest, "/release/artifact/digest", errors);
+      const encryption = checkObject(artifact.encryption, "/release/artifact/encryption", ["mode"], errors, ["mode"]);
+      checkEnum(encryption.mode, ["none", "aes256_gcm"], "/release/artifact/encryption/mode", errors);
+    } else if (artifact.kind === "runtime_image") {
+      checkObject(release.artifact, "/release/artifact", [
+        "kind", "imageDigest", "bootstrapCid", "bootstrapDigest"
+      ], errors, ["kind", "imageDigest", "bootstrapCid", "bootstrapDigest"]);
+      checkSha256(artifact.imageDigest, "/release/artifact/imageDigest", errors);
+      checkIpfsUri(artifact.bootstrapCid, "/release/artifact/bootstrapCid", errors);
+      checkSha256(artifact.bootstrapDigest, "/release/artifact/bootstrapDigest", errors);
+    }
+  }
 
   const runtime = checkOptionalObject(root, "runtime", "", ["engine", "command", "role", "resources", "requiredModules", "bootstrap"], errors);
   if (runtime.engine !== undefined) checkEnum(runtime.engine, ["nodejs", "deno", "bun"], "/runtime/engine", errors);
   checkOptionalString(runtime.command, "/runtime/command", errors);
   checkOptionalString(runtime.role, "/runtime/role", errors);
   checkStringArray(runtime.requiredModules, "/runtime/requiredModules", errors);
+  checkDuplicateStrings(runtime.requiredModules, "/runtime/requiredModules", errors);
   const resources = checkOptionalObject(runtime, "resources", "/runtime", ["memoryMiB", "storageMiB", "networkRequestQuota"], errors);
   for (const key of ["memoryMiB", "storageMiB", "networkRequestQuota"]) {
     checkInteger(resources[key], `/runtime/resources/${key}`, errors, 0);
@@ -163,11 +322,11 @@ export function validateApplicationPolicyV4(value: unknown): PolicyValidationErr
     "trustProfile", "signedDiagnosticsRequired", "identityBoundSecretsRequired"
   ], errors);
   if (bootstrap.trustProfile !== undefined && bootstrap.trustProfile !== ATTESTED_RUNTIME_PROFILE) {
-    errors.push({ code: "invalid_policy", message: "attested runtime trust is mandatory", pointer: "/runtime/bootstrap/trustProfile" });
+    errors.push({ code: "invalid_manifest", message: "attested runtime trust is mandatory", pointer: "/runtime/bootstrap/trustProfile" });
   }
   for (const key of ["signedDiagnosticsRequired", "identityBoundSecretsRequired"]) {
     if (bootstrap[key] !== undefined && bootstrap[key] !== true) {
-      errors.push({ code: "invalid_policy", message: `${key} cannot be disabled`, pointer: `/runtime/bootstrap/${key}` });
+      errors.push({ code: "invalid_manifest", message: `${key} cannot be disabled`, pointer: `/runtime/bootstrap/${key}` });
     }
   }
 
@@ -176,7 +335,7 @@ export function validateApplicationPolicyV4(value: unknown): PolicyValidationErr
   ], errors, ["parallelism", "schedule", "lifecycle"]);
   const parallelism = deployment.parallelism;
   if (!Number.isSafeInteger(parallelism) || (parallelism as number) < 1 || (parallelism as number) > 64) {
-    errors.push({ code: "invalid_policy", message: "parallelism must be an integer in 1..=64", pointer: "/deployment/parallelism" });
+    errors.push({ code: "invalid_manifest", message: "parallelism must be an integer in 1..=64", pointer: "/deployment/parallelism" });
   } else if ((parallelism as number) > 1) {
     errors.push({ code: "unsupported_policy_feature", message: "parallelism above 1 is not enabled", pointer: "/deployment/parallelism" });
     errors.push({ code: "entitlement_exceeded", message: "parallelism exceeds the default entitlement", pointer: "/deployment/parallelism" });
@@ -186,13 +345,13 @@ export function validateApplicationPolicyV4(value: unknown): PolicyValidationErr
   ], errors, ["durationMs"]);
   const durationMs = schedule.durationMs;
   if (!Number.isSafeInteger(durationMs) || (durationMs as number) <= 0) {
-    errors.push({ code: "invalid_policy", message: "durationMs must be a positive integer", pointer: "/deployment/schedule/durationMs" });
+    errors.push({ code: "invalid_manifest", message: "durationMs must be a positive integer", pointer: "/deployment/schedule/durationMs" });
   }
   checkInteger(schedule.startDelayMs, "/deployment/schedule/startDelayMs", errors, 0);
   checkInteger(schedule.maxStartDelayMs, "/deployment/schedule/maxStartDelayMs", errors, 0);
   if (typeof schedule.startDelayMs === "number" && typeof schedule.maxStartDelayMs === "number"
     && schedule.startDelayMs > schedule.maxStartDelayMs) {
-    errors.push({ code: "invalid_policy", message: "startDelayMs cannot exceed maxStartDelayMs", pointer: "/deployment/schedule/startDelayMs" });
+    errors.push({ code: "invalid_manifest", message: "startDelayMs cannot exceed maxStartDelayMs", pointer: "/deployment/schedule/startDelayMs" });
   }
 
   const placement = checkOptionalObject(deployment, "placement", "/deployment", [
@@ -202,7 +361,7 @@ export function validateApplicationPolicyV4(value: unknown): PolicyValidationErr
     "trustProfile", "machine", "evidence"
   ], errors);
   if (requirements.trustProfile !== undefined && requirements.trustProfile !== ATTESTED_RUNTIME_PROFILE) {
-    errors.push({ code: "invalid_policy", message: "placement trust profile cannot be weakened", pointer: "/deployment/placement/requirements/trustProfile" });
+    errors.push({ code: "invalid_manifest", message: "placement trust profile cannot be weakened", pointer: "/deployment/placement/requirements/trustProfile" });
   }
   const machine = checkOptionalObject(requirements, "machine", "/deployment/placement/requirements", [
     "class", "profileVersion", "minimums"
@@ -211,7 +370,7 @@ export function validateApplicationPolicyV4(value: unknown): PolicyValidationErr
   checkOptionalString(machine.profileVersion, "/deployment/placement/requirements/machine/profileVersion", errors);
   const minimums = object(machine.minimums);
   if (machine.minimums !== undefined && !minimums) {
-    errors.push({ code: "invalid_policy", message: "must be an object", pointer: "/deployment/placement/requirements/machine/minimums" });
+    errors.push({ code: "invalid_manifest", message: "must be an object", pointer: "/deployment/placement/requirements/machine/minimums" });
   } else if (minimums) {
     for (const [key, minimum] of Object.entries(minimums)) {
       checkInteger(minimum, `/deployment/placement/requirements/machine/minimums/${key}`, errors, 0);
@@ -244,19 +403,19 @@ export function validateApplicationPolicyV4(value: unknown): PolicyValidationErr
     if (geography.kind === "country") {
       checkObject(group.geography, geographyAt, ["kind", "standard", "values"], errors, ["kind", "standard", "values"]);
       if (geography.standard !== "ISO-3166-1-alpha-2") {
-        errors.push({ code: "invalid_policy", message: "standard must be ISO-3166-1-alpha-2", pointer: `${geographyAt}/standard` });
+        errors.push({ code: "invalid_manifest", message: "standard must be ISO-3166-1-alpha-2", pointer: `${geographyAt}/standard` });
       }
       if (Array.isArray(geography.values) && (geography.values.length === 0
         || geography.values.some((entry) => typeof entry !== "string" || !/^[A-Z]{2}$/.test(entry)))) {
-        errors.push({ code: "invalid_policy", message: "country values must be uppercase ISO alpha-2 codes", pointer: `${geographyAt}/values` });
+        errors.push({ code: "invalid_manifest", message: "country values must be uppercase ISO alpha-2 codes", pointer: `${geographyAt}/values` });
       }
     } else if (geography.kind === "region") {
       checkObject(group.geography, geographyAt, ["kind", "catalog", "values"], errors, ["kind", "catalog", "values"]);
       if (typeof geography.catalog !== "string" || !geography.catalog.trim()) {
-        errors.push({ code: "invalid_policy", message: "catalog must be a non-empty string", pointer: `${geographyAt}/catalog` });
+        errors.push({ code: "invalid_manifest", message: "catalog must be a non-empty string", pointer: `${geographyAt}/catalog` });
       }
       if (Array.isArray(geography.values) && geography.values.length === 0) {
-        errors.push({ code: "invalid_policy", message: "region values cannot be empty", pointer: `${geographyAt}/values` });
+        errors.push({ code: "invalid_manifest", message: "region values cannot be empty", pointer: `${geographyAt}/values` });
       }
     }
   }
@@ -264,15 +423,24 @@ export function validateApplicationPolicyV4(value: unknown): PolicyValidationErr
     errors.push({ code: "unsupported_policy_feature", message: "counted placement groups are not enabled", pointer: "/deployment/placement/groups" });
     const sum = groups.reduce((total, group) => total + (typeof group.count === "number" ? group.count : 0), 0);
     if (typeof parallelism === "number" && sum !== parallelism) {
-      errors.push({ code: "invalid_policy", message: "placement group counts must sum to parallelism", pointer: "/deployment/placement/groups" });
+      errors.push({ code: "invalid_manifest", message: "placement group counts must sum to parallelism", pointer: "/deployment/placement/groups" });
     }
   }
+  checkDuplicateKeys(groups, "name", "/deployment/placement/groups", errors);
   const topology = checkArrayObjects(placement.topologyConstraints, "/deployment/placement/topologyConstraints", [
     "kind", "scope", "topologyKey", "strength"
   ], errors, ["kind", "scope", "topologyKey", "strength"]);
   if (topology.length > 0) {
     errors.push({ code: "unsupported_policy_feature", message: "topology constraints are not enabled", pointer: "/deployment/placement/topologyConstraints" });
   }
+  const seenTopology = new Set<string>();
+  topology.forEach((constraint, index) => {
+    const key = canonicalJson(constraint);
+    if (seenTopology.has(key)) {
+      errors.push({ code: "invalid_manifest", message: "duplicate set entry", pointer: `/deployment/placement/topologyConstraints/${index}` });
+    }
+    seenTopology.add(key);
+  });
   for (const [index, constraint] of topology.entries()) {
     const at = `/deployment/placement/topologyConstraints/${index}`;
     checkEnum(constraint.kind, ["affinity", "anti_affinity"], `${at}/kind`, errors);
@@ -299,7 +467,7 @@ export function validateApplicationPolicyV4(value: unknown): PolicyValidationErr
       "mode", "managerId", ...selectionControls
     ], errors, ["mode", "managerId"]);
     if (typeof selection.managerId !== "string" || !selection.managerId.trim()) {
-      errors.push({ code: "invalid_policy", message: "managerId must be non-empty", pointer: "/deployment/placement/processorSelection/managerId" });
+      errors.push({ code: "invalid_manifest", message: "managerId must be non-empty", pointer: "/deployment/placement/processorSelection/managerId" });
     }
   } else if (selection.mode === "static") {
     checkObject(placement.processorSelection, "/deployment/placement/processorSelection", [
@@ -309,9 +477,13 @@ export function validateApplicationPolicyV4(value: unknown): PolicyValidationErr
     checkOptionalString(selection.managerId, "/deployment/placement/processorSelection/managerId", errors);
   }
   checkStringArray(selection.excludeManagers, "/deployment/placement/processorSelection/excludeManagers", errors);
+  checkDuplicateStrings(selection.excludeManagers, "/deployment/placement/processorSelection/excludeManagers", errors);
+  if (selection.mode === "static") {
+    checkDuplicateStrings(selection.processorIds, "/deployment/placement/processorSelection/processorIds", errors);
+  }
   for (const key of ["allowUnknownManager", "requireScheduleClear", "requireConsumerAccess"]) {
     if (selection[key] !== undefined && typeof selection[key] !== "boolean") {
-      errors.push({ code: "invalid_policy", message: "must be a boolean", pointer: `/deployment/placement/processorSelection/${key}` });
+      errors.push({ code: "invalid_manifest", message: "must be a boolean", pointer: `/deployment/placement/processorSelection/${key}` });
     }
   }
   checkInteger(selection.maxHeartbeatAgeSeconds, "/deployment/placement/processorSelection/maxHeartbeatAgeSeconds", errors, 1);
@@ -333,12 +505,12 @@ export function validateApplicationPolicyV4(value: unknown): PolicyValidationErr
       checkObject(renewal.leadTime, "/deployment/lifecycle/renewal/leadTime", ["mode", "durationMs"], errors, ["mode", "durationMs"]);
       const max = Math.min(1_800_000, typeof durationMs === "number" ? durationMs / 2 : 0);
       if (!Number.isSafeInteger(lead.durationMs) || (lead.durationMs as number) < 60_000 || (lead.durationMs as number) > max) {
-        errors.push({ code: "invalid_policy", message: `fixed durationMs must be in 60000..=${max}`, pointer: "/deployment/lifecycle/renewal/leadTime/durationMs" });
+        errors.push({ code: "invalid_manifest", message: `fixed durationMs must be in 60000..=${max}`, pointer: "/deployment/lifecycle/renewal/leadTime/durationMs" });
       }
     } else if (lead.mode === "automatic") {
       checkObject(renewal.leadTime, "/deployment/lifecycle/renewal/leadTime", ["mode", "profile"], errors, ["mode", "profile"]);
       if (lead.profile !== "proof.liskov.renewal-lead.v1") {
-        errors.push({ code: "invalid_policy", message: "automatic profile must be proof.liskov.renewal-lead.v1", pointer: "/deployment/lifecycle/renewal/leadTime/profile" });
+        errors.push({ code: "invalid_manifest", message: "automatic profile must be proof.liskov.renewal-lead.v1", pointer: "/deployment/lifecycle/renewal/leadTime/profile" });
       }
       errors.push({ code: "unsupported_policy_feature", message: "automatic renewal is not enabled", pointer: "/deployment/lifecycle/renewal/leadTime/mode" });
     }
@@ -350,13 +522,14 @@ export function validateApplicationPolicyV4(value: unknown): PolicyValidationErr
   if (existingJobs.mode === "cooperative_cease") {
     checkObject(update.existingJobs, "/deployment/lifecycle/update/existingJobs", ["mode", "trigger"], errors, ["mode", "trigger"]);
     checkEnum(existingJobs.trigger, ["rollout_started", "successor_processor_claimed", "successor_runtime_ready"], "/deployment/lifecycle/update/existingJobs/trigger", errors);
+    errors.push({ code: "unsupported_policy_feature", message: "cooperative cease is typed but command delivery is not enabled", pointer: "/deployment/lifecycle/update/existingJobs/mode" });
   } else if (existingJobs.mode === "run_until_scheduled_end") {
     checkObject(update.existingJobs, "/deployment/lifecycle/update/existingJobs", ["mode"], errors, ["mode"]);
   }
   const recovery = checkObject(lifecycle.recovery, "/deployment/lifecycle/recovery", ["launch", "runtimeFailure"], errors, ["runtimeFailure"]);
   const launch = checkOptionalObject(recovery, "launch", "/deployment/lifecycle/recovery", ["maxRetries"], errors);
   if (launch.maxRetries !== undefined && (!Number.isSafeInteger(launch.maxRetries) || (launch.maxRetries as number) < 0 || (launch.maxRetries as number) > 10)) {
-    errors.push({ code: "invalid_policy", message: "maxRetries must be in 0..=10", pointer: "/deployment/lifecycle/recovery/launch/maxRetries" });
+    errors.push({ code: "invalid_manifest", message: "maxRetries must be in 0..=10", pointer: "/deployment/lifecycle/recovery/launch/maxRetries" });
   }
   const runtimeFailure = checkObject(recovery.runtimeFailure, "/deployment/lifecycle/recovery/runtimeFailure", [
     "mode", "contactLossAfterMs", "restartGraceMs", "maxSameJobRestarts", "maxFreshRegistrationReplacements"
@@ -373,7 +546,7 @@ export function validateApplicationPolicyV4(value: unknown): PolicyValidationErr
     for (const [key, min, max] of bounds) {
       if (runtimeFailure[key] !== undefined
         && (!Number.isSafeInteger(runtimeFailure[key]) || (runtimeFailure[key] as number) < min || (runtimeFailure[key] as number) > max)) {
-        errors.push({ code: "invalid_policy", message: `${key} must be in ${min}..=${max}`, pointer: `/deployment/lifecycle/recovery/runtimeFailure/${key}` });
+        errors.push({ code: "invalid_manifest", message: `${key} must be in ${min}..=${max}`, pointer: `/deployment/lifecycle/recovery/runtimeFailure/${key}` });
       }
     }
   } else if (runtimeFailure.mode === "wait_until_scheduled_end") {
@@ -405,38 +578,40 @@ export function validateApplicationPolicyV4(value: unknown): PolicyValidationErr
   const observability = checkOptionalObject(root, "observability", "", ["logs", "runtimeDiagnostics"], errors);
   const logs = checkOptionalObject(observability, "logs", "/observability", ["enabled", "profileId", "sinkName", "context"], errors);
   if (logs.enabled !== undefined && typeof logs.enabled !== "boolean") {
-    errors.push({ code: "invalid_policy", message: "must be a boolean", pointer: "/observability/logs/enabled" });
+    errors.push({ code: "invalid_manifest", message: "must be a boolean", pointer: "/observability/logs/enabled" });
   }
   checkOptionalString(logs.profileId, "/observability/logs/profileId", errors);
   checkOptionalString(logs.sinkName, "/observability/logs/sinkName", errors);
   const context = object(logs.context);
   if (logs.context !== undefined && (!context || Object.values(context).some((entry) => typeof entry !== "string"))) {
-    errors.push({ code: "invalid_policy", message: "must be an object of string values", pointer: "/observability/logs/context" });
+    errors.push({ code: "invalid_manifest", message: "must be an object of string values", pointer: "/observability/logs/context" });
   }
   const runtimeDiagnostics = checkOptionalObject(observability, "runtimeDiagnostics", "/observability", ["signed"], errors);
   if (runtimeDiagnostics.signed !== undefined && typeof runtimeDiagnostics.signed !== "boolean") {
-    errors.push({ code: "invalid_policy", message: "must be a boolean", pointer: "/observability/runtimeDiagnostics/signed" });
+    errors.push({ code: "invalid_manifest", message: "must be a boolean", pointer: "/observability/runtimeDiagnostics/signed" });
   }
   if (runtimeDiagnostics.signed !== undefined && runtimeDiagnostics.signed !== true) {
-    errors.push({ code: "invalid_policy", message: "signed runtime diagnostics cannot be disabled", pointer: "/observability/runtimeDiagnostics/signed" });
+    errors.push({ code: "invalid_manifest", message: "signed runtime diagnostics cannot be disabled", pointer: "/observability/runtimeDiagnostics/signed" });
   }
   const configuration = checkOptionalObject(root, "configuration", "", ["variables", "secrets"], errors);
   const variables = checkArrayObjects(configuration.variables, "/configuration/variables", ["name", "required", "managed", "default"], errors, ["name"]);
+  checkDuplicateKeys(variables, "name", "/configuration/variables", errors);
   for (const [index, variable] of variables.entries()) {
-    checkOptionalString(variable.name, `/configuration/variables/${index}/name`, errors);
+    checkNonEmptyString(variable.name, `/configuration/variables/${index}/name`, errors);
     checkOptionalString(variable.default, `/configuration/variables/${index}/default`, errors);
     for (const key of ["required", "managed"]) {
       if (variable[key] !== undefined && typeof variable[key] !== "boolean") {
-        errors.push({ code: "invalid_policy", message: "must be a boolean", pointer: `/configuration/variables/${index}/${key}` });
+        errors.push({ code: "invalid_manifest", message: "must be a boolean", pointer: `/configuration/variables/${index}/${key}` });
       }
     }
   }
   const secrets = checkArrayObjects(configuration.secrets, "/configuration/secrets", ["secretId", "required", "destination", "bundleId"], errors, ["secretId", "destination"]);
+  checkDuplicateKeys(secrets, "secretId", "/configuration/secrets", errors);
   for (const [index, secret] of secrets.entries()) {
-    checkOptionalString(secret.secretId, `/configuration/secrets/${index}/secretId`, errors);
+    checkNonEmptyString(secret.secretId, `/configuration/secrets/${index}/secretId`, errors);
     checkOptionalString(secret.bundleId, `/configuration/secrets/${index}/bundleId`, errors);
     if (secret.required !== undefined && typeof secret.required !== "boolean") {
-      errors.push({ code: "invalid_policy", message: "must be a boolean", pointer: `/configuration/secrets/${index}/required` });
+      errors.push({ code: "invalid_manifest", message: "must be a boolean", pointer: `/configuration/secrets/${index}/required` });
     }
     const destination = checkObject(secret.destination, `/configuration/secrets/${index}/destination`, ["kind", "name", "path"], errors, ["kind"]);
     checkEnum(destination.kind, ["env", "file"], `/configuration/secrets/${index}/destination/kind`, errors);
@@ -449,296 +624,4 @@ export function validateApplicationPolicyV4(value: unknown): PolicyValidationErr
     }
   }
   return errors;
-}
-
-function removeUndefined(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(removeUndefined);
-  const source = object(value);
-  if (!source) return value;
-  return Object.fromEntries(Object.entries(source)
-    .filter(([, entry]) => entry !== undefined)
-    .map(([key, entry]) => [key, removeUndefined(entry)]));
-}
-
-export function migrateApplicationPolicyV3(value: unknown): {
-  policy: JsonObject;
-  warnings: PolicyMigrationWarning[];
-} {
-  const v3 = object(value);
-  if (!v3 || v3.domain !== "proof.slipway.application-policy.v3") {
-    throw new Error("input must be a proof.slipway.application-policy.v3 object");
-  }
-  const applicationId = typeof v3.applicationId === "string" ? v3.applicationId.trim() : "";
-  if (!applicationId) throw new Error("v3 applicationId is required");
-  const runtime = object(v3.runtime) ?? {};
-  const acurast = object(v3.acurast) ?? {};
-  const artifact = object(v3.artifact) ?? {};
-  const legacyMachine = object(acurast.machine);
-  const migratedMachine = legacyMachine
-    ? {
-        class: legacyMachine.class,
-        minimums: object(legacyMachine.minimums)
-      }
-    : undefined;
-  const migratedRuntimeImage = typeof artifact.runtimeImage === "string"
-    ? artifact.runtimeImage
-    : undefined;
-  const recovery = object(acurast.recovery) ?? {};
-  const metadata = object(v3.metadata) ?? {};
-  const resources = object(runtime.resources) ?? {};
-  const automation = object(object(v3.artifactAutomation)?.github);
-  const source = object(v3.source) ?? {};
-  const selection = object(acurast.processorSelection) ?? {};
-  const budgetCaps = object(acurast.budgetCaps) ?? {};
-  const blackbox = object(v3.blackbox) ?? {};
-  const schedule = object(v3.schedule) ?? {};
-  const durationMs = typeof runtime.durationMs === "number"
-    ? runtime.durationMs
-    : (typeof schedule.durationMs === "number" ? schedule.durationMs : 1_800_000);
-  const parallelismValue = typeof runtime.desiredCount === "number"
-    ? runtime.desiredCount
-    : (typeof v3.replicas === "number" ? v3.replicas : 1);
-  const parallelism = Math.min(64, Math.max(1, parallelismValue));
-  const maxRetriesValue = typeof recovery.maxAutoRetries === "number" ? recovery.maxAutoRetries : 5;
-  const maxRetries = Math.min(10, maxRetriesValue);
-  const maxRuntimeReplaces = typeof recovery.maxRuntimeReplaces === "number"
-    ? Math.min(10, recovery.maxRuntimeReplaces)
-    : 2;
-  const startDelayMs = typeof acurast.startDelayMs === "number" ? acurast.startDelayMs : undefined;
-  const maxStartDelayMs = typeof acurast.maxStartDelayMs === "number"
-    ? acurast.maxStartDelayMs
-    : undefined;
-  const migratedStartDelayMs = startDelayMs !== undefined
-    && maxStartDelayMs !== undefined
-    && startDelayMs > maxStartDelayMs
-    ? maxStartDelayMs
-    : startDelayMs;
-  const pinnedProcessors = Array.isArray(acurast.pinnedProcessors)
-    ? acurast.pinnedProcessors.filter((entry): entry is string => typeof entry === "string")
-    : [];
-  const selectionControls = {
-    excludeManagers: selection.excludeManagers === undefined
-      ? undefined
-      : Array.isArray(selection.excludeManagers)
-      ? selection.excludeManagers.filter((entry): entry is string => typeof entry === "string")
-      : [],
-    allowUnknownManager: selection.allowUnknownManager === true,
-    requireScheduleClear: selection.requireScheduleClear === true,
-    requireConsumerAccess: selection.requireConsumerAccess === true,
-    maxHeartbeatAgeSeconds: selection.maxHeartbeatAgeSeconds,
-    candidateLimit: selection.candidateLimit,
-    scanLimit: selection.scanLimit
-  };
-  const processorSelection = selection.mode === "static"
-    ? {
-        mode: "static",
-        processorIds: pinnedProcessors,
-        managerId: acurast.managerId,
-        ...selectionControls
-      }
-    : selection.mode === "manager"
-      ? { mode: "manager", managerId: acurast.managerId, ...selectionControls }
-      : { mode: "open_market", ...selectionControls };
-  const githubBuild = automation
-    ? {
-        repository: typeof automation.repository === "string" ? automation.repository : source.repository,
-        allowedRefs: Array.isArray(automation.allowedRefs)
-          ? automation.allowedRefs.filter((entry): entry is string => typeof entry === "string")
-          : (typeof automation.ref === "string" ? [automation.ref] : []),
-        workflowRef: automation.workflowRef,
-        path: source.path
-      }
-    : undefined;
-  const variables = (Array.isArray(object(v3.environment)?.variables)
-    ? object(v3.environment)?.variables as unknown[]
-    : []).flatMap((entry) => {
-      const variable = object(entry);
-      if (!variable || typeof variable.name !== "string") return [];
-      return [{
-        name: variable.name,
-        required: variable.required === true,
-        managed: variable.source === "managed",
-        default: variable.value
-      }];
-    });
-  const secrets = (Array.isArray(object(v3.secrets)?.declarations)
-    ? object(v3.secrets)?.declarations as unknown[]
-    : []).flatMap((entry) => {
-      const secret = object(entry);
-      if (!secret || typeof secret.secretId !== "string" || typeof secret.name !== "string") return [];
-      return [{
-        secretId: secret.secretId,
-        required: secret.required !== false,
-        destination: secret.target === "file"
-          ? { kind: "file", path: secret.name }
-          : { kind: "env", name: secret.name },
-        bundleId: secret.bundleId
-      }];
-    });
-  const policy = removeUndefined({
-    schema: APPLICATION_POLICY_SCHEMA,
-    schemaVersion: 4,
-    applicationId,
-    applicationUid: v3.applicationUid,
-    metadata: {
-      appType: metadata.appType,
-      labels: Array.isArray(metadata.labels) ? metadata.labels : [],
-      description: metadata.description
-    },
-    artifact: {
-      kind: artifact.mode === "runtime-image" ? "runtime_image" : "ipfs",
-      cid: artifact.cid,
-      digest: artifact.digest,
-      runtimeImage: migratedRuntimeImage,
-      encryption: { mode: artifact.requiredEncryptionMode === "aes-256-gcm" ? "aes256_gcm" : "none" }
-    },
-    build: { github: githubBuild },
-    runtime: {
-      engine: ["deno", "bun"].includes(String(runtime.runtime)) ? runtime.runtime : "nodejs",
-      command: runtime.command,
-      role: runtime.role,
-      requiredModules: Array.isArray(runtime.requiredModules) ? runtime.requiredModules : [],
-      resources: {
-        memoryMiB: resources.memory,
-        storageMiB: resources.storage,
-        networkRequestQuota: resources.networkRequests
-      },
-      bootstrap: {
-        trustProfile: ATTESTED_RUNTIME_PROFILE,
-        signedDiagnosticsRequired: true,
-        identityBoundSecretsRequired: true
-      }
-    },
-    deployment: {
-      parallelism,
-      schedule: {
-        durationMs,
-        startDelayMs: migratedStartDelayMs,
-        maxStartDelayMs
-      },
-      placement: {
-        requirements: {
-          trustProfile: ATTESTED_RUNTIME_PROFILE,
-          machine: migratedMachine
-        },
-        processorSelection
-      },
-      lifecycle: {
-        renewal: { mode: "after_scheduled_end" },
-        update: {
-          timing: "immediate",
-          existingJobs: { mode: "run_until_scheduled_end" }
-        },
-        recovery: {
-          launch: { maxRetries },
-          runtimeFailure: maxRuntimeReplaces === 0
-            ? { mode: "wait_until_scheduled_end" }
-            : {
-                mode: "replace_after_failure",
-                contactLossAfterMs: 300_000,
-                restartGraceMs: 600_000,
-                maxSameJobRestarts: 3,
-                maxFreshRegistrationReplacements: maxRuntimeReplaces
-              }
-        }
-      },
-      spend: {
-        maxRewardPlanckPerJob: budgetCaps.maxRewardPerLaunch === undefined
-          ? undefined
-          : String(budgetCaps.maxRewardPerLaunch),
-        maxNativeFeePlanckPerJob: budgetCaps.maxNativeFeePerLaunch === undefined
-          ? undefined
-          : String(budgetCaps.maxNativeFeePerLaunch)
-      }
-    },
-    ingress: {},
-    observability: {
-      logs: {
-        enabled: blackbox.enabled === true,
-        profileId: blackbox.profileId,
-        sinkName: blackbox.sinkName,
-        context: object(blackbox.context) ?? {}
-      },
-      runtimeDiagnostics: { signed: true }
-    },
-    configuration: { variables, secrets }
-  }) as JsonObject;
-  const warnings: PolicyMigrationWarning[] = [
-    {
-      level: "warning",
-      code: "mandatory_trust_added",
-      message: "v4 requires proof.liskov.attested-runtime.v1 and signed diagnostics",
-      pointer: "/runtime/bootstrap/trustProfile"
-    },
-    {
-      level: "warning",
-      code: "legacy_renewal_after_end",
-      message: "v3 renewal is migrated to after_scheduled_end",
-      pointer: "/deployment/lifecycle/renewal"
-    },
-    {
-      level: "warning",
-      code: "server_metadata_removed",
-      message: "display name, ownership, publication metadata, signatures, and provenance remain server-owned",
-      pointer: "/metadata"
-    }
-  ];
-  if (runtime.replacementRunwayMs !== undefined || runtime.replacementHandoff !== undefined) {
-    warnings.push({
-      level: "warning",
-      code: "legacy_replacement_runway_ignored",
-      message: "replacementRunwayMs/replacementHandoff are not migrated",
-      pointer: "/runtime/replacementRunwayMs"
-    });
-  }
-  if (startDelayMs !== undefined && maxStartDelayMs !== undefined && startDelayMs > maxStartDelayMs) {
-    warnings.push({
-      level: "warning",
-      code: "legacy_start_delay_clamped",
-      message: "v3 startDelayMs exceeded maxStartDelayMs and was reduced to that explicit maximum",
-      pointer: "/deployment/schedule/startDelayMs"
-    });
-  }
-  if (v3.ha !== undefined || acurast.spread !== undefined) {
-    warnings.push({
-      level: "warning",
-      code: "placement_review_required",
-      message: "legacy ha/spread hints require review before authoring v4 topology constraints",
-      pointer: "/deployment/placement/topologyConstraints"
-    });
-  }
-  if (legacyMachine && Object.keys(legacyMachine).some((key) =>
-    !["class", "minimums"].includes(key))) {
-    warnings.push({
-      level: "warning",
-      code: "legacy_machine_resolution_removed",
-      message: "server-resolved machine catalog metadata was removed; class and minimums were retained",
-      pointer: "/deployment/placement/requirements/machine"
-    });
-  }
-  if (object(artifact.runtimeImage)) {
-    warnings.push({
-      level: "warning",
-      code: "legacy_runtime_image_metadata_removed",
-      message: "server-owned runtime-image metadata was removed; artifact kind, CID, and digest were retained",
-      pointer: "/artifact/runtimeImage"
-    });
-  }
-  if (automation?.autoPublish !== undefined) {
-    warnings.push({
-      level: "warning",
-      code: "automatic_publication_removed",
-      message: "build.github is preserved, but publication remains a separate server-authorized action",
-      pointer: "/artifactAutomation/github/autoPublish"
-    });
-  }
-  if (!["manager", "static"].includes(String(selection.mode)) && acurast.managerId !== undefined) {
-    warnings.push({
-      level: "warning",
-      code: "open_market_manager_binding_ignored",
-      message: "v3 managerId is not an open-market constraint and requires review",
-      pointer: "/acurast/managerId"
-    });
-  }
-  return { policy, warnings };
 }

@@ -214,6 +214,8 @@ export interface SlipwayApplicationRenameInput {
 
 export interface SlipwayApplicationPublishInput {
   applicationRef: string;
+  artifactVersion?: string;
+  dryRun?: boolean;
   paused?: boolean;
   reason?: string;
   yes?: boolean;
@@ -446,7 +448,6 @@ export interface SlipwayApplicationImportInput {
   file?: string;
   github?: string;
   serverFetch?: boolean;
-  publish?: boolean;
   slipwayUrl?: string;
   config?: string;
   json?: boolean;
@@ -1680,14 +1681,76 @@ export async function runSlipwayApplicationPublish(input: SlipwayApplicationPubl
     }, "Error (SLIPWAY_APPLICATION_PUBLISH_REASON_WITHOUT_PAUSED): --reason is only valid with --paused.");
     return 1;
   }
-  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_PUBLISH_CONFIRMATION_REQUIRED", "Application publish");
+  if (input.dryRun && (input.paused || reason)) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_PUBLISH_DRY_RUN_STATUS_CONFLICT",
+      applicationRef: input.applicationRef
+    }, "Error (SLIPWAY_APPLICATION_PUBLISH_DRY_RUN_STATUS_CONFLICT): --dry-run cannot be combined with --paused or --reason.");
+    return 1;
+  }
+  if (!input.yes && !input.dryRun) {
+    return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_PUBLISH_CONFIRMATION_REQUIRED", "Application publish");
+  }
+
+  const preflightBody = input.artifactVersion
+    ? { artifactVersionId: input.artifactVersion }
+    : {};
+  const preflight = await authenticatedSlipwayJsonRequest<SlipwayGenericResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/publish/preflight`,
+    body: preflightBody,
+    requestErrorCode: "SLIPWAY_APPLICATION_PUBLISH_PREFLIGHT_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not preflight Liskov Application publication"
+  }, options);
+  if (!preflight.ok) return preflight.exitCode;
+  if (preflight.body?.ok !== true) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_PUBLISH_PREFLIGHT_FAILED",
+      status: preflight.response.status,
+      reason: preflight.body?.reason ?? preflight.body?.error,
+      applicationRef: input.applicationRef
+    }, `Error (SLIPWAY_APPLICATION_PUBLISH_PREFLIGHT_FAILED): Liskov could not preflight publication for ${input.applicationRef}.`);
+    return 1;
+  }
+  if (input.dryRun) {
+    writeStructuredOrHuman(
+      options,
+      input.json,
+      preflight.body,
+      `Publication preflight for ${input.applicationRef}: ${preflight.body.publicationReady === true ? "ready" : "blocked"}.`
+    );
+    return preflight.body.publicationReady === true ? 0 : 1;
+  }
+  if (preflight.body.publicationReady !== true || typeof preflight.body.authoredDigest !== "string") {
+    writeStructuredOrHuman(options, input.json, {
+      ...preflight.body,
+      ok: false,
+      error: "SLIPWAY_APPLICATION_PUBLISH_NOT_READY",
+      applicationRef: input.applicationRef
+    }, `Error (SLIPWAY_APPLICATION_PUBLISH_NOT_READY): publication preflight for ${input.applicationRef} is blocked.`);
+    return 1;
+  }
+  const publishBody: Record<string, unknown> = {
+    expectedAuthoredDigest: preflight.body.authoredDigest
+  };
+  if (input.artifactVersion) publishBody.artifactVersionId = input.artifactVersion;
+  if (input.paused) {
+    publishBody.postPublishStatus = "paused";
+    publishBody.reason = reason;
+  }
   return runSlipwayJsonCommand({
     config: input.config,
     slipwayUrl: input.slipwayUrl,
     json: input.json,
     method: "POST",
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/publish`,
-    body: input.paused ? { postPublishStatus: "paused", reason } : {},
+    body: publishBody,
     errorCode: "SLIPWAY_APPLICATION_PUBLISH_FAILED",
     fetchFailedMessage: "could not publish Liskov Application",
     human: (body) => {
@@ -2415,11 +2478,10 @@ export async function runSlipwayApplicationImport(input: SlipwayApplicationImpor
       }, `Error (SLIPWAY_APPLICATION_IMPORT_FILE_FAILED): could not read Application policy JSON from ${filePath}.`);
       return 1;
     }
-    body = {
-      document,
-      source: { kind: "upload", filename: path.basename(filePath) },
-      publish: input.publish === true
-    };
+      body = {
+        document,
+        source: { kind: "upload", filename: path.basename(filePath) }
+      };
   } else {
     let github: SlipwayGithubPolicySpec;
     try {
@@ -2440,10 +2502,7 @@ export async function runSlipwayApplicationImport(input: SlipwayApplicationImpor
       path: github.path
     };
     if (input.serverFetch === true) {
-      body = {
-        source,
-        publish: input.publish === true
-      };
+      body = { source };
     } else {
       let document: unknown;
       try {
@@ -2457,11 +2516,7 @@ export async function runSlipwayApplicationImport(input: SlipwayApplicationImpor
         }, `Error (SLIPWAY_APPLICATION_IMPORT_GITHUB_FETCH_FAILED): could not fetch ${github.repository}:${github.path}@${github.ref}.`);
         return 1;
       }
-      body = {
-        document,
-        source,
-        publish: input.publish === true
-      };
+      body = { document, source };
     }
   }
 
@@ -2496,7 +2551,9 @@ export async function runSlipwayApplicationImport(input: SlipwayApplicationImpor
     options,
     input.json,
     responseBody,
-    `Imported ${String(responseBody.count ?? responseBody.applicationCount ?? 0)} application(s), ${String(responseBody.serviceCount ?? 0)} service(s).`
+    `Imported ${String(responseBody.count ?? responseBody.applicationCount ?? 0)} application manifest(s).
+authoredDigest: ${String(responseBody.authoredDigest ?? "unavailable")}
+releaseIntentDigest: ${String(responseBody.releaseIntentDigest ?? "unavailable")}`
   );
   return 0;
 }

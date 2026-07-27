@@ -2,16 +2,33 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
-  migrateApplicationPolicyV3,
-  validateApplicationPolicyV4
+  authoredDigest,
+  releaseIntentDigest,
+  validateApplicationManifestV4
 } from "../src/application-policy.js";
 
-function policy(): Record<string, unknown> {
+function manifest(): Record<string, unknown> {
   return {
-    schema: "proof.liskov.application-policy",
+    schema: "proof.liskov.application-manifest",
     schemaVersion: 4,
     applicationId: "uptime-prober",
+    metadata: { description: "Human-authored evidence" },
+    release: {
+      mode: "build",
+      artifact: {
+        kind: "ipfs_bundle",
+        encryption: { mode: "aes256_gcm" }
+      },
+      builder: {
+        kind: "github",
+        repository: "proof-computer/uptime-prober",
+        allowedRefs: ["refs/heads/main"],
+        workflowRef: "proof-computer/uptime-prober/.github/workflows/release.yml@refs/heads/main",
+        manifestPath: ".liskov/application-manifest.json"
+      }
+    },
     runtime: {
+      requiredModules: ["module-a"],
       bootstrap: {
         trustProfile: "proof.liskov.attested-runtime.v1",
         signedDiagnosticsRequired: true,
@@ -28,10 +45,7 @@ function policy(): Record<string, unknown> {
         },
         update: {
           timing: "immediate",
-          existingJobs: {
-            mode: "cooperative_cease",
-            trigger: "successor_runtime_ready"
-          }
+          existingJobs: { mode: "run_until_scheduled_end" }
         },
         recovery: {
           launch: { maxRetries: 5 },
@@ -43,197 +57,94 @@ function policy(): Record<string, unknown> {
   };
 }
 
-describe("local application-policy v4 tools", () => {
-  it("validates the first-public contract and rejects unknown fields with pointers", () => {
-    assert.deepEqual(validateApplicationPolicyV4(policy()), []);
-    const unknown = policy();
-    const deployment = unknown.deployment as Record<string, unknown>;
-    (deployment.lifecycle as Record<string, unknown>).surprise = true;
-    deployment.placement = {
-      requirements: {
-        machine: { catalogVersion: "server-owned" }
-      }
-    };
-    assert.ok(validateApplicationPolicyV4(unknown).some((error) =>
-      error.code === "unknown_field" && error.pointer === "/deployment/lifecycle/surprise"));
-    assert.ok(validateApplicationPolicyV4(unknown).some((error) =>
-      error.code === "unknown_field"
-      && error.pointer === "/deployment/placement/requirements/machine/catalogVersion"));
-  });
+describe("local application-manifest v4 tools", () => {
+  it("validates build releases and rejects unknown and mixed release fields with pointers", () => {
+    assert.deepEqual(validateApplicationManifestV4(manifest()), []);
 
-  it("preserves explicit recovery zeroes and reports typed-but-disabled capabilities", () => {
-    const input = policy();
-    const lifecycle = (input.deployment as Record<string, unknown>).lifecycle as Record<string, unknown>;
-    const recovery = lifecycle.recovery as Record<string, unknown>;
-    recovery.launch = { maxRetries: 0 };
-    recovery.runtimeFailure = {
-      mode: "replace_after_failure",
-      contactLossAfterMs: 300_000,
-      restartGraceMs: 0,
-      maxSameJobRestarts: 0,
-      maxFreshRegistrationReplacements: 0
-    };
-    const errors = validateApplicationPolicyV4(input);
-    assert.equal(errors.filter((error) => error.code === "invalid_policy").length, 0);
-    assert.ok(errors.some((error) => error.code === "unsupported_policy_feature"));
-  });
-
-  it("enforces union-arm fields and primitive types as strictly as the server contract", () => {
-    const input = policy();
-    const deployment = input.deployment as Record<string, unknown>;
-    const lifecycle = deployment.lifecycle as Record<string, unknown>;
-    lifecycle.renewal = {
-      mode: "after_scheduled_end",
-      leadTime: { mode: "fixed", durationMs: 60_000 }
-    };
-    const runtime = input.runtime as Record<string, unknown>;
-    runtime.requiredModules = ["ok", 42];
-    const errors = validateApplicationPolicyV4(input);
+    const unknown = manifest();
+    const release = unknown.release as Record<string, unknown>;
+    release.cid = "ipfs://bafyinvalid";
+    const errors = validateApplicationManifestV4(unknown);
     assert.ok(errors.some((error) =>
-      error.code === "unknown_field"
-      && error.pointer === "/deployment/lifecycle/renewal/leadTime"));
-    assert.ok(errors.some((error) =>
-      error.code === "invalid_policy"
-      && error.pointer === "/runtime/requiredModules"));
+      error.code === "unknown_field" && error.pointer === "/release/cid"));
   });
 
-  it("migrates v3 deterministically, warns, and round-trips through strict validation", () => {
-    const input = {
-      domain: "proof.slipway.application-policy.v3",
-      applicationId: "uptime-prober",
-      runtime: {
-        durationMs: 1_800_000,
-        desiredCount: 1,
-        replacementRunwayMs: 900_000
-      },
-      artifact: { mode: "manual-cid", cid: "bafy-test" },
-      artifactAutomation: {
-        github: {
-          autoPublish: true,
-          repository: "proof-computer/uptime-prober",
-          allowedRefs: ["refs/heads/main"]
-        }
-      },
-      source: { path: ".liskov/policy.json" },
-      acurast: {
-        managerId: "9470",
-        startDelayMs: 600_000,
-        maxStartDelayMs: 300_000,
-        processorSelection: {
-          mode: "open-market",
-          excludeManagers: ["untrusted-manager"],
-          allowUnknownManager: true,
-          requireScheduleClear: true,
-          requireConsumerAccess: true,
-          maxHeartbeatAgeSeconds: 60,
-          candidateLimit: 16,
-          scanLimit: 32
-        },
-        recovery: { maxAutoRetries: 0, maxRuntimeReplaces: 0 }
-      }
-    };
-    const first = migrateApplicationPolicyV3(input);
-    const second = migrateApplicationPolicyV3(input);
-    assert.deepEqual(first, second);
-    assert.equal(
-      ((first.policy.deployment as Record<string, unknown>).lifecycle as Record<string, unknown>).renewal
-        && (((first.policy.deployment as Record<string, unknown>).lifecycle as Record<string, unknown>).renewal as Record<string, unknown>).mode,
-      "after_scheduled_end"
-    );
-    assert.ok(first.warnings.some((warning) => warning.code === "legacy_replacement_runway_ignored"));
-    assert.ok(first.warnings.some((warning) => warning.code === "automatic_publication_removed"));
-    assert.ok(first.warnings.some((warning) => warning.code === "open_market_manager_binding_ignored"));
-    assert.ok(first.warnings.some((warning) =>
-      warning.code === "legacy_start_delay_clamped"
-      && warning.pointer === "/deployment/schedule/startDelayMs"));
-    assert.ok(first.warnings.some((warning) =>
-      warning.code === "mandatory_trust_added"
-      && warning.pointer === "/runtime/bootstrap/trustProfile"));
-    assert.ok(!first.warnings.some((warning) => warning.code === "runtime_recovery_review_required"));
-    assert.equal(
-      ((first.policy.build as Record<string, unknown>).github as Record<string, unknown>).repository,
-      "proof-computer/uptime-prober"
-    );
-    assert.deepEqual(
-      ((first.policy.deployment as Record<string, unknown>).placement as Record<string, unknown>).processorSelection,
-      {
-        mode: "open_market",
-        excludeManagers: ["untrusted-manager"],
-        allowUnknownManager: true,
-        requireScheduleClear: true,
-        requireConsumerAccess: true,
-        maxHeartbeatAgeSeconds: 60,
-        candidateLimit: 16,
-        scanLimit: 32
-      }
-    );
-    assert.deepEqual(
-      (first.policy.deployment as Record<string, Record<string, unknown>>).schedule,
-      {
-        durationMs: 1_800_000,
-        startDelayMs: 300_000,
-        maxStartDelayMs: 300_000
-      }
-    );
-    assert.equal(validateApplicationPolicyV4(first.policy).length, 0);
-  });
-
-  it("removes server-owned machine/runtime-image metadata without losing execution identity", () => {
-    const migration = migrateApplicationPolicyV3({
-      domain: "proof.slipway.application-policy.v3",
-      applicationId: "runtime-image-smoke",
-      artifact: {
-        mode: "runtime-image",
-        cid: "bafy-bootstrap",
-        digest: "sha256:bundle",
-        runtimeImage: {
-          sessionId: "server-session",
-          imageUrl: "s3://private/runtime-image.tar"
-        }
-      },
-      runtime: {
-        command: "node index.js",
-        durationMs: 1_800_000
-      },
-      acurast: {
-        machine: {
-          class: "confidential",
-          minimums: { memoryMiB: 1024 },
-          catalogVersion: "catalog-v7",
-          metricPoolNames: ["tee"],
-          minEligibleProcessors: 3
-        },
-        recovery: { maxRuntimeReplaces: 0 }
-      }
-    });
-    const artifact = migration.policy.artifact as Record<string, unknown>;
-    assert.deepEqual(artifact, {
+  it("rejects empty, malformed, unsafe, duplicate, and wrong-kind release evidence", () => {
+    const input = manifest();
+    const release = input.release as Record<string, unknown>;
+    const builder = release.builder as Record<string, unknown>;
+    builder.allowedRefs = ["refs/heads/main", "refs/heads/main"];
+    builder.manifestPath = "../application-manifest.json";
+    release.artifact = {
       kind: "runtime_image",
-      cid: "bafy-bootstrap",
-      digest: "sha256:bundle",
       encryption: { mode: "none" }
-    });
-    const deployment = migration.policy.deployment as Record<string, unknown>;
-    const placement = deployment.placement as Record<string, unknown>;
-    const requirements = placement.requirements as Record<string, unknown>;
-    assert.deepEqual(requirements.machine, {
-      class: "confidential",
-      minimums: { memoryMiB: 1024 }
-    });
-    assert.deepEqual(
-      migration.warnings.map(({ code, pointer }) => ({ code, pointer }))
-        .filter(({ code }) => code.startsWith("legacy_machine_") || code.startsWith("legacy_runtime_image_")),
-      [
-        {
-          code: "legacy_machine_resolution_removed",
-          pointer: "/deployment/placement/requirements/machine"
-        },
-        {
-          code: "legacy_runtime_image_metadata_removed",
-          pointer: "/artifact/runtimeImage"
-        }
-      ]
-    );
-    assert.equal(validateApplicationPolicyV4(migration.policy).length, 0);
+    };
+
+    const errors = validateApplicationManifestV4(input);
+    assert.ok(errors.some((error) => error.pointer === "/release/builder/allowedRefs/1"));
+    assert.ok(errors.some((error) => error.pointer === "/release/builder/manifestPath"));
+    assert.ok(errors.some((error) =>
+      error.code === "unknown_field" && error.pointer === "/release/artifact/encryption"));
+  });
+
+  it("validates pinned IPFS and runtime-image artifacts strictly", () => {
+    const ipfs = manifest();
+    ipfs.release = {
+      mode: "pinned",
+      artifact: {
+        kind: "ipfs_bundle",
+        cid: "ipfs://bafybeigdyrzt",
+        digest: `sha256:${"a".repeat(64)}`,
+        encryption: { mode: "none" }
+      }
+    };
+    assert.deepEqual(validateApplicationManifestV4(ipfs), []);
+
+    const runtimeImage = manifest();
+    runtimeImage.release = {
+      mode: "pinned",
+      artifact: {
+        kind: "runtime_image",
+        imageDigest: `sha256:${"b".repeat(64)}`,
+        bootstrapCid: "ipfs://bafybeibootstrap",
+        bootstrapDigest: `sha256:${"c".repeat(64)}`
+      }
+    };
+    assert.deepEqual(validateApplicationManifestV4(runtimeImage), []);
+
+    (runtimeImage.release as Record<string, Record<string, unknown>>).artifact.bootstrapDigest = "sha256:not-a-digest";
+    assert.ok(validateApplicationManifestV4(runtimeImage).some((error) =>
+      error.pointer === "/release/artifact/bootstrapDigest"));
+  });
+
+  it("separates authored and release-intent digest domains", () => {
+    const original = manifest();
+    const metadataEdit = structuredClone(original);
+    metadataEdit.metadata = { description: "Changed prose" };
+    assert.notEqual(authoredDigest(original), authoredDigest(metadataEdit));
+    assert.equal(releaseIntentDigest(original), releaseIntentDigest(metadataEdit));
+
+    const reorderedRefs = structuredClone(original);
+    const builder = ((reorderedRefs.release as Record<string, unknown>).builder as Record<string, unknown>);
+    builder.allowedRefs = ["refs/tags/v1", "refs/heads/main"];
+    const reverse = structuredClone(reorderedRefs);
+    (((reverse.release as Record<string, unknown>).builder as Record<string, unknown>).allowedRefs as unknown[]).reverse();
+    assert.notEqual(authoredDigest(reorderedRefs), authoredDigest(reverse));
+    assert.equal(releaseIntentDigest(reorderedRefs), releaseIntentDigest(reverse));
+  });
+
+  it("keeps contract validity separate from target capability diagnostics", () => {
+    const input = manifest();
+    const lifecycle = ((input.deployment as Record<string, unknown>).lifecycle as Record<string, unknown>);
+    (lifecycle.update as Record<string, unknown>).existingJobs = {
+      mode: "cooperative_cease",
+      trigger: "successor_runtime_ready"
+    };
+    const diagnostics = validateApplicationManifestV4(input);
+    assert.equal(diagnostics.filter((error) =>
+      error.code === "invalid_manifest" || error.code === "unknown_field").length, 0);
+    assert.ok(diagnostics.some((error) =>
+      error.code === "unsupported_policy_feature"
+      && error.pointer === "/deployment/lifecycle/update/existingJobs/mode"));
   });
 });

@@ -9,11 +9,14 @@ export default class SlipwayApplicationPublish extends Command {
   static description = "Publish the current Liskov Application draft.";
   static examples = [
     "<%= config.bin %> liskov application publish proof-docs --yes",
+    "<%= config.bin %> liskov application publish proof-docs --artifact-version av-... --dry-run",
     "<%= config.bin %> liskov application publish proof-docs --paused --reason \"failure-matrix initialization\" --yes",
     "<%= config.bin %> liskov application publish proof-docs --yes --json"
   ];
   static flags: Interfaces.FlagInput = {
+    "artifact-version": Flags.string({ description: "Exact artifactVersionId required by a build release." }),
     config: Flags.string({ description: "Path to the local Liskov session file." }),
+    "dry-run": Flags.boolean({ description: "Run the read-only publication preflight." }),
     help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
     paused: Flags.boolean({ description: "Atomically leave the Application paused after publication." }),
@@ -27,7 +30,9 @@ export default class SlipwayApplicationPublish extends Command {
     const { args, flags } = await this.parse(SlipwayApplicationPublish);
     const code = await runSlipwayApplicationPublish({
       applicationRef: args.app_ref,
+      artifactVersion: flags["artifact-version"] as string | undefined,
       config: flags.config as string | undefined,
+      dryRun: flags["dry-run"] as boolean | undefined,
       json: flags.json as boolean | undefined,
       paused: flags.paused as boolean | undefined,
       reason: flags.reason as string | undefined,

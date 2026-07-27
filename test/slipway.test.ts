@@ -1990,39 +1990,6 @@ describe("proof-cli Liskov runner", () => {
 
     const cases = [
       {
-        name: "publish",
-        run: () => runSlipwayApplicationPublish({
-          applicationRef: "alpha",
-          config: sessionFile,
-          json: true,
-          yes: true
-        }, sharedOptions()),
-        expected: {
-          url: "https://slipway.test/api/applications/alpha/publish",
-          method: "POST",
-          body: {}
-        }
-      },
-      {
-        name: "publish paused",
-        run: () => runSlipwayApplicationPublish({
-          applicationRef: "alpha",
-          config: sessionFile,
-          json: true,
-          paused: true,
-          reason: "matrix initialization",
-          yes: true
-        }, sharedOptions()),
-        expected: {
-          url: "https://slipway.test/api/applications/alpha/publish",
-          method: "POST",
-          body: {
-            postPublishStatus: "paused",
-            reason: "matrix initialization"
-          }
-        }
-      },
-      {
         name: "deployment import",
         run: () => runSlipwayApplicationDeploymentImport({
           applicationRef: "alpha",
@@ -2205,6 +2172,76 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(code, 1);
     const body = JSON.parse(out.text) as { error: string };
     assert.equal(body.error, "SLIPWAY_APPLICATION_PUBLISH_PAUSED_REASON_REQUIRED");
+  });
+
+  it("preflights publication, fences the observed manifest digest, and supports read-only dry-run", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "publish-fence-token",
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const options = {
+      fetchImpl: async (url: URL | RequestInfo, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        requests.push({ url: String(url), body });
+        if (String(url).endsWith("/publish/preflight")) {
+          return jsonResponse({
+            ok: true,
+            manifestValid: true,
+            releaseResolved: true,
+            policyValid: true,
+            targetSupported: true,
+            entitled: true,
+            publicationEnabled: true,
+            publicationReady: true,
+            authoredDigest: "a".repeat(64),
+            releaseIntentDigest: "b".repeat(64),
+            policyDigest: "c".repeat(64),
+            artifactVersionId: "av-test"
+          });
+        }
+        return jsonResponse({ ok: true, policy: { policyVersionId: "pv-test" } });
+      },
+      stdout: writer().write
+    };
+
+    assert.equal(await runSlipwayApplicationPublish({
+      applicationRef: "alpha",
+      artifactVersion: "av-test",
+      config: sessionFile,
+      json: true,
+      yes: true
+    }, options), 0);
+    assert.deepEqual(requests, [
+      {
+        url: "https://slipway.test/api/applications/alpha/publish/preflight",
+        body: { artifactVersionId: "av-test" }
+      },
+      {
+        url: "https://slipway.test/api/applications/alpha/publish",
+        body: {
+          expectedAuthoredDigest: "a".repeat(64),
+          artifactVersionId: "av-test"
+        }
+      }
+    ]);
+
+    requests.length = 0;
+    assert.equal(await runSlipwayApplicationPublish({
+      applicationRef: "alpha",
+      artifactVersion: "av-test",
+      config: sessionFile,
+      dryRun: true,
+      json: true
+    }, options), 0);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications/alpha/publish/preflight",
+      body: { artifactVersionId: "av-test" }
+    }]);
   });
 
   it("reconciles executor operations with exact guards, dry-run default, JSON-only stdout, and token redaction", async () => {
@@ -3736,7 +3773,7 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(out.text.includes(token), false);
   });
 
-  it("imports a GitHub Application policy through server fetch without printing the bearer token", async () => {
+  it("imports a GitHub Application manifest through server fetch without publishing or printing the bearer token", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
     const token = "slipway_import_github_secret_token_do_not_print";
@@ -3750,9 +3787,8 @@ describe("proof-cli Liskov runner", () => {
     const requests: Array<{ url: string; authorization?: string; body?: Record<string, unknown> }> = [];
     const out = writer();
     const code = await runSlipwayApplicationImport({
-      github: "proof-computer/alpha:.slipway/application-policy.json@main",
+      github: "proof-computer/alpha:.liskov/application-manifest.json@main",
       serverFetch: true,
-      publish: true,
       config: sessionFile,
       json: true
     }, {
@@ -3771,10 +3807,11 @@ describe("proof-cli Liskov runner", () => {
             kind: "github",
             repository: "proof-computer/alpha",
             ref: "main",
-            path: ".slipway/application-policy.json",
+            path: ".liskov/application-manifest.json",
             commitSha: "a".repeat(40)
           },
-          policies: [{ applicationId: "alpha", policyVersionId: "alpha-v1" }]
+          authoredDigest: "a".repeat(64),
+          releaseIntentDigest: "b".repeat(64)
         });
       },
       stdout: out.write
@@ -3789,26 +3826,34 @@ describe("proof-cli Liskov runner", () => {
         kind: "github",
         repository: "proof-computer/alpha",
         ref: "main",
-        path: ".slipway/application-policy.json"
-      },
-      publish: true
+        path: ".liskov/application-manifest.json"
+      }
     });
     assert.equal(out.text.includes(token), false);
-    const parsed = JSON.parse(out.text) as { ok: boolean; applicationCount: number; policies: Array<{ applicationId: string }> };
+    const parsed = JSON.parse(out.text) as { ok: boolean; applicationCount: number; authoredDigest: string };
     assert.equal(parsed.ok, true);
     assert.equal(parsed.applicationCount, 1);
-    assert.equal(parsed.policies[0]?.applicationId, "alpha");
+    assert.equal(parsed.authoredDigest, "a".repeat(64));
   });
 
-  it("imports a local Application policy file without printing the bearer token", async () => {
+  it("imports a local Application manifest file without printing the bearer token", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
-    const policyFile = path.join(dir, "application-policy.json");
+    const policyFile = path.join(dir, "application-manifest.json");
     const token = "slipway_import_file_secret_token_do_not_print";
     const document = {
-      domain: "proof.slipway.application-policy.v3",
+      schema: "proof.liskov.application-manifest",
+      schemaVersion: 4,
       applicationId: "alpha",
-      replicas: 1
+      release: {
+        mode: "pinned",
+        artifact: {
+          kind: "ipfs_bundle",
+          cid: "ipfs://bafyalpha",
+          digest: `sha256:${"a".repeat(64)}`,
+          encryption: { mode: "none" }
+        }
+      }
     };
     await writeFile(policyFile, `${JSON.stringify(document)}\n`, "utf8");
     await saveSlipwaySession({
@@ -3847,8 +3892,7 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(requests[0]?.authorization, `Bearer ${token}`);
     assert.deepEqual(requests[0]?.body, {
       document,
-      source: { kind: "upload", filename: "application-policy.json" },
-      publish: false
+      source: { kind: "upload", filename: "application-manifest.json" }
     });
     assert.equal(out.text.includes(token), false);
     const parsed = JSON.parse(out.text) as { ok: boolean; count: number };
@@ -3856,14 +3900,23 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.count, 1);
   });
 
-  it("can client-fetch a public GitHub Application policy before import", async () => {
+  it("can client-fetch a public GitHub Application manifest before import", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
     const token = "slipway_import_client_github_secret_token_do_not_print";
     const document = {
-      domain: "proof.slipway.application-policy.v3",
+      schema: "proof.liskov.application-manifest",
+      schemaVersion: 4,
       applicationId: "alpha",
-      replicas: 1
+      release: {
+        mode: "pinned",
+        artifact: {
+          kind: "ipfs_bundle",
+          cid: "ipfs://bafyalpha",
+          digest: `sha256:${"a".repeat(64)}`,
+          encryption: { mode: "none" }
+        }
+      }
     };
     await saveSlipwaySession({
       version: 1,
@@ -3875,7 +3928,7 @@ describe("proof-cli Liskov runner", () => {
     const requests: Array<{ url: string; authorization?: string; body?: Record<string, unknown> }> = [];
     const out = writer();
     const code = await runSlipwayApplicationImport({
-      github: "proof-computer/alpha:.slipway/application-policy.json@main",
+      github: "proof-computer/alpha:.liskov/application-manifest.json@main",
       config: sessionFile,
       json: true
     }, {
@@ -3885,7 +3938,7 @@ describe("proof-cli Liskov runner", () => {
           authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
           body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
         });
-        if (String(url) === "https://raw.githubusercontent.com/proof-computer/alpha/main/.slipway/application-policy.json") {
+        if (String(url) === "https://raw.githubusercontent.com/proof-computer/alpha/main/.liskov/application-manifest.json") {
           return jsonResponse(document);
         }
         return jsonResponse({
@@ -3899,7 +3952,7 @@ describe("proof-cli Liskov runner", () => {
     });
 
     assert.equal(code, 0);
-    assert.equal(requests[0]?.url, "https://raw.githubusercontent.com/proof-computer/alpha/main/.slipway/application-policy.json");
+    assert.equal(requests[0]?.url, "https://raw.githubusercontent.com/proof-computer/alpha/main/.liskov/application-manifest.json");
     assert.equal(requests[0]?.authorization, undefined);
     assert.equal(requests[1]?.url, "https://slipway.test/api/applications/imports");
     assert.equal(requests[1]?.authorization, `Bearer ${token}`);
@@ -3909,9 +3962,8 @@ describe("proof-cli Liskov runner", () => {
         kind: "github",
         repository: "proof-computer/alpha",
         ref: "main",
-        path: ".slipway/application-policy.json"
-      },
-      publish: false
+        path: ".liskov/application-manifest.json"
+      }
     });
     assert.equal(out.text.includes(token), false);
   });

@@ -29,13 +29,12 @@ USAGE
 COMMANDS
   backfill-identities [--yes]
   delete APP_REF [--owner OWNER] [--reason TEXT] [--force] [--yes]
-  import --github owner/repo:path@ref [--server-fetch] [--publish]
-  import --file PATH [--publish]
+  import --github owner/repo:path@ref [--server-fetch]
+  import --file PATH
   list
-  publish APP_REF [--paused --reason TEXT] --yes
+  publish APP_REF [--artifact-version ID] [--dry-run] [--paused --reason TEXT] [--yes]
   pause APP_REF [--owner OWNER] [--reason TEXT] [--yes]
-  policy validate --file PATH [--json]
-  policy migrate --file PATH --output PATH [--json]
+  manifest validate --file PATH [--json]
   resume APP_REF [--owner OWNER] [--reason TEXT] [--yes]
   status APPLICATION_ID
   plans APPLICATION_ID

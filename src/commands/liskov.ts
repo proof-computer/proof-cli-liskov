@@ -33,9 +33,10 @@ COMMANDS
   organization billing ORG_ID
   organization service-credits ORG_ID
   organization billing transactions ORG_ID [--limit N] [--before MS]
-  application import --github owner/repo:path@ref [--server-fetch] [--publish]
+  application import --github owner/repo:path@ref [--server-fetch]
   application list
-  application publish APP_REF [--paused --reason TEXT] --yes
+  application manifest validate --file PATH [--json]
+  application publish APP_REF [--artifact-version ID] [--dry-run] [--paused --reason TEXT] [--yes]
   application pause APP_REF --yes
   application resume APP_REF --yes
   application status APPLICATION_ID
