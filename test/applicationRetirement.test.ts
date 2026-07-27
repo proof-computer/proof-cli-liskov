@@ -82,6 +82,8 @@ describe("application retirement CLI", () => {
       ok: true,
       domain: "proof.liskov.application-retirement.v1",
       lifecycleState: "active",
+      creationAvailability: { available: true },
+      capabilities: { create: true, cancel: true },
       preview: {
         assessment: {
           domain: "proof.liskov.application-retirement-assessment.v1",
@@ -149,6 +151,12 @@ describe("application retirement CLI", () => {
       },
       receipt: null
     };
+    const preview = {
+      ok: true,
+      creationAvailability: { available: true },
+      capabilities: { create: true, cancel: true },
+      preview: { assessment: { executionBlockerCount: 0, financialBlockerCount: 1, ambiguityBlockerCount: 0 } }
+    };
     const out = writer();
     const code = await runSlipwayApplicationRetirement({
       applicationRef: "alpha",
@@ -161,20 +169,69 @@ describe("application retirement CLI", () => {
         requests.push({
           url: String(url),
           method: init?.method,
-          body: JSON.parse(String(init?.body))
+          body: init?.body === undefined ? undefined : JSON.parse(String(init.body))
         });
-        return jsonResponse(response, 202);
+        return init?.method === "POST"
+          ? jsonResponse(response, 202)
+          : jsonResponse(preview);
       },
       stdout: out.write
     });
 
     assert.equal(code, 0);
-    assert.deepEqual(requests, [{
-      url: "https://liskov.test/api/applications/alpha/retirement",
-      method: "POST",
-      body: { reason: "project complete" }
-    }]);
+    assert.deepEqual(requests, [
+      {
+        url: "https://liskov.test/api/applications/alpha/retirement",
+        method: "GET",
+        body: undefined
+      },
+      {
+        url: "https://liskov.test/api/applications/alpha/retirement",
+        method: "POST",
+        body: { reason: "project complete" }
+      }
+    ]);
     assert.deepEqual(JSON.parse(out.text), response);
+  });
+
+  it("does not post a new intent when rollout availability blocks creation", async () => {
+    const session = await sessionFile();
+    const requests: string[] = [];
+    const response = {
+      ok: true,
+      creationAvailability: {
+        domain: "proof.liskov.application-retirement-creation-availability.v1",
+        available: false,
+        reason: "kill_switch_enabled"
+      },
+      capabilities: { create: true, cancel: true },
+      preview: {
+        assessment: {
+          phase: "blocked",
+          executionBlockerCount: 0,
+          financialBlockerCount: 0,
+          ambiguityBlockerCount: 1,
+          blockers: []
+        }
+      }
+    };
+    const out = writer();
+    const code = await runSlipwayApplicationRetirement({
+      applicationRef: "alpha",
+      config: session.file,
+      yes: true
+    }, {
+      fetchImpl: async (url, init) => {
+        requests.push(`${init?.method}:${String(url)}`);
+        return jsonResponse(response);
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 1);
+    assert.deepEqual(requests, ["GET:https://liskov.test/api/applications/alpha/retirement"]);
+    assert.match(out.text, /operator kill switch is enabled/u);
+    assert.doesNotMatch(out.text, /Use --yes/u);
   });
 
   it("requires explicit confirmation to cancel and leaves the request unsent", async () => {
@@ -243,6 +300,8 @@ describe("application retirement CLI", () => {
     }, {
       fetchImpl: async () => jsonResponse({
         ok: true,
+        creationAvailability: { available: true },
+        capabilities: { create: true, cancel: true },
         preview: {
           assessment: {
             phase: "blocked",

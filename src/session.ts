@@ -764,6 +764,15 @@ interface SlipwayApplicationDeleteResponse {
 interface SlipwayApplicationRetirementResponse extends SlipwayGenericResponse {
   domain?: string;
   lifecycleState?: string;
+  creationAvailability?: {
+    domain?: string;
+    available?: boolean;
+    reason?: "rollout_disabled" | "canary_uid_not_allowed" | "kill_switch_enabled" | string;
+  };
+  capabilities?: {
+    create?: boolean;
+    cancel?: boolean;
+  };
   preview?: Record<string, unknown>;
   previousRetirement?: Record<string, unknown>;
   retirement?: Record<string, unknown>;
@@ -1522,8 +1531,49 @@ export async function runSlipwayApplicationRetirement(
     );
   }
   const path = applicationRetirementPath(input.applicationRef);
-  const request = input.yes === true
-    ? await authenticatedSlipwayJsonRequest<SlipwayApplicationRetirementResponse>({
+  const readRequest = await authenticatedSlipwayRequest<SlipwayApplicationRetirementResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path,
+    requestErrorCode: "SLIPWAY_APPLICATION_RETIREMENT_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application retirement"
+  }, options);
+  if (!readRequest.ok) return readRequest.exitCode;
+  if (input.yes !== true) {
+    return writeRetirementResponse(
+      readRequest.body,
+      readRequest.response,
+      input.json,
+      options,
+      "SLIPWAY_APPLICATION_RETIREMENT_FAILED"
+    );
+  }
+  if (!readRequest.body || !readRequest.response.ok || readRequest.body.ok === false) {
+    return writeRetirementResponse(
+      readRequest.body,
+      readRequest.response,
+      input.json,
+      options,
+      "SLIPWAY_APPLICATION_RETIREMENT_FAILED"
+    );
+  }
+  const readRetirement = objectRecord(readRequest.body.retirement);
+  const activeReplay = readRetirement.status === "active";
+  const receiptReplay = Object.keys(objectRecord(readRequest.body.receipt)).length > 0;
+  const creationAvailable = readRequest.body.creationAvailability?.available === true;
+  const canCreate = readRequest.body.capabilities?.create === true;
+  if (!activeReplay && !receiptReplay && (!creationAvailable || !canCreate)) {
+    writeStructuredOrHuman(
+      options,
+      input.json,
+      readRequest.body,
+      formatApplicationRetirement(readRequest.body)
+    );
+    return 1;
+  }
+  const request = await authenticatedSlipwayJsonRequest<SlipwayApplicationRetirementResponse>({
         config: input.config,
         slipwayUrl: input.slipwayUrl,
         json: input.json,
@@ -1533,15 +1583,6 @@ export async function runSlipwayApplicationRetirement(
         requestErrorCode: "SLIPWAY_APPLICATION_RETIREMENT_FAILED",
         notFoundMessage: "No Liskov CLI session is stored locally.",
         fetchFailedMessage: "could not start Liskov Application retirement"
-      }, options)
-    : await authenticatedSlipwayRequest<SlipwayApplicationRetirementResponse>({
-        config: input.config,
-        slipwayUrl: input.slipwayUrl,
-        json: input.json,
-        path,
-        requestErrorCode: "SLIPWAY_APPLICATION_RETIREMENT_FAILED",
-        notFoundMessage: "No Liskov CLI session is stored locally.",
-        fetchFailedMessage: "could not read Liskov Application retirement"
       }, options);
   if (!request.ok) return request.exitCode;
   return writeRetirementResponse(
@@ -4884,13 +4925,33 @@ function formatApplicationRetirement(body: SlipwayApplicationRetirementResponse)
 
   const preview = objectRecord(body.preview);
   if (Object.keys(preview).length > 0) {
+    const creationAvailability = objectRecord(body.creationAvailability);
+    const capabilities = objectRecord(body.capabilities);
+    const action = booleanValue(creationAvailability.available) !== true
+      ? `Retirement creation unavailable: ${formatRetirementCreationUnavailableReason(creationAvailability.reason)}`
+      : booleanValue(capabilities.create) !== true
+        ? "Retirement state is readable, but this session lacks application.delete permission."
+        : "Use --yes to pause the application and start a durable retirement intent.";
     return [
       "Retirement preview (read only).",
       formatRetirementAssessment(objectRecord(preview.assessment)),
-      "Use --yes to pause the application and start a durable retirement intent."
+      action
     ].join("\n");
   }
   return "Liskov returned application retirement state.";
+}
+
+function formatRetirementCreationUnavailableReason(reason: unknown): string {
+  switch (reason) {
+    case "rollout_disabled":
+      return "the rollout is disabled; existing state and receipts remain readable.";
+    case "canary_uid_not_allowed":
+      return "this application UID is not in the exact canary allowlist.";
+    case "kill_switch_enabled":
+      return "the operator kill switch is enabled; coordinator work is also paused.";
+    default:
+      return "the server is not accepting new retirement intents.";
+  }
 }
 
 function formatRetirementReceipt(receipt: Record<string, unknown>): string {
