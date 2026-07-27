@@ -6,24 +6,24 @@ export default class SlipwayApplicationDelete extends Command {
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true })
   };
-  static description = "Preview or confirm a Liskov Application tombstone.";
+  static description = "Deprecated clean-only deletion bridge for a Liskov Application.";
   static examples = [
     "<%= config.bin %> liskov application delete proof-docs",
     "<%= config.bin %> liskov application delete app-0123456789abcdef --reason retired --yes",
-    "<%= config.bin %> liskov application delete proof-docs --acknowledge-live-resources --reason retired --yes --json"
+    "<%= config.bin %> liskov application retire proof-docs --reason retired --yes --json"
   ];
   static flags: Interfaces.FlagInput = {
     config: Flags.string({ description: "Path to the local Liskov session file." }),
-    "acknowledge-live-resources": Flags.boolean({ description: "Acknowledge that live and pending resources will continue after tombstoning." }),
-    force: Flags.boolean({ description: "Deprecated alias for --acknowledge-live-resources." }),
+    "acknowledge-live-resources": Flags.boolean({ description: "Deprecated compatibility flag; parsed but never bypasses retirement blockers." }),
+    force: Flags.boolean({ description: "Deprecated compatibility flag; parsed but never bypasses retirement blockers." }),
     help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
     owner: Flags.string({ description: "Owner address to disambiguate a legacy Application id." }),
     reason: Flags.string({ description: "Deletion reason recorded only with --yes." }),
     "slipway-url": Flags.string({ description: "Liskov service URL." }),
-    yes: Flags.boolean({ char: "y", description: "Confirm the tombstone mutation. Without this flag the CLI performs a read-only preview." })
+    yes: Flags.boolean({ char: "y", description: "Confirm clean-only deletion. Without this flag the CLI performs a read-only preview." })
   };
-  static summary = "Read-only preview or confirmed tombstone for a Liskov Application.";
+  static summary = "Deprecated clean-only deletion bridge; use application retire.";
 
   async run(): Promise<void> {
     const { args, flags } = await this.parse(SlipwayApplicationDelete);

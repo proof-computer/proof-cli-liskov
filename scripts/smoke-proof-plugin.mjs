@@ -51,11 +51,22 @@ try {
   assertIncludes(applicationBackfillIdentitiesHelp.stdout, "--yes");
 
   const applicationDeleteHelp = run(process.execPath, [proofDevBin, "liskov", "application", "delete", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationDeleteHelp.stdout, "Read-only preview or confirmed tombstone");
+  assertIncludes(applicationDeleteHelp.stdout, "Deprecated clean-only deletion bridge");
   assertIncludes(applicationDeleteHelp.stdout, "performs a read-only preview");
   assertIncludes(applicationDeleteHelp.stdout, "--acknowledge-live-resources");
   assertIncludes(applicationDeleteHelp.stdout, "--force");
   assertIncludes(applicationDeleteHelp.stdout, "--yes");
+
+  const applicationRetireHelp = run(process.execPath, [proofDevBin, "liskov", "application", "retire", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationRetireHelp.stdout, "Read or start safe Liskov Application retirement");
+  assertIncludes(applicationRetireHelp.stdout, "command is read only.");
+  assertIncludes(applicationRetireHelp.stdout, "--reason");
+  assertIncludes(applicationRetireHelp.stdout, "--yes");
+
+  const applicationRetireCancelHelp = run(process.execPath, [proofDevBin, "liskov", "application", "retire", "cancel", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationRetireCancelHelp.stdout, "Cancel retirement and leave the Liskov Application paused");
+  assertIncludes(applicationRetireCancelHelp.stdout, "--reason");
+  assertIncludes(applicationRetireCancelHelp.stdout, "--yes");
 
   const applicationPauseHelp = run(process.execPath, [proofDevBin, "liskov", "application", "pause", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationPauseHelp.stdout, "Pause new Liskov work");
@@ -73,7 +84,7 @@ try {
   assertIncludes(applicationResumeHelp.stdout, "--yes");
 
   const applicationImportHelp = run(process.execPath, [proofDevBin, "liskov", "application", "import", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationImportHelp.stdout, "Import a Liskov Application policy");
+  assertIncludes(applicationImportHelp.stdout, "Import a Liskov Application manifest");
   assertIncludes(applicationImportHelp.stdout, "--github");
   assertIncludes(applicationImportHelp.stdout, "--server-fetch");
 

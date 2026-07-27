@@ -35,6 +35,8 @@ COMMANDS
   publish APP_REF [--artifact-version ID] [--dry-run] [--paused --reason TEXT] [--yes]
   pause APP_REF [--owner OWNER] [--reason TEXT] [--yes]
   manifest validate --file PATH [--json]
+  retire APP_REF [--reason TEXT] [--yes]
+  retire cancel APP_REF [--reason TEXT] --yes
   resume APP_REF [--owner OWNER] [--reason TEXT] [--yes]
   status APPLICATION_ID
   plans APPLICATION_ID
@@ -54,6 +56,8 @@ COMMANDS
 DESCRIPTION
   Application commands use the local proof liskov session created by
   \`${bin} liskov login\`. Pause stops new planning/executor work without
-  stopping Acurast jobs, revoking Lockbox grants, or draining routes. Delete
-  creates a Liskov tombstone.`);
+  stopping Acurast jobs, revoking Lockbox grants, or draining routes. Retire
+  pauses immediately, waits for chain schedules and bounded financial closeout,
+  then writes an immutable zero-gate receipt. Delete is a deprecated clean-only
+  compatibility bridge.`);
 }

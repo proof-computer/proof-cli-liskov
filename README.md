@@ -20,6 +20,9 @@ proof liskov application publish proof-docs --artifact-version av-... --yes
 proof liskov application publish proof-docs --paused --reason "failure-matrix initialization" --yes
 proof liskov application pause proof-docs --reason "funding pending" --yes
 proof liskov application resume proof-docs --reason "funded" --yes
+proof liskov application retire proof-docs
+proof liskov application retire proof-docs --reason "project complete" --yes
+proof liskov application retire cancel proof-docs --yes
 proof liskov application devtools view-key proof-docs 66059 --json
 proof liskov application runtime-image workflow proof-docs
 proof liskov application deployment import proof-docs --sequence 701 --origin 5... --yes
@@ -40,6 +43,7 @@ proof liskov custody execution diagnose proof-docs --execution-id ID --network m
 proof liskov custody execution recover proof-docs --execution-id ID --reason "operator reviewed" --yes
 proof liskov custody machine catalog --network mainnet --json
 proof liskov application backfill-identities
+# Deprecated clean-only compatibility bridge; use application retire.
 proof liskov application delete proof-docs
 proof liskov application delete proof-docs --reason retired --yes
 proof liskov admin executor-operation reconcile op-123 --expect-application slipway-diagnostic --expect-kind runtime_replacement --expect-deployment dep-123 --expect-job job-123 --expect-status pending --reason "terminalize unsubmitted replacement" --json

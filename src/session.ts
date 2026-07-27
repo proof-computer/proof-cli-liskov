@@ -179,6 +179,24 @@ export interface SlipwayApplicationDeleteInput {
   json?: boolean;
 }
 
+export interface SlipwayApplicationRetirementInput {
+  applicationRef: string;
+  reason?: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationRetirementCancelInput {
+  applicationRef: string;
+  reason?: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationStatusTransitionInput {
   applicationRef: string;
   status: "active" | "paused";
@@ -741,6 +759,16 @@ interface SlipwayApplicationDeleteResponse {
   reason?: string;
   candidates?: PublicSlipwayApplicationRefCandidate[];
   [key: string]: unknown;
+}
+
+interface SlipwayApplicationRetirementResponse extends SlipwayGenericResponse {
+  domain?: string;
+  lifecycleState?: string;
+  preview?: Record<string, unknown>;
+  previousRetirement?: Record<string, unknown>;
+  retirement?: Record<string, unknown>;
+  receipt?: Record<string, unknown>;
+  legacyCleanup?: Record<string, unknown>;
 }
 
 interface SlipwayApplicationStatusTransitionResponse {
@@ -1478,6 +1506,94 @@ export async function runSlipwayApplicationDelete(input: SlipwayApplicationDelet
     formatApplicationDelete(body)
   );
   return 0;
+}
+
+export async function runSlipwayApplicationRetirement(
+  input: SlipwayApplicationRetirementInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  const reason = input.reason?.trim();
+  if (reason && reason.length > 500) {
+    return writeRetirementInputError(
+      options,
+      input.json,
+      "SLIPWAY_APPLICATION_RETIREMENT_REASON_TOO_LONG",
+      "Retirement reason must contain at most 500 characters."
+    );
+  }
+  const path = applicationRetirementPath(input.applicationRef);
+  const request = input.yes === true
+    ? await authenticatedSlipwayJsonRequest<SlipwayApplicationRetirementResponse>({
+        config: input.config,
+        slipwayUrl: input.slipwayUrl,
+        json: input.json,
+        method: "POST",
+        path,
+        body: reason ? { reason } : {},
+        requestErrorCode: "SLIPWAY_APPLICATION_RETIREMENT_FAILED",
+        notFoundMessage: "No Liskov CLI session is stored locally.",
+        fetchFailedMessage: "could not start Liskov Application retirement"
+      }, options)
+    : await authenticatedSlipwayRequest<SlipwayApplicationRetirementResponse>({
+        config: input.config,
+        slipwayUrl: input.slipwayUrl,
+        json: input.json,
+        path,
+        requestErrorCode: "SLIPWAY_APPLICATION_RETIREMENT_FAILED",
+        notFoundMessage: "No Liskov CLI session is stored locally.",
+        fetchFailedMessage: "could not read Liskov Application retirement"
+      }, options);
+  if (!request.ok) return request.exitCode;
+  return writeRetirementResponse(
+    request.body,
+    request.response,
+    input.json,
+    options,
+    "SLIPWAY_APPLICATION_RETIREMENT_FAILED"
+  );
+}
+
+export async function runSlipwayApplicationRetirementCancel(
+  input: SlipwayApplicationRetirementCancelInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  if (input.yes !== true) {
+    return writeConfirmationRequired(
+      options,
+      input.json,
+      "SLIPWAY_APPLICATION_RETIREMENT_CANCEL_CONFIRMATION_REQUIRED",
+      "Cancelling application retirement"
+    );
+  }
+  const reason = input.reason?.trim();
+  if (reason && reason.length > 500) {
+    return writeRetirementInputError(
+      options,
+      input.json,
+      "SLIPWAY_APPLICATION_RETIREMENT_CANCEL_REASON_TOO_LONG",
+      "Cancellation reason must contain at most 500 characters."
+    );
+  }
+  const request =
+    await authenticatedSlipwayJsonRequest<SlipwayApplicationRetirementResponse>({
+      config: input.config,
+      slipwayUrl: input.slipwayUrl,
+      json: input.json,
+      method: "POST",
+      path: `${applicationRetirementPath(input.applicationRef)}/cancel`,
+      body: reason ? { reason } : {},
+      requestErrorCode: "SLIPWAY_APPLICATION_RETIREMENT_CANCEL_FAILED",
+      notFoundMessage: "No Liskov CLI session is stored locally.",
+      fetchFailedMessage: "could not cancel Liskov Application retirement"
+    }, options);
+  if (!request.ok) return request.exitCode;
+  return writeRetirementResponse(
+    request.body,
+    request.response,
+    input.json,
+    options,
+    "SLIPWAY_APPLICATION_RETIREMENT_CANCEL_FAILED"
+  );
 }
 
 export async function runSlipwayApplicationStatusTransition(input: SlipwayApplicationStatusTransitionInput, options: SlipwayCliOptions = {}): Promise<number> {
@@ -4344,6 +4460,10 @@ function applicationDeletionPreviewPath(applicationRef: string, owner: string | 
   return `${pathValue}?${query.toString()}`;
 }
 
+function applicationRetirementPath(applicationRef: string): string {
+  return `/api/applications/${encodeURIComponent(applicationRef)}/retirement`;
+}
+
 function applicationStatusPath(applicationRef: string, owner: string | undefined): string {
   const pathValue = `/api/applications/${encodeURIComponent(applicationRef)}/status`;
   if (!owner || !owner.trim()) return pathValue;
@@ -4676,10 +4796,138 @@ function formatApplicationDelete(body: SlipwayApplicationDeleteResponse): string
   const lines = [header];
   lines.push(
     `Impact: ${impact.activeDeploymentCount ?? 0} active/current deployment(s), ${impact.liveJobCount ?? 0} live job(s), ${impact.pendingOperationCount ?? 0} pending/running executor operation(s).`,
-    "Deletion stops future planning; existing jobs, grants, ingress, logs, submitted operations, and accounting continue unchanged."
+    "Legacy DELETE is a deprecated clean-only bridge. It never starts a long-running retirement or bypasses a nonzero or ambiguous gate."
   );
   if (body.dryRun === true && impact.hasLiveOrPendingResources === true) {
-    lines.push("Confirm with --acknowledge-live-resources --reason TEXT --yes after reviewing these live resources.");
+    lines.push("This application cannot be deleted through the legacy bridge. Use `proof liskov application retire APP_REF` to inspect or start safe retirement.");
+  } else if (body.dryRun === true) {
+    lines.push("The current gate is clean. Confirm with --reason TEXT --yes, or use the retirement command.");
+  }
+  return lines.join("\n");
+}
+
+function writeRetirementInputError(
+  options: SlipwayCliOptions,
+  json: boolean | undefined,
+  error: string,
+  message: string
+): number {
+  writeStructuredOrHuman(
+    options,
+    json,
+    { ok: false, error, message },
+    `Error (${error}): ${message}`
+  );
+  return 1;
+}
+
+function writeRetirementResponse(
+  body: SlipwayApplicationRetirementResponse | undefined,
+  response: Response,
+  json: boolean | undefined,
+  options: SlipwayCliOptions,
+  fallbackError: string
+): number {
+  if (!body) return writeMalformedReadResponse(fallbackError, response, json, options);
+  if (json) {
+    writeStructuredOrHuman(options, true, body, "");
+    return response.ok && body.ok !== false ? 0 : 1;
+  }
+  if (!response.ok || body.ok === false) {
+    const error = response.status === 401
+      ? "SLIPWAY_SESSION_UNAUTHORIZED"
+      : typeof body.error === "string"
+        ? body.error
+        : fallbackError;
+    const receipt = objectRecord(body.receipt);
+    const completion = Object.keys(receipt).length > 0
+      ? ` ${formatRetirementReceipt(receipt)}`
+      : "";
+    emit(options, `Error (${error}): ${body.reason ?? "Liskov retirement request failed."}${completion}`);
+    return 1;
+  }
+  emit(options, formatApplicationRetirement(body));
+  return 0;
+}
+
+function formatApplicationRetirement(body: SlipwayApplicationRetirementResponse): string {
+  const receipt = objectRecord(body.receipt);
+  if (Object.keys(receipt).length > 0) {
+    const lines = [formatRetirementReceipt(receipt)];
+    const legacyCleanup = objectRecord(body.legacyCleanup);
+    if (Object.keys(legacyCleanup).length > 0) {
+      lines.push(
+        booleanValue(legacyCleanup.resourcesTerminalized) === true
+          ? "Legacy post-deletion resources are terminalized."
+          : `Legacy post-deletion cleanup remains open. ${formatRetirementAssessment(objectRecord(legacyCleanup.assessment))}`
+      );
+    }
+    return lines.join("\n");
+  }
+
+  const retirement = objectRecord(body.retirement);
+  if (Object.keys(retirement).length > 0) {
+    const status = typeof retirement.status === "string" ? retirement.status : "unknown";
+    const retirementId = typeof retirement.retirementId === "string"
+      ? retirement.retirementId
+      : "unknown";
+    const phase = typeof retirement.phase === "string"
+      ? retirement.phase
+      : "unknown";
+    const header = status === "active"
+      ? `Retirement ${retirementId} is active (${phase}).`
+      : `Retirement ${retirementId} is ${status}.`;
+    return [header, formatRetirementAssessment(objectRecord(retirement.assessment))]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  const preview = objectRecord(body.preview);
+  if (Object.keys(preview).length > 0) {
+    return [
+      "Retirement preview (read only).",
+      formatRetirementAssessment(objectRecord(preview.assessment)),
+      "Use --yes to pause the application and start a durable retirement intent."
+    ].join("\n");
+  }
+  return "Liskov returned application retirement state.";
+}
+
+function formatRetirementReceipt(receipt: Record<string, unknown>): string {
+  const kind = typeof receipt.receiptKind === "string" ? receipt.receiptKind : "unknown";
+  const digest = typeof receipt.digest === "string" ? receipt.digest : "unavailable";
+  const label = kind === "legacy_immediate_tombstone"
+    ? "Legacy immediate tombstone receipt"
+    : "Safe application retirement receipt";
+  return `${label}: ${digest}.`;
+}
+
+function formatRetirementAssessment(assessment: Record<string, unknown>): string {
+  if (Object.keys(assessment).length === 0) return "";
+  const execution = numberValue(assessment.executionBlockerCount) ?? 0;
+  const financial = numberValue(assessment.financialBlockerCount) ?? 0;
+  const ambiguity = numberValue(assessment.ambiguityBlockerCount) ?? 0;
+  const phase = typeof assessment.phase === "string" ? assessment.phase : "unknown";
+  const lines = [
+    `Phase ${phase}: ${execution} execution, ${financial} financial, ${ambiguity} ambiguity blocker(s).`
+  ];
+  const scheduleEnd = numberValue(assessment.latestKnownScheduleEndAtMs);
+  if (scheduleEnd !== undefined) {
+    lines.push(`Latest known schedule end: ${new Date(scheduleEnd).toISOString()} (estimate, not a completion promise).`);
+  }
+  for (const value of arrayValue(assessment.blockers)) {
+    const blocker = objectRecord(value);
+    const category = typeof blocker.category === "string" ? blocker.category : "unknown";
+    const code = typeof blocker.code === "string" ? blocker.code : "unknown";
+    const resourceKind = typeof blocker.resourceKind === "string" ? blocker.resourceKind : "resource";
+    const resourceId = typeof blocker.resourceId === "string" ? blocker.resourceId : "unknown";
+    const authority = typeof blocker.evidenceAuthority === "string"
+      ? blocker.evidenceAuthority
+      : "unknown authority";
+    const remediation = typeof blocker.remediationClass === "string"
+      ? blocker.remediationClass
+      : "review";
+    lines.push(`- ${category}/${code}: ${resourceKind} ${resourceId}; evidence ${authority}; remediation ${remediation}.`);
   }
   return lines.join("\n");
 }
