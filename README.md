@@ -38,6 +38,7 @@ proof liskov custody execution diagnose proof-docs --execution-id ID --network m
 proof liskov custody execution recover proof-docs --execution-id ID --reason "operator reviewed" --yes
 proof liskov custody machine catalog --network mainnet --json
 proof liskov application backfill-identities
+proof liskov application delete proof-docs
 proof liskov application delete proof-docs --reason retired --yes
 proof liskov admin executor-operation reconcile op-123 --expect-application slipway-diagnostic --expect-kind runtime_replacement --expect-deployment dep-123 --expect-job job-123 --expect-status pending --reason "terminalize unsubmitted replacement" --json
 proof liskov admin deploy-spend resolve reserve-123 --expect-organization org-1 --expect-application app-1 --expect-deployment dep-1 --expect-execution exec-1 --expect-billing-transaction tx-1 --expect-status review_required --final-usd-micros 25000 --evidence-ref case:123 --evidence-sha256 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --reason "reviewed chain evidence" --json
@@ -60,7 +61,10 @@ provider references and memos. Execution-history reads remain unbounded when
 pagination flags are omitted; human output reports returned count, total, and
 next offset.
 
-Application deletion is a logical Liskov tombstone. It removes the Application
+Application deletion is a logical Liskov tombstone. Without `--yes`, the CLI
+uses the read-only deletion-preview endpoint and sends no mutation body. With
+`--yes`, it sends a guarded DELETE that requires a reason and, when needed,
+explicit live-resource acknowledgement. Tombstoning removes the Application
 from normal management/read surfaces but does not stop Acurast jobs, revoke
 Lockbox grants, drain routes, or spend.
 

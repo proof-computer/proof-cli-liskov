@@ -1419,22 +1419,32 @@ export async function runSlipwayApplicationDelete(input: SlipwayApplicationDelet
     }, "Error (SLIPWAY_APPLICATION_DELETE_REASON_REQUIRED): confirmed deletion requires a non-empty --reason.");
     return 1;
   }
-  const request = await authenticatedSlipwayJsonRequest<SlipwayApplicationDeleteResponse>({
-    config: input.config,
-    slipwayUrl: input.slipwayUrl,
-    json: input.json,
-    method: "DELETE",
-    path: applicationDeletePath(input.applicationRef, input.owner),
-    body: {
-      confirm: input.yes === true,
-      acknowledgeLiveResources: input.acknowledgeLiveResources === true,
-      force: input.force === true ? true : undefined,
-      reason
-    },
-    requestErrorCode: "SLIPWAY_APPLICATION_DELETE_FAILED",
-    notFoundMessage: "No Liskov CLI session is stored locally.",
-    fetchFailedMessage: "could not delete Liskov Application"
-  }, options);
+  const request = input.yes === true
+    ? await authenticatedSlipwayJsonRequest<SlipwayApplicationDeleteResponse>({
+        config: input.config,
+        slipwayUrl: input.slipwayUrl,
+        json: input.json,
+        method: "DELETE",
+        path: applicationDeletePath(input.applicationRef, input.owner),
+        body: {
+          confirm: true,
+          acknowledgeLiveResources: input.acknowledgeLiveResources === true,
+          force: input.force === true ? true : undefined,
+          reason
+        },
+        requestErrorCode: "SLIPWAY_APPLICATION_DELETE_FAILED",
+        notFoundMessage: "No Liskov CLI session is stored locally.",
+        fetchFailedMessage: "could not delete Liskov Application"
+      }, options)
+    : await authenticatedSlipwayRequest<SlipwayApplicationDeleteResponse>({
+        config: input.config,
+        slipwayUrl: input.slipwayUrl,
+        json: input.json,
+        path: applicationDeletionPreviewPath(input.applicationRef, input.owner),
+        requestErrorCode: "SLIPWAY_APPLICATION_DELETE_FAILED",
+        notFoundMessage: "No Liskov CLI session is stored locally.",
+        fetchFailedMessage: "could not preview Liskov Application deletion"
+      }, options);
   if (!request.ok) return request.exitCode;
 
   const body = request.body;
@@ -4270,6 +4280,13 @@ function applicationDeletePath(applicationRef: string, owner: string | undefined
   return `${pathValue}?${query.toString()}`;
 }
 
+function applicationDeletionPreviewPath(applicationRef: string, owner: string | undefined): string {
+  const pathValue = `/api/applications/${encodeURIComponent(applicationRef)}/deletion-preview`;
+  if (!owner || !owner.trim()) return pathValue;
+  const query = new URLSearchParams({ owner: owner.trim() });
+  return `${pathValue}?${query.toString()}`;
+}
+
 function applicationStatusPath(applicationRef: string, owner: string | undefined): string {
   const pathValue = `/api/applications/${encodeURIComponent(applicationRef)}/status`;
   if (!owner || !owner.trim()) return pathValue;
@@ -4594,9 +4611,11 @@ function formatApplicationDelete(body: SlipwayApplicationDeleteResponse): string
   const impact = body.impact ?? {};
   const header = body.dryRun === true
     ? `Dry run: ${target} would be tombstoned.`
-    : body.deleted === true
-      ? `Deleted ${target}.`
-      : `${target} is already deleted.`;
+    : body.deleted === true && body.changed === false
+      ? `${target} is already tombstoned.`
+      : body.deleted === true
+        ? `Deleted ${target}.`
+        : `${target} was not tombstoned.`;
   const lines = [header];
   lines.push(
     `Impact: ${impact.activeDeploymentCount ?? 0} active/current deployment(s), ${impact.liveJobCount ?? 0} live job(s), ${impact.pendingOperationCount ?? 0} pending/running executor operation(s).`,

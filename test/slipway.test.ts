@@ -774,7 +774,7 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.changes[0]?.applicationName, "alpha");
   });
 
-  it("dry-runs Application delete with the stored session bearer without printing it", async () => {
+  it("previews Application deletion with GET only and preserves raw JSON", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
     const token = "slipway_delete_secret_token_do_not_print";
@@ -785,12 +785,35 @@ describe("proof-cli Liskov runner", () => {
       savedAtMs: 0
     }, { config: sessionFile });
 
-    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: string }> = [];
     const out = writer();
+    const serverBody = {
+      ok: true,
+      dryRun: true,
+      deleted: false,
+      changed: false,
+      application: {
+        applicationUid: "app-1111111111111111",
+        applicationName: "alpha",
+        applicationId: "legacy-alpha",
+        ownerAddress: "5 owner/+?",
+        status: "active"
+      },
+      impact: {
+        activeDeploymentCount: 1,
+        liveJobCount: 2,
+        pendingOperationCount: 1,
+        hasLiveOrPendingResources: true,
+        stopsFuturePlanning: true,
+        existingResourcesContinue: true
+      }
+    };
     const code = await runSlipwayApplicationDelete({
-      applicationRef: "alpha",
-      owner: "5owner",
+      applicationRef: "alpha/beta",
+      owner: "5 owner/+?",
       reason: "cleanup",
+      acknowledgeLiveResources: true,
+      force: true,
       config: sessionFile,
       json: true
     }, {
@@ -799,50 +822,22 @@ describe("proof-cli Liskov runner", () => {
           url: String(url),
           method: init?.method,
           authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
-          body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
+          body: init?.body === undefined ? undefined : String(init.body)
         });
-        return jsonResponse({
-          ok: true,
-          dryRun: true,
-          deleted: false,
-          application: {
-            applicationUid: "app-1111111111111111",
-            applicationName: "alpha",
-            applicationId: "legacy-alpha",
-            ownerAddress: "5owner",
-            status: "active"
-          },
-          impact: {
-            activeDeploymentCount: 1,
-            liveJobCount: 2,
-            pendingOperationCount: 1,
-            hasLiveOrPendingResources: true,
-            stopsFuturePlanning: true,
-            existingResourcesContinue: true
-          }
-        });
+        return jsonResponse(serverBody);
       },
       stdout: out.write
     });
 
     assert.equal(code, 0);
     assert.deepEqual(requests, [{
-      url: "https://slipway.test/api/applications/alpha?owner=5owner",
-      method: "DELETE",
+      url: "https://slipway.test/api/applications/alpha%2Fbeta/deletion-preview?owner=5+owner%2F%2B%3F",
+      method: "GET",
       authorization: `Bearer ${token}`,
-      body: {
-        acknowledgeLiveResources: false,
-        confirm: false,
-        reason: "cleanup"
-      }
+      body: undefined
     }]);
     assert.equal(out.text.includes(token), false);
-    const parsed = JSON.parse(out.text) as { ok: boolean; dryRun: boolean; application: { applicationUid: string; applicationName: string }; impact: { liveJobCount: number } };
-    assert.equal(parsed.ok, true);
-    assert.equal(parsed.dryRun, true);
-    assert.equal(parsed.application.applicationUid, "app-1111111111111111");
-    assert.equal(parsed.application.applicationName, "alpha");
-    assert.equal(parsed.impact.liveJobCount, 2);
+    assert.deepEqual(JSON.parse(out.text), serverBody);
   });
 
   it("requires a reason before confirmed Application deletion", async () => {
@@ -866,6 +861,180 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.error, "SLIPWAY_APPLICATION_DELETE_REASON_REQUIRED");
   });
 
+  it("uses guarded DELETE only for confirmed Application deletion", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_confirmed_delete_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: unknown }> = [];
+    const serverBody = {
+      ok: true,
+      dryRun: false,
+      deleted: true,
+      changed: true,
+      application: {
+        applicationUid: "app-1111111111111111",
+        applicationName: "alpha",
+        applicationId: "legacy-alpha",
+        ownerAddress: "5owner",
+        status: "deleted"
+      },
+      impact: {
+        activeDeploymentCount: 1,
+        liveJobCount: 0,
+        pendingOperationCount: 0,
+        hasLiveOrPendingResources: true,
+        stopsFuturePlanning: true,
+        existingResourcesContinue: true
+      }
+    };
+    const out = writer();
+    const code = await runSlipwayApplicationDelete({
+      applicationRef: "app-1111111111111111",
+      owner: "5owner",
+      reason: "retired",
+      acknowledgeLiveResources: true,
+      force: true,
+      yes: true,
+      config: sessionFile,
+      json: true
+    }, {
+      fetchImpl: async (url, init) => {
+        requests.push({
+          url: String(url),
+          method: init?.method,
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: JSON.parse(String(init?.body ?? "{}"))
+        });
+        return jsonResponse(serverBody);
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications/app-1111111111111111?owner=5owner",
+      method: "DELETE",
+      authorization: `Bearer ${token}`,
+      body: {
+        confirm: true,
+        acknowledgeLiveResources: true,
+        force: true,
+        reason: "retired"
+      }
+    }]);
+    assert.deepEqual(JSON.parse(out.text), serverBody);
+    assert.equal(out.text.includes(token), false);
+  });
+
+  it("renders an immutable deletion receipt as already tombstoned", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_deleted_receipt_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const out = writer();
+    const code = await runSlipwayApplicationDelete({
+      applicationRef: "app-1111111111111111",
+      config: sessionFile
+    }, {
+      fetchImpl: async (_url, init) => {
+        assert.equal(init?.method, "GET");
+        assert.equal(init?.body, undefined);
+        return jsonResponse({
+          ok: true,
+          dryRun: false,
+          deleted: true,
+          changed: false,
+          application: {
+            applicationUid: "app-1111111111111111",
+            applicationName: "alpha",
+            applicationId: "legacy-alpha",
+            ownerAddress: "5owner",
+            status: "deleted"
+          },
+          impact: {
+            activeDeploymentCount: 0,
+            liveJobCount: 0,
+            pendingOperationCount: 0,
+            hasLiveOrPendingResources: false,
+            stopsFuturePlanning: true,
+            existingResourcesContinue: true
+          }
+        });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.match(out.text, /alpha is already tombstoned\./u);
+    assert.doesNotMatch(out.text, /Deleted alpha\./u);
+    assert.equal(out.text.includes(token), false);
+  });
+
+  it("handles deletion-preview authorization, malformed, and network failures without leaking the bearer", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_delete_failure_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    for (const [response, expectedError] of [
+      [jsonResponse({ ok: false, error: "unauthorized" }, 401), "SLIPWAY_SESSION_UNAUTHORIZED"],
+      [jsonResponse({ ok: false, error: "application_not_authorized" }, 403), "SLIPWAY_APPLICATION_DELETE_FAILED"],
+      [new Response("not-json", { status: 502 }), "SLIPWAY_APPLICATION_DELETE_FAILED"]
+    ] as const) {
+      const out = writer();
+      const code = await runSlipwayApplicationDelete({
+        applicationRef: "alpha",
+        config: sessionFile,
+        json: true
+      }, {
+        fetchImpl: async (_url, init) => {
+          assert.equal(init?.method, "GET");
+          assert.equal(init?.body, undefined);
+          return response;
+        },
+        stdout: out.write
+      });
+      assert.equal(code, 1);
+      assert.equal((JSON.parse(out.text) as { error: string }).error, expectedError);
+      assert.equal(out.text.includes(token), false);
+    }
+
+    const network = writer();
+    const networkCode = await runSlipwayApplicationDelete({
+      applicationRef: "alpha",
+      config: sessionFile,
+      json: true
+    }, {
+      fetchImpl: async () => {
+        throw new Error("network offline");
+      },
+      stdout: network.write
+    });
+    assert.equal(networkCode, 1);
+    const networkBody = JSON.parse(network.text) as { error: string; message: string };
+    assert.equal(networkBody.error, "SLIPWAY_APPLICATION_DELETE_FAILED");
+    assert.match(networkBody.message, /network offline/u);
+    assert.equal(network.text.includes(token), false);
+  });
+
   it("renders ambiguous Application delete candidates without printing the bearer token", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
@@ -877,7 +1046,7 @@ describe("proof-cli Liskov runner", () => {
       savedAtMs: 0
     }, { config: sessionFile });
 
-    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: string }> = [];
     const out = writer();
     const code = await runSlipwayApplicationDelete({
       applicationRef: "shared",
@@ -888,7 +1057,7 @@ describe("proof-cli Liskov runner", () => {
           url: String(url),
           method: init?.method,
           authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
-          body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
+          body: init?.body === undefined ? undefined : String(init.body)
         });
         return jsonResponse({
           ok: false,
@@ -916,13 +1085,10 @@ describe("proof-cli Liskov runner", () => {
 
     assert.equal(code, 1);
     assert.deepEqual(requests, [{
-      url: "https://slipway.test/api/applications/shared",
-      method: "DELETE",
+      url: "https://slipway.test/api/applications/shared/deletion-preview",
+      method: "GET",
       authorization: `Bearer ${token}`,
-      body: {
-        acknowledgeLiveResources: false,
-        confirm: false,
-      }
+      body: undefined
     }]);
     assert.equal(out.text.includes(token), false);
     assert.match(out.text, /SLIPWAY_APPLICATION_AMBIGUOUS/u);

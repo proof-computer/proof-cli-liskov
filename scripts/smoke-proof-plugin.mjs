@@ -51,7 +51,8 @@ try {
   assertIncludes(applicationBackfillIdentitiesHelp.stdout, "--yes");
 
   const applicationDeleteHelp = run(process.execPath, [proofDevBin, "liskov", "application", "delete", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationDeleteHelp.stdout, "Tombstone a Liskov Application");
+  assertIncludes(applicationDeleteHelp.stdout, "Read-only preview or confirmed tombstone");
+  assertIncludes(applicationDeleteHelp.stdout, "performs a read-only preview");
   assertIncludes(applicationDeleteHelp.stdout, "--acknowledge-live-resources");
   assertIncludes(applicationDeleteHelp.stdout, "--force");
   assertIncludes(applicationDeleteHelp.stdout, "--yes");

@@ -12,6 +12,7 @@ const requiredArtifacts = [
   "dist/commands/liskov/application/blackbox/configure.js",
   "dist/commands/liskov/application/deployment.js",
   "dist/commands/liskov/application/deployment/import.js",
+  "dist/commands/liskov/application/delete.js",
   "dist/commands/liskov/application/import.js",
   "dist/commands/liskov/application/lockbox.js",
   "dist/commands/liskov/application/lockbox/dispatch.js",

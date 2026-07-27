@@ -6,7 +6,7 @@ export default class SlipwayApplicationDelete extends Command {
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true })
   };
-  static description = "Tombstone a Liskov Application.";
+  static description = "Preview or confirm a Liskov Application tombstone.";
   static examples = [
     "<%= config.bin %> liskov application delete proof-docs",
     "<%= config.bin %> liskov application delete app-0123456789abcdef --reason retired --yes",
@@ -19,11 +19,11 @@ export default class SlipwayApplicationDelete extends Command {
     help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
     owner: Flags.string({ description: "Owner address to disambiguate a legacy Application id." }),
-    reason: Flags.string({ description: "Deletion reason recorded on the tombstone." }),
+    reason: Flags.string({ description: "Deletion reason recorded only with --yes." }),
     "slipway-url": Flags.string({ description: "Liskov service URL." }),
-    yes: Flags.boolean({ char: "y", description: "Confirm the tombstone mutation. Without this flag the server returns a dry run." })
+    yes: Flags.boolean({ char: "y", description: "Confirm the tombstone mutation. Without this flag the CLI performs a read-only preview." })
   };
-  static summary = "Tombstone a Liskov Application.";
+  static summary = "Read-only preview or confirmed tombstone for a Liskov Application.";
 
   async run(): Promise<void> {
     const { args, flags } = await this.parse(SlipwayApplicationDelete);
