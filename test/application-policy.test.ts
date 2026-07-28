@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  ACURAST_SET_ENVIRONMENT_BOOTSTRAP_DELIVERY,
   authoredDigest,
   releaseIntentDigest,
   validateApplicationManifestV4
@@ -146,5 +147,38 @@ describe("local application-manifest v4 tools", () => {
     assert.ok(diagnostics.some((error) =>
       error.code === "unsupported_policy_feature"
       && error.pointer === "/deployment/lifecycle/update/existingJobs/mode"));
+  });
+
+  it("accepts and preserves explicit environment bootstrap delivery and generation bounds", () => {
+    const input = manifest();
+    const runtime = input.runtime as Record<string, unknown>;
+    runtime.bootstrapDelivery = ACURAST_SET_ENVIRONMENT_BOOTSTRAP_DELIVERY;
+    runtime.maxGenerations = 7;
+    const before = structuredClone(input);
+
+    assert.deepEqual(validateApplicationManifestV4(input), []);
+    assert.deepEqual(input, before);
+    assert.equal(runtime.bootstrapDelivery, "acurast-set-environment");
+    assert.equal(runtime.maxGenerations, 7);
+    assert.notEqual(authoredDigest(input), authoredDigest(manifest()));
+    assert.equal(releaseIntentDigest(input), releaseIntentDigest(manifest()));
+  });
+
+  it("rejects unsupported bootstrap delivery and non-positive or non-integer generation bounds", () => {
+    for (const invalid of ["inline", null]) {
+      const input = manifest();
+      (input.runtime as Record<string, unknown>).bootstrapDelivery = invalid;
+      assert.ok(validateApplicationManifestV4(input).some((error) =>
+        error.code === "invalid_manifest"
+        && error.pointer === "/runtime/bootstrapDelivery"));
+    }
+
+    for (const invalid of [0, -1, 1.5, "1", null]) {
+      const input = manifest();
+      (input.runtime as Record<string, unknown>).maxGenerations = invalid;
+      assert.ok(validateApplicationManifestV4(input).some((error) =>
+        error.code === "invalid_manifest"
+        && error.pointer === "/runtime/maxGenerations"));
+    }
   });
 });

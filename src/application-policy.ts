@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 export const APPLICATION_MANIFEST_SCHEMA = "proof.liskov.application-manifest";
 export const APPLICATION_MANIFEST_VERSION = 4;
 export const ATTESTED_RUNTIME_PROFILE = "proof.liskov.attested-runtime.v1";
+export const ACURAST_SET_ENVIRONMENT_BOOTSTRAP_DELIVERY = "acurast-set-environment";
 
 export interface PolicyValidationError {
   code: "invalid_manifest" | "unknown_field" | "unsupported_policy_feature" | "entitlement_exceeded";
@@ -308,10 +309,22 @@ export function validateApplicationManifestV4(value: unknown): PolicyValidationE
     }
   }
 
-  const runtime = checkOptionalObject(root, "runtime", "", ["engine", "command", "role", "resources", "requiredModules", "bootstrap"], errors);
+  const runtime = checkOptionalObject(root, "runtime", "", [
+    "engine", "command", "role", "resources", "requiredModules", "bootstrap",
+    "bootstrapDelivery", "maxGenerations"
+  ], errors);
   if (runtime.engine !== undefined) checkEnum(runtime.engine, ["nodejs", "deno", "bun"], "/runtime/engine", errors);
   checkOptionalString(runtime.command, "/runtime/command", errors);
   checkOptionalString(runtime.role, "/runtime/role", errors);
+  if (runtime.bootstrapDelivery !== undefined) {
+    checkEnum(
+      runtime.bootstrapDelivery,
+      [ACURAST_SET_ENVIRONMENT_BOOTSTRAP_DELIVERY],
+      "/runtime/bootstrapDelivery",
+      errors
+    );
+  }
+  checkInteger(runtime.maxGenerations, "/runtime/maxGenerations", errors, 1);
   checkStringArray(runtime.requiredModules, "/runtime/requiredModules", errors);
   checkDuplicateStrings(runtime.requiredModules, "/runtime/requiredModules", errors);
   const resources = checkOptionalObject(runtime, "resources", "/runtime", ["memoryMiB", "storageMiB", "networkRequestQuota"], errors);
