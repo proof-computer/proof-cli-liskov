@@ -24,7 +24,7 @@ proof liskov application retire proof-docs
 proof liskov application retire proof-docs --reason "project complete" --yes
 proof liskov application retire cancel proof-docs --yes
 proof liskov application devtools view-key proof-docs 66059 --json
-proof liskov application runtime-image workflow proof-docs
+proof liskov application runtime-image workflow proof-docs --manifest .liskov/proof-docs.json
 proof liskov application deployment import proof-docs --sequence 701 --origin 5... --yes
 proof liskov application lockbox setup-pr proof-docs --yes
 proof liskov application lockbox dispatch proof-docs --yes
@@ -107,17 +107,22 @@ digest, optional deployment, and blockers, and only then sends the guarded
 submit. If a timestamp-derived plan ID changed, the unchanged unique returned
 key may select the refreshed ID; the server remains the final authority.
 
-`proof liskov application runtime-image workflow APP_REF` writes a manual
-GitHub Actions workflow for the stage 1-2 PRoot runtime-image upload path. The
-workflow requests GitHub OIDC with audience `liskov-runtime-image-upload`,
-downloads a pinned image URL supplied at dispatch time, asks Liskov for a
-one-run Tigris upload session, uploads with `aws s3api put-object`, and calls
-the Liskov finalize route with digest, byte size, object key, and provenance.
-It does not store the returned Tigris secret key in the repository. The active
-Application policy must allow the repository/ref under
-`runtimeImageAutomation.github`; if it pins `workflowRef`, set it to
-`<owner>/<repo>/.github/workflows/liskov-runtime-image.yml@refs/heads/<branch>`
-or the path written with `--output`.
+`proof liskov application runtime-image workflow APP_ID --manifest PATH`
+writes a manual GitHub Actions caller for the manifest-bound runtime-image
+pipeline at
+`proof-computer/liskov-github-actions/.github/workflows/runtime-image.yml@v1`.
+The CLI first verifies that `PATH` is a valid repo-relative V4 build manifest
+for `APP_ID`, that its artifact kind is `runtime_image`, and that its authored
+`builder.manifestPath` exactly matches `PATH`. At dispatch time the reusable
+workflow imports that manifest, downloads the supplied image URL, and binds the
+one-run Tigris upload session to the server-authoritative authored and release
+intent digests before upload and finalize. Use `--liskov-url` and
+`--oidc-audience` to embed custom endpoints in the caller.
+
+The active Application policy must allow the repository/ref under
+`runtimeImageAutomation.github`; if it pins `workflowRef`, set it to the
+generated caller path, such as
+`<owner>/<repo>/.github/workflows/liskov-runtime-image.yml@refs/heads/<branch>`.
 
 ## Development
 

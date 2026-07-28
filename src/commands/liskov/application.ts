@@ -43,7 +43,7 @@ COMMANDS
   action-plan APP_REF
   action-plan retry APP_REF --decision-id ID --reason TEXT --yes
   devtools view-key APP_REF DEPLOYMENT_ID
-  runtime-image workflow APP_REF [--output PATH]
+  runtime-image workflow APP_ID --manifest PATH [--output PATH]
   deployment import APP_REF --sequence N --origin ADDRESS --yes
   lockbox setup-pr APP_REF --yes
   lockbox dispatch APP_REF --yes

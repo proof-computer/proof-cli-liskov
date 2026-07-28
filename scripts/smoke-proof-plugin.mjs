@@ -113,6 +113,11 @@ try {
   assertIncludes(applicationDeploymentImportHelp.stdout, "--origin");
   assertIncludes(applicationDeploymentImportHelp.stdout, "--yes");
 
+  const runtimeImageWorkflowHelp = run(process.execPath, [proofDevBin, "liskov", "application", "runtime-image", "workflow", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(runtimeImageWorkflowHelp.stdout, "APP_ID");
+  assertIncludes(runtimeImageWorkflowHelp.stdout, "--manifest=<value>");
+  assertIncludes(runtimeImageWorkflowHelp.stdout, "(required)");
+
   const custodyHelp = run(process.execPath, [proofDevBin, "liskov", "custody", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(custodyHelp.stdout, "Operate Liskov live custody");
   assertIncludes(custodyHelp.stdout, "liskov custody execution");

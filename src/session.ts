@@ -30,12 +30,14 @@ import {
   formatOrganizationTransactions,
   formatOrganizationUse
 } from "./organization-output.js";
+import { validateApplicationManifestV4 } from "./application-policy.js";
 
 export const DEFAULT_SLIPWAY_URL = "https://liskov.proof.computer";
 const DEFAULT_RUNTIME_IMAGE_WORKFLOW_OUTPUT = ".github/workflows/liskov-runtime-image.yml";
 const DEFAULT_RUNTIME_IMAGE_WORKFLOW_NAME = "Liskov Runtime Image Upload";
 const DEFAULT_RUNTIME_IMAGE_OIDC_AUDIENCE = "liskov-runtime-image-upload";
-const RUNTIME_IMAGE_UPLOAD_SESSION_DOMAIN = "proof.liskov.runtime-image-upload-session.v1";
+const DEFAULT_RUNTIME_IMAGE_ACTIONS_REF =
+  "proof-computer/liskov-github-actions/.github/workflows/runtime-image.yml@v1";
 
 export interface SlipwayCliOptions {
   env?: NodeJS.ProcessEnv;
@@ -389,6 +391,7 @@ export interface SlipwayAdminDeploySpendResolveInput {
 
 export interface SlipwayApplicationRuntimeImageWorkflowInput {
   applicationRef: string;
+  manifestPath: string;
   liskovUrl?: string;
   oidcAudience?: string;
   output?: string;
@@ -2394,6 +2397,71 @@ export async function runSlipwayApplicationRuntimeImageWorkflow(
   input: SlipwayApplicationRuntimeImageWorkflowInput,
   options: SlipwayCliOptions = {}
 ): Promise<number> {
+  const manifestPath = normalizeRepositoryPath(input.manifestPath);
+  if (!manifestPath) {
+    return runtimeImageWorkflowFailure(
+      options,
+      input,
+      "SLIPWAY_RUNTIME_IMAGE_MANIFEST_PATH_INVALID",
+      "--manifest must be a safe repo-relative path without empty, dot, parent, or backslash segments."
+    );
+  }
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(await readFile(path.resolve(manifestPath), "utf8")) as unknown;
+  } catch (error) {
+    return runtimeImageWorkflowFailure(
+      options,
+      input,
+      "SLIPWAY_RUNTIME_IMAGE_MANIFEST_INVALID",
+      `Unable to read V4 manifest ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`,
+      { manifestPath }
+    );
+  }
+  const diagnostics = validateApplicationManifestV4(manifest);
+  const errors = diagnostics.filter((diagnostic) =>
+    diagnostic.code === "invalid_manifest" || diagnostic.code === "unknown_field");
+  if (errors.length > 0) {
+    return runtimeImageWorkflowFailure(
+      options,
+      input,
+      "SLIPWAY_RUNTIME_IMAGE_MANIFEST_INVALID",
+      `${manifestPath} is not a valid V4 application manifest.`,
+      { manifestPath, errors }
+    );
+  }
+  const manifestObject = objectRecord(manifest);
+  if (manifestObject.applicationId !== input.applicationRef) {
+    return runtimeImageWorkflowFailure(
+      options,
+      input,
+      "SLIPWAY_RUNTIME_IMAGE_MANIFEST_APPLICATION_MISMATCH",
+      `${manifestPath} declares applicationId ${String(manifestObject.applicationId)}, expected ${input.applicationRef}.`,
+      { manifestPath }
+    );
+  }
+  const release = objectRecord(manifestObject.release);
+  const artifact = objectRecord(release.artifact);
+  const builder = objectRecord(release.builder);
+  if (release.mode !== "build" || artifact.kind !== "runtime_image") {
+    return runtimeImageWorkflowFailure(
+      options,
+      input,
+      "SLIPWAY_RUNTIME_IMAGE_MANIFEST_RELEASE_INVALID",
+      `${manifestPath} must contain a build release with artifact.kind runtime_image.`,
+      { manifestPath }
+    );
+  }
+  if (builder.manifestPath !== manifestPath) {
+    return runtimeImageWorkflowFailure(
+      options,
+      input,
+      "SLIPWAY_RUNTIME_IMAGE_MANIFEST_PATH_MISMATCH",
+      `${manifestPath} declares release.builder.manifestPath ${String(builder.manifestPath)}.`,
+      { manifestPath, authoredManifestPath: builder.manifestPath }
+    );
+  }
+
   const output = path.resolve(input.output ?? DEFAULT_RUNTIME_IMAGE_WORKFLOW_OUTPUT);
   if (!input.yes && await fileExists(output)) {
     writeStructuredOrHuman(options, input.json, {
@@ -2408,9 +2476,11 @@ export async function runSlipwayApplicationRuntimeImageWorkflow(
   const workflowPath = workflowPathForOutput(output);
   const workflow = renderRuntimeImageWorkflow({
     applicationRef: input.applicationRef,
+    manifestPath,
     liskovUrl: normalizeBaseUrl(input.liskovUrl ?? DEFAULT_SLIPWAY_URL),
     oidcAudience: input.oidcAudience ?? DEFAULT_RUNTIME_IMAGE_OIDC_AUDIENCE,
-    workflowName: input.workflowName ?? DEFAULT_RUNTIME_IMAGE_WORKFLOW_NAME
+    workflowName: input.workflowName ?? DEFAULT_RUNTIME_IMAGE_WORKFLOW_NAME,
+    actionsRef: DEFAULT_RUNTIME_IMAGE_ACTIONS_REF
   });
   await mkdir(path.dirname(output), { recursive: true });
   await writeFile(output, workflow, { encoding: "utf8", mode: 0o644 });
@@ -2421,6 +2491,8 @@ export async function runSlipwayApplicationRuntimeImageWorkflow(
     output,
     workflowPath,
     workflowName: input.workflowName ?? DEFAULT_RUNTIME_IMAGE_WORKFLOW_NAME,
+    manifestPath,
+    actionsRef: DEFAULT_RUNTIME_IMAGE_ACTIONS_REF,
     liskovUrl: normalizeBaseUrl(input.liskovUrl ?? DEFAULT_SLIPWAY_URL),
     oidcAudience: input.oidcAudience ?? DEFAULT_RUNTIME_IMAGE_OIDC_AUDIENCE,
     uploadSessionRoute: `/api/applications/${encodeURIComponent(input.applicationRef)}/runtime-images/upload-session`,
@@ -2431,7 +2503,7 @@ export async function runSlipwayApplicationRuntimeImageWorkflow(
     options,
     input.json,
     value,
-    `Wrote Liskov runtime-image upload workflow to ${output}. Configure runtimeImageAutomation.github to allow the repository/ref, and workflowRef ${value.policyWorkflowRefHint} if the policy pins workflowRef.`
+    `Wrote manifest-bound Liskov runtime-image workflow to ${output}. The authored builder.workflowRef must authorize caller ${value.policyWorkflowRefHint}.`
   );
   return 0;
 }
@@ -3471,6 +3543,33 @@ async function fileExists(file: string): Promise<boolean> {
   }
 }
 
+function normalizeRepositoryPath(value: string): string | undefined {
+  const candidate = value.trim();
+  if (!candidate || path.isAbsolute(candidate) || candidate.includes("\\")) return undefined;
+  const segments = candidate.split("/");
+  if (segments.some((segment) => !segment || segment === "." || segment === "..")) {
+    return undefined;
+  }
+  return segments.join("/");
+}
+
+function runtimeImageWorkflowFailure(
+  options: SlipwayCliOptions,
+  input: SlipwayApplicationRuntimeImageWorkflowInput,
+  error: string,
+  message: string,
+  details: Record<string, unknown> = {}
+): number {
+  writeStructuredOrHuman(options, input.json, {
+    ok: false,
+    error,
+    message,
+    applicationRef: input.applicationRef,
+    ...details
+  }, `Error (${error}): ${message}`);
+  return 1;
+}
+
 function workflowPathForOutput(output: string): string {
   return path.relative(process.cwd(), output).split(path.sep).join("/");
 }
@@ -3482,9 +3581,11 @@ function yamlSingleQuoted(value: string): string {
 
 function renderRuntimeImageWorkflow(input: {
   applicationRef: string;
+  manifestPath: string;
   liskovUrl: string;
   oidcAudience: string;
   workflowName: string;
+  actionsRef: string;
 }): string {
   return [
     `name: ${yamlSingleQuoted(input.workflowName)}`,
@@ -3507,199 +3608,14 @@ function renderRuntimeImageWorkflow(input: {
     "",
     "jobs:",
     "  upload-runtime-image:",
-    "    runs-on: ubuntu-latest",
-    "    env:",
-    `      LISKOV_URL: ${yamlSingleQuoted(input.liskovUrl)}`,
-    `      LISKOV_APPLICATION_REF: ${yamlSingleQuoted(input.applicationRef)}`,
-    `      LISKOV_OIDC_AUDIENCE: ${yamlSingleQuoted(input.oidcAudience)}`,
-    "    steps:",
-    "      - name: Check upload tools",
-    "        shell: bash",
-    "        run: |",
-    "          set -euo pipefail",
-    "          command -v aws >/dev/null",
-    "          command -v curl >/dev/null",
-    "          command -v node >/dev/null",
-    "          command -v sha256sum >/dev/null",
-    "",
-    "      - name: Download runtime image",
-    "        id: image",
-    "        shell: bash",
-    "        env:",
-    "          LISKOV_RUNTIME_IMAGE_URL: ${{ inputs.image_url }}",
-    "          LISKOV_EXPECTED_SHA256: ${{ inputs.expected_sha256 }}",
-    "        run: |",
-    "          set -euo pipefail",
-    "          image_path=\"$RUNNER_TEMP/liskov-runtime-image.tar.zst\"",
-    "          curl --fail --location --show-error --silent --output \"$image_path\" \"$LISKOV_RUNTIME_IMAGE_URL\"",
-    "          expected=\"${LISKOV_EXPECTED_SHA256#sha256:}\"",
-    "          expected=\"${expected#SHA256:}\"",
-    "          expected=\"$(printf '%s' \"$expected\" | tr '[:upper:]' '[:lower:]')\"",
-    "          if [ -n \"$expected\" ]; then",
-    "            printf '%s  %s\\n' \"$expected\" \"$image_path\" | sha256sum --check --strict",
-    "          fi",
-    "          digest=\"sha256:$(sha256sum \"$image_path\" | awk '{print $1}')\"",
-    "          byte_size=\"$(stat -c '%s' \"$image_path\")\"",
-    "          printf 'image_path=%s\\n' \"$image_path\" >> \"$GITHUB_OUTPUT\"",
-    "          printf 'digest=%s\\n' \"$digest\" >> \"$GITHUB_OUTPUT\"",
-    "          printf 'byte_size=%s\\n' \"$byte_size\" >> \"$GITHUB_OUTPUT\"",
-    "",
-    "      - name: Create Liskov upload session and upload runtime image",
-    "        id: upload_session",
-    "        shell: bash",
-    "        run: |",
-    "          set -euo pipefail",
-    "          workflow_escape() {",
-    "            WORKFLOW_VALUE=\"$1\" node -e 'process.stdout.write((process.env.WORKFLOW_VALUE ?? \"\").replace(/%/g, \"%25\").replace(/\\r/g, \"%0D\").replace(/\\n/g, \"%0A\"))'",
-    "          }",
-    "          get_oidc_token() {",
-    "            local audience oidc_json",
-    "            audience=\"$(node -e 'process.stdout.write(encodeURIComponent(process.env.LISKOV_OIDC_AUDIENCE ?? \"\"))')\"",
-    "            oidc_json=\"$RUNNER_TEMP/liskov-upload-session-oidc.json\"",
-    "            curl --fail --show-error --silent --header \"Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}\" \"${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${audience}\" > \"$oidc_json\"",
-    "            node - \"$oidc_json\" <<'NODE'",
-    "          const fs = require(\"fs\");",
-    "          const [oidcPath] = process.argv.slice(2);",
-    "          const body = JSON.parse(fs.readFileSync(oidcPath, \"utf8\"));",
-    "          if (typeof body.value !== \"string\" || body.value.length === 0) {",
-    "            throw new Error(\"GitHub OIDC response did not contain value\");",
-    "          }",
-    "          process.stdout.write(body.value);",
-    "          NODE",
-    "          }",
-    "          oidc_token=\"$(get_oidc_token)\"",
-    "          printf '::add-mask::%s\\n' \"$(workflow_escape \"$oidc_token\")\"",
-    "          application_path=\"$(node -e 'process.stdout.write(encodeURIComponent(process.env.LISKOV_APPLICATION_REF ?? \"\"))')\"",
-    "          response_json=\"$RUNNER_TEMP/liskov-upload-session.json\"",
-    "          curl --fail-with-body --show-error --silent --request POST \\",
-    "            \"${LISKOV_URL%/}/api/applications/${application_path}/runtime-images/upload-session\" \\",
-    "            --header \"Authorization: Bearer ${oidc_token}\" \\",
-    "            --header 'Content-Type: application/json' \\",
-    `            --data '${JSON.stringify({ domain: RUNTIME_IMAGE_UPLOAD_SESSION_DOMAIN })}' \\`,
-    "            > \"$response_json\"",
-    "          mapfile -d '' upload_values < <(node - \"$response_json\" \"$GITHUB_OUTPUT\" <<'NODE'",
-    "          const fs = require(\"fs\");",
-    "          const [responsePath, outputPath] = process.argv.slice(2);",
-    "          const response = JSON.parse(fs.readFileSync(responsePath, \"utf8\"));",
-    "          function required(value, field) {",
-    "            if (typeof value !== \"string\" || value.length === 0) {",
-    "              throw new Error(`Liskov upload-session response missing ${field}`);",
-    "            }",
-    "            if (/[\\r\\n\\u0000]/u.test(value)) {",
-    "              throw new Error(`Liskov upload-session response field ${field} contains a control character`);",
-    "            }",
-    "            return value;",
-    "          }",
-    "          function line(name, value) {",
-    "            return `${name}=${value}\\n`;",
-    "          }",
-    "          const uploadSession = response.uploadSession ?? {};",
-    "          const upload = response.upload ?? {};",
-    "          const credentials = response.credentials ?? {};",
-    "          const sessionId = required(uploadSession.sessionId, \"uploadSession.sessionId\");",
-    "          const objectKey = required(upload.objectKey, \"upload.objectKey\");",
-    "          const bucket = required(upload.bucket, \"upload.bucket\");",
-    "          const endpointUrl = required(upload.endpointUrl, \"upload.endpointUrl\");",
-    "          const region = required(upload.region, \"upload.region\");",
-    "          const accessKeyId = required(credentials.accessKeyId, \"credentials.accessKeyId\");",
-    "          const secretAccessKey = required(credentials.secretAccessKey, \"credentials.secretAccessKey\");",
-    "          fs.appendFileSync(outputPath, line(\"session_id\", sessionId) + line(\"object_key\", objectKey) + line(\"bucket\", bucket));",
-    "          process.stdout.write([accessKeyId, secretAccessKey, region, endpointUrl, bucket, objectKey].join(\"\\u0000\") + \"\\u0000\");",
-    "          NODE",
-    "          )",
-    "          if [ \"${#upload_values[@]}\" -ne 6 ]; then",
-    "            echo \"Liskov upload-session response did not produce upload credentials\" >&2",
-    "            exit 1",
-    "          fi",
-    "          access_key_id=\"${upload_values[0]}\"",
-    "          secret_access_key=\"${upload_values[1]}\"",
-    "          region=\"${upload_values[2]}\"",
-    "          endpoint_url=\"${upload_values[3]}\"",
-    "          bucket=\"${upload_values[4]}\"",
-    "          object_key=\"${upload_values[5]}\"",
-    "          printf '::add-mask::%s\\n' \"$(workflow_escape \"$secret_access_key\")\"",
-    "          AWS_ACCESS_KEY_ID=\"$access_key_id\" \\",
-    "          AWS_SECRET_ACCESS_KEY=\"$secret_access_key\" \\",
-    "          AWS_REGION=\"$region\" \\",
-    "          AWS_ENDPOINT_URL_S3=\"$endpoint_url\" \\",
-    "          aws s3api put-object \\",
-    "            --endpoint-url \"$endpoint_url\" \\",
-    "            --bucket \"$bucket\" \\",
-    "            --key \"$object_key\" \\",
-    "            --body \"${{ steps.image.outputs.image_path }}\" \\",
-    "            --metadata \"sha256=${{ steps.image.outputs.digest }}\"",
-    "          unset secret_access_key",
-    "",
-    "      - name: Finalize Liskov upload session",
-    "        shell: bash",
-    "        env:",
-    "          LISKOV_DIGEST: ${{ steps.image.outputs.digest }}",
-    "          LISKOV_BYTE_SIZE: ${{ steps.image.outputs.byte_size }}",
-    "          LISKOV_OBJECT_KEY: ${{ steps.upload_session.outputs.object_key }}",
-    "          LISKOV_RUNTIME_IMAGE_URL: ${{ inputs.image_url }}",
-    "          LISKOV_UPLOAD_SESSION_ID: ${{ steps.upload_session.outputs.session_id }}",
-    "          LISKOV_WORKFLOW_REF: ${{ github.workflow_ref }}",
-    "        run: |",
-    "          set -euo pipefail",
-    "          workflow_escape() {",
-    "            WORKFLOW_VALUE=\"$1\" node -e 'process.stdout.write((process.env.WORKFLOW_VALUE ?? \"\").replace(/%/g, \"%25\").replace(/\\r/g, \"%0D\").replace(/\\n/g, \"%0A\"))'",
-    "          }",
-    "          get_oidc_token() {",
-    "            local audience oidc_json",
-    "            audience=\"$(node -e 'process.stdout.write(encodeURIComponent(process.env.LISKOV_OIDC_AUDIENCE ?? \"\"))')\"",
-    "            oidc_json=\"$RUNNER_TEMP/liskov-finalize-oidc.json\"",
-    "            curl --fail --show-error --silent --header \"Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}\" \"${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${audience}\" > \"$oidc_json\"",
-    "            node - \"$oidc_json\" <<'NODE'",
-    "          const fs = require(\"fs\");",
-    "          const [oidcPath] = process.argv.slice(2);",
-    "          const body = JSON.parse(fs.readFileSync(oidcPath, \"utf8\"));",
-    "          if (typeof body.value !== \"string\" || body.value.length === 0) {",
-    "            throw new Error(\"GitHub OIDC response did not contain value\");",
-    "          }",
-    "          process.stdout.write(body.value);",
-    "          NODE",
-    "          }",
-    "          payload_json=\"$RUNNER_TEMP/liskov-finalize.json\"",
-    "          node - \"$payload_json\" <<'NODE'",
-    "          const fs = require(\"fs\");",
-    "          const [payloadPath] = process.argv.slice(2);",
-    "          function requiredEnv(name) {",
-    "            const value = process.env[name];",
-    "            if (typeof value !== \"string\" || value.length === 0) throw new Error(`${name} is required`);",
-    "            return value;",
-    "          }",
-    "          const byteSize = Number.parseInt(requiredEnv(\"LISKOV_BYTE_SIZE\"), 10);",
-    "          if (!Number.isSafeInteger(byteSize) || byteSize <= 0) throw new Error(\"LISKOV_BYTE_SIZE must be a positive integer\");",
-    "          const payload = {",
-    "            objectKey: requiredEnv(\"LISKOV_OBJECT_KEY\"),",
-    "            digest: requiredEnv(\"LISKOV_DIGEST\"),",
-    "            byteSize,",
-    "            provenance: {",
-    "              repository: requiredEnv(\"GITHUB_REPOSITORY\"),",
-    "              ref: requiredEnv(\"GITHUB_REF\"),",
-    "              sha: requiredEnv(\"GITHUB_SHA\"),",
-    "              workflowRef: requiredEnv(\"LISKOV_WORKFLOW_REF\"),",
-    "              workflow: process.env.GITHUB_WORKFLOW,",
-    "              runId: process.env.GITHUB_RUN_ID,",
-    "              runAttempt: process.env.GITHUB_RUN_ATTEMPT,",
-    "              actor: process.env.GITHUB_ACTOR,",
-    "              eventName: process.env.GITHUB_EVENT_NAME,",
-    "              sourceImageUrl: process.env.LISKOV_RUNTIME_IMAGE_URL",
-    "            }",
-    "          };",
-    "          fs.writeFileSync(payloadPath, `${JSON.stringify(payload)}\\n`);",
-    "          NODE",
-    "          oidc_token=\"$(get_oidc_token)\"",
-    "          printf '::add-mask::%s\\n' \"$(workflow_escape \"$oidc_token\")\"",
-    "          application_path=\"$(node -e 'process.stdout.write(encodeURIComponent(process.env.LISKOV_APPLICATION_REF ?? \"\"))')\"",
-    "          session_path=\"$(node -e 'process.stdout.write(encodeURIComponent(process.env.LISKOV_UPLOAD_SESSION_ID ?? \"\"))')\"",
-    "          curl --fail-with-body --show-error --silent --request POST \\",
-    "            \"${LISKOV_URL%/}/api/applications/${application_path}/runtime-images/upload-sessions/${session_path}/finalize\" \\",
-    "            --header \"Authorization: Bearer ${oidc_token}\" \\",
-    "            --header 'Content-Type: application/json' \\",
-    "            --data @\"$payload_json\" \\",
-    "            > \"$RUNNER_TEMP/liskov-finalized.json\"",
-    ""
+    `    uses: ${input.actionsRef}`,
+    "    with:",
+    `      application-id: ${yamlSingleQuoted(input.applicationRef)}`,
+    `      manifest-path: ${yamlSingleQuoted(input.manifestPath)}`,
+    "      image-url: ${{ inputs.image_url }}",
+    "      expected-sha256: ${{ inputs.expected_sha256 }}",
+    `      liskov-url: ${yamlSingleQuoted(input.liskovUrl)}`,
+    `      audience: ${yamlSingleQuoted(input.oidcAudience)}`
   ].join("\n");
 }
 

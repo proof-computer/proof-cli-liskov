@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 
+import RuntimeImageWorkflowCommand from "../src/commands/liskov/application/runtime-image/workflow.js";
 import {
   runSlipwayAdminDeploySpendResolve,
   runSlipwayAdminExecutorOperationReconcile,
@@ -55,14 +55,15 @@ import {
 } from "../src/index.js";
 
 describe("proof-cli Liskov runner", () => {
-  it("writes a runtime-image upload workflow without emitting credentials", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+  it("writes a manifest-bound @v1 runtime-image workflow without inline upload logic", async () => {
+    const { dir, manifestPath } = await runtimeImageWorkflowFixture("proof-docs");
     const output = path.join(dir, ".github", "workflows", "liskov-runtime-image.yml");
     const out = writer();
     const code = await runSlipwayApplicationRuntimeImageWorkflow({
       applicationRef: "proof-docs",
       json: true,
       liskovUrl: "https://liskov.test",
+      manifestPath,
       oidcAudience: "liskov-runtime-image-upload",
       output,
       workflowName: "Upload Runtime"
@@ -75,6 +76,8 @@ describe("proof-cli Liskov runner", () => {
       output: string;
       liskovUrl: string;
       oidcAudience: string;
+      manifestPath: string;
+      actionsRef: string;
       policyWorkflowRefHint: string;
     };
     assert.equal(parsed.ok, true);
@@ -82,6 +85,11 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.output, output);
     assert.equal(parsed.liskovUrl, "https://liskov.test");
     assert.equal(parsed.oidcAudience, "liskov-runtime-image-upload");
+    assert.equal(parsed.manifestPath, manifestPath);
+    assert.equal(
+      parsed.actionsRef,
+      "proof-computer/liskov-github-actions/.github/workflows/runtime-image.yml@v1"
+    );
     assert.match(parsed.policyWorkflowRefHint, /\.github\/workflows\/liskov-runtime-image\.yml@refs\/heads\/<branch>/u);
     assert.equal(out.text.includes("secretAccessKey"), false);
     assert.equal(out.text.includes("AWS_SECRET_ACCESS_KEY"), false);
@@ -91,28 +99,30 @@ describe("proof-cli Liskov runner", () => {
     assert.match(workflow, /^"on":$/mu);
     assert.match(workflow, /description: 'Optional sha256 digest, with or without sha256: prefix'/u);
     assert.match(workflow, /id-token: write/u);
-    assert.match(workflow, /LISKOV_URL: 'https:\/\/liskov\.test'/u);
-    assert.match(workflow, /LISKOV_APPLICATION_REF: 'proof-docs'/u);
-    assert.match(workflow, /runtime-images\/upload-session/u);
-    assert.match(workflow, /runtime-images\/upload-sessions\/\$\{session_path\}\/finalize/u);
-    assert.match(workflow, /aws s3api put-object/u);
-    assert.match(workflow, /::add-mask::/u);
-    assert.doesNotMatch(workflow, /^const fs = require/m);
-    assert.doesNotMatch(workflow, /\$GITHUB_ENV/u);
-    assert.doesNotMatch(workflow, /steps\.[^.]+\.outputs\.token/u);
-    assert.doesNotMatch(workflow, /set -x/u);
-    assert.doesNotMatch(workflow, /secret-once|do_not_print/u);
-    await assertWorkflowRunBlocksAreBashSyntax(workflow, dir);
+    assert.match(
+      workflow,
+      /uses: proof-computer\/liskov-github-actions\/\.github\/workflows\/runtime-image\.yml@v1/u
+    );
+    assert.match(workflow, /application-id: 'proof-docs'/u);
+    assert.match(workflow, new RegExp(`manifest-path: '${manifestPath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}'`, "u"));
+    assert.match(workflow, /image-url: \$\{\{ inputs\.image_url \}\}/u);
+    assert.match(workflow, /expected-sha256: \$\{\{ inputs\.expected_sha256 \}\}/u);
+    assert.match(workflow, /liskov-url: 'https:\/\/liskov\.test'/u);
+    assert.match(workflow, /audience: 'liskov-runtime-image-upload'/u);
+    assert.doesNotMatch(workflow, /runtime-images\/upload-session/u);
+    assert.doesNotMatch(workflow, /aws s3api|ACTIONS_ID_TOKEN_REQUEST|secretAccessKey|AWS_SECRET_ACCESS_KEY/u);
+    assert.doesNotMatch(workflow, /curl --request POST|::add-mask::|run: \|/u);
   });
 
-  it("does not overwrite an existing runtime-image workflow without --yes", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+  it("requires --yes before overwriting an existing runtime-image workflow", async () => {
+    const { dir, manifestPath } = await runtimeImageWorkflowFixture("proof-docs");
     const output = path.join(dir, "runtime-image.yml");
     await writeFile(output, "existing workflow\n", "utf8");
     const out = writer();
     const code = await runSlipwayApplicationRuntimeImageWorkflow({
       applicationRef: "proof-docs",
       json: true,
+      manifestPath,
       output
     }, { stdout: out.write });
 
@@ -122,6 +132,125 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.ok, false);
     assert.equal(parsed.error, "SLIPWAY_RUNTIME_IMAGE_WORKFLOW_EXISTS");
     assert.equal(parsed.output, output);
+
+    const confirmed = writer();
+    const confirmedCode = await runSlipwayApplicationRuntimeImageWorkflow({
+      applicationRef: "proof-docs",
+      json: true,
+      manifestPath,
+      output,
+      yes: true
+    }, { stdout: confirmed.write });
+    assert.equal(confirmedCode, 0);
+    assert.match(
+      await readFile(output, "utf8"),
+      /uses: proof-computer\/liskov-github-actions\/\.github\/workflows\/runtime-image\.yml@v1/u
+    );
+  });
+
+  it("requires the runtime-image workflow manifest flag", () => {
+    const manifest = RuntimeImageWorkflowCommand.flags.manifest as { required?: boolean };
+    assert.equal(manifest.required, true);
+  });
+
+  it("rejects invalid, mismatched, and non-runtime-image manifests before writing", async (context) => {
+    await context.test("unsafe manifest path", async () => {
+      const output = path.join(tmpdir(), "unsafe-runtime-image.yml");
+      const out = writer();
+      const code = await runSlipwayApplicationRuntimeImageWorkflow({
+        applicationRef: "proof-docs",
+        json: true,
+        manifestPath: "../manifest.json",
+        output
+      }, { stdout: out.write });
+
+      assert.equal(code, 1);
+      assert.equal(
+        (JSON.parse(out.text) as { error: string }).error,
+        "SLIPWAY_RUNTIME_IMAGE_MANIFEST_PATH_INVALID"
+      );
+    });
+
+    await context.test("malformed manifest", async () => {
+      const { dir, manifestPath } = await runtimeImageWorkflowFixture("proof-docs");
+      await writeFile(path.resolve(manifestPath), "{not json\n", "utf8");
+      const output = path.join(dir, "malformed.yml");
+      const out = writer();
+      const code = await runSlipwayApplicationRuntimeImageWorkflow({
+        applicationRef: "proof-docs",
+        json: true,
+        manifestPath,
+        output
+      }, { stdout: out.write });
+
+      assert.equal(code, 1);
+      assert.equal(
+        (JSON.parse(out.text) as { error: string }).error,
+        "SLIPWAY_RUNTIME_IMAGE_MANIFEST_INVALID"
+      );
+    });
+
+    await context.test("application id mismatch", async () => {
+      const { dir, manifestPath } = await runtimeImageWorkflowFixture("another-app");
+      const output = path.join(dir, "application-mismatch.yml");
+      const out = writer();
+      const code = await runSlipwayApplicationRuntimeImageWorkflow({
+        applicationRef: "proof-docs",
+        json: true,
+        manifestPath,
+        output
+      }, { stdout: out.write });
+
+      assert.equal(code, 1);
+      assert.equal(
+        (JSON.parse(out.text) as { error: string }).error,
+        "SLIPWAY_RUNTIME_IMAGE_MANIFEST_APPLICATION_MISMATCH"
+      );
+    });
+
+    await context.test("non-runtime-image build", async () => {
+      const { dir, manifestPath, manifest } = await runtimeImageWorkflowFixture("proof-docs");
+      (manifest.release as { artifact: Record<string, unknown> }).artifact = {
+        kind: "ipfs_bundle",
+        encryption: { mode: "none" }
+      };
+      await writeFile(path.resolve(manifestPath), `${JSON.stringify(manifest)}\n`, "utf8");
+      const output = path.join(dir, "wrong-artifact.yml");
+      const out = writer();
+      const code = await runSlipwayApplicationRuntimeImageWorkflow({
+        applicationRef: "proof-docs",
+        json: true,
+        manifestPath,
+        output
+      }, { stdout: out.write });
+
+      assert.equal(code, 1);
+      assert.equal(
+        (JSON.parse(out.text) as { error: string }).error,
+        "SLIPWAY_RUNTIME_IMAGE_MANIFEST_RELEASE_INVALID"
+      );
+    });
+
+    await context.test("authored manifest path mismatch", async () => {
+      const { dir, manifestPath, manifest } = await runtimeImageWorkflowFixture("proof-docs");
+      ((manifest.release as { builder: Record<string, unknown> }).builder).manifestPath =
+        ".liskov/different.json";
+      await writeFile(path.resolve(manifestPath), `${JSON.stringify(manifest)}\n`, "utf8");
+      const output = path.join(dir, "path-mismatch.yml");
+      const out = writer();
+      const code = await runSlipwayApplicationRuntimeImageWorkflow({
+        applicationRef: "proof-docs",
+        json: true,
+        manifestPath,
+        output
+      }, { stdout: out.write });
+
+      assert.equal(code, 1);
+      assert.equal(
+        (JSON.parse(out.text) as { error: string }).error,
+        "SLIPWAY_RUNTIME_IMAGE_MANIFEST_PATH_MISMATCH"
+      );
+    });
   });
 
   it("reads a saved session through /api/session without printing the bearer token", async () => {
@@ -4140,39 +4269,57 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-async function assertWorkflowRunBlocksAreBashSyntax(workflow: string, dir: string): Promise<void> {
-  const blocks = extractYamlRunBlocks(workflow);
-  assert.equal(blocks.length, 4);
-  for (const [index, block] of blocks.entries()) {
-    const scriptPath = path.join(dir, `workflow-run-${index + 1}.sh`);
-    await writeFile(scriptPath, block, "utf8");
-    const result = spawnSync("bash", ["-n", scriptPath], { encoding: "utf8" });
-    assert.equal(result.status, 0, result.stderr);
-  }
+async function runtimeImageWorkflowFixture(applicationId: string): Promise<{
+  dir: string;
+  manifestPath: string;
+  manifest: Record<string, unknown>;
+}> {
+  const fixtureRoot = path.join(process.cwd(), ".tmp");
+  await mkdir(fixtureRoot, { recursive: true });
+  const dir = await mkdtemp(path.join(fixtureRoot, "runtime-image-workflow-"));
+  const manifestFile = path.join(dir, "application-manifest.json");
+  const manifestPath = path.relative(process.cwd(), manifestFile).split(path.sep).join("/");
+  const manifest = runtimeImageBuildManifest(applicationId, manifestPath);
+  await writeFile(manifestFile, `${JSON.stringify(manifest)}\n`, "utf8");
+  return { dir, manifestPath, manifest };
 }
 
-function extractYamlRunBlocks(workflow: string): string[] {
-  const lines = workflow.split(/\r?\n/u);
-  const blocks: string[] = [];
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]!;
-    if (line.trim() !== "run: |") continue;
-    const baseIndent = line.length - line.trimStart().length;
-    const block: string[] = [];
-    index += 1;
-    while (index < lines.length) {
-      const blockLine = lines[index]!;
-      const indent = blockLine.length - blockLine.trimStart().length;
-      if (blockLine.trim() && indent <= baseIndent) {
-        index -= 1;
-        break;
+function runtimeImageBuildManifest(
+  applicationId: string,
+  manifestPath: string
+): Record<string, unknown> {
+  return {
+    schema: "proof.liskov.application-manifest",
+    schemaVersion: 4,
+    applicationId,
+    release: {
+      mode: "build",
+      artifact: { kind: "runtime_image" },
+      builder: {
+        kind: "github",
+        repository: "proof-computer/runtime-image-app",
+        allowedRefs: ["refs/heads/main"],
+        workflowRef:
+          "proof-computer/runtime-image-app/.github/workflows/liskov-runtime-image.yml@refs/heads/main",
+        manifestPath
       }
-      block.push(blockLine.length >= baseIndent + 2 ? blockLine.slice(baseIndent + 2) : "");
-      index += 1;
+    },
+    deployment: {
+      parallelism: 1,
+      schedule: { durationMs: 1_800_000 },
+      lifecycle: {
+        renewal: { mode: "after_scheduled_end" },
+        update: {
+          timing: "immediate",
+          existingJobs: { mode: "run_until_scheduled_end" }
+        },
+        recovery: {
+          launch: { maxRetries: 0 },
+          runtimeFailure: { mode: "wait_until_scheduled_end" }
+        }
+      }
     }
-    blocks.push(`${block.join("\n")}\n`);
-  }
-  return blocks;
+  };
 }
 
 function setEnvironmentPlanItem(
