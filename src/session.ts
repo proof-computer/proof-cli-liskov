@@ -3227,16 +3227,26 @@ async function selectFreshRunOnePlanItem(
 
   const lifecyclePolicy = objectRecord(preflight.lifecyclePolicy);
   if (input.requireEnvironmentBootstrap) {
-    const ready = lifecyclePolicy.activePolicyFound === true
-      && lifecyclePolicy.serverEnvironmentRequired === true
+    const explicitServerEnvironmentReady = lifecyclePolicy.serverEnvironmentRequired === true
       && lifecyclePolicy.setEnvironmentEnabled === true
       && lifecyclePolicy.environmentReady === true;
+    const ownedBootstrapReady = lifecyclePolicy.bootstrapDelivery === "acurast-set-environment"
+      && lifecyclePolicy.setEnvironmentEnabled === true
+      && lifecyclePolicy.serverEnvironmentHandoffEnabled === true
+      && lifecyclePolicy.serverEnvironmentHandoffApplicationAllowed === true
+      && lifecyclePolicy.environmentReady === true;
+    const ready = lifecyclePolicy.activePolicyFound === true
+      && (explicitServerEnvironmentReady || ownedBootstrapReady);
     if (!ready) {
       return reject("environment_bootstrap_not_ready", {
         field: "lifecyclePolicy",
         activePolicyFound: lifecyclePolicy.activePolicyFound ?? null,
         serverEnvironmentRequired: lifecyclePolicy.serverEnvironmentRequired ?? null,
+        bootstrapDelivery: lifecyclePolicy.bootstrapDelivery ?? null,
         setEnvironmentEnabled: lifecyclePolicy.setEnvironmentEnabled ?? null,
+        serverEnvironmentHandoffEnabled: lifecyclePolicy.serverEnvironmentHandoffEnabled ?? null,
+        serverEnvironmentHandoffApplicationAllowed:
+          lifecyclePolicy.serverEnvironmentHandoffApplicationAllowed ?? null,
         environmentReady: lifecyclePolicy.environmentReady ?? null
       });
     }

@@ -3274,6 +3274,22 @@ describe("proof-cli Liskov runner", () => {
       "environment_bootstrap_not_ready"
     );
 
+    const disabledOwnedBootstrap = await invoke({
+      activePolicyFound: true,
+      serverEnvironmentRequired: false,
+      bootstrapDelivery: "acurast-set-environment",
+      setEnvironmentEnabled: true,
+      serverEnvironmentHandoffEnabled: false,
+      serverEnvironmentHandoffApplicationAllowed: true,
+      environmentReady: true
+    });
+    assert.equal(disabledOwnedBootstrap.code, 1);
+    assert.equal(disabledOwnedBootstrap.requestCount, 1);
+    assert.equal(
+      (JSON.parse(disabledOwnedBootstrap.out.text) as Record<string, unknown>).reason,
+      "environment_bootstrap_not_ready"
+    );
+
     const missingGenerationFence = await invoke({
       activePolicyFound: true,
       serverEnvironmentRequired: true,
@@ -3352,8 +3368,11 @@ describe("proof-cli Liskov runner", () => {
 
     const interrupted = await invoke({
       activePolicyFound: true,
-      serverEnvironmentRequired: true,
+      serverEnvironmentRequired: false,
+      bootstrapDelivery: "acurast-set-environment",
       setEnvironmentEnabled: true,
+      serverEnvironmentHandoffEnabled: true,
+      serverEnvironmentHandoffApplicationAllowed: true,
       environmentReady: true,
       maxGenerations: 1,
       oneGenerationFenced: true,
