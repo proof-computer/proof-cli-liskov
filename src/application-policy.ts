@@ -13,6 +13,17 @@ export interface PolicyValidationError {
 
 type JsonObject = Record<string, unknown>;
 
+export interface TailscaleSshProvider {
+  integrationId: string;
+  kind: "tailscale";
+  port?: 22;
+}
+
+export type RuntimeSshIngressPolicy =
+  | { mode: "disabled" }
+  | { mode: "optional" }
+  | { mode: "required"; provider: TailscaleSshProvider };
+
 function object(value: unknown): JsonObject | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as JsonObject
@@ -579,9 +590,23 @@ export function validateApplicationManifestV4(value: unknown): PolicyValidationE
     checkInteger(http.port, "/ingress/http/port", errors, 0, 65_535, false);
   }
   checkOptionalString(http.healthPath, "/ingress/http/healthPath", errors);
-  const ssh = checkOptionalObject(ingress, "ssh", "/ingress", ["mode", "port"], errors, ["mode"]);
+  const ssh = checkOptionalObject(ingress, "ssh", "/ingress", ["mode", "provider"], errors, ["mode"]);
   if (ssh.mode !== undefined) checkEnum(ssh.mode, ["disabled", "optional", "required"], "/ingress/ssh/mode", errors);
-  checkInteger(ssh.port, "/ingress/ssh/port", errors, 0, 65_535);
+  if (ingress.ssh !== undefined && (ssh.mode === "disabled" || ssh.mode === "optional")) {
+    checkObject(ingress.ssh, "/ingress/ssh", ["mode"], errors, ["mode"]);
+  } else if (ingress.ssh !== undefined && ssh.mode === "required") {
+    checkObject(ingress.ssh, "/ingress/ssh", ["mode", "provider"], errors, ["mode", "provider"]);
+    const provider = checkObject(ssh.provider, "/ingress/ssh/provider", ["kind", "integrationId", "port"], errors, ["kind", "integrationId"]);
+    checkEnum(provider.kind, ["tailscale"], "/ingress/ssh/provider/kind", errors);
+    checkNonEmptyString(provider.integrationId, "/ingress/ssh/provider/integrationId", errors);
+    if (provider.port !== undefined && provider.port !== 22) {
+      errors.push({
+        code: "invalid_manifest",
+        message: "Tailscale Runtime SSH port must be 22",
+        pointer: "/ingress/ssh/provider/port"
+      });
+    }
+  }
   if (http.mode === "optional" || ssh.mode === "optional") {
     errors.push({ code: "unsupported_policy_feature", message: "optional ingress is not enabled", pointer: "/ingress" });
   }
