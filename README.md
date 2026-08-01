@@ -32,6 +32,13 @@ proof liskov application lockbox grant ensure proof-docs --yes
 proof liskov application lockbox grant status proof-docs --json
 proof liskov application lockbox grant-status proof-docs --json
 proof liskov application blackbox configure proof-docs --yes
+proof liskov runtime-ssh integration list org-123
+proof liskov runtime-ssh integration create org-123 --name "Production tailnet" --tailnet example.com --tag tag:liskov-runtime --oauth-client-id CLIENT_ID
+proof liskov runtime-ssh integration validate org-123 int_123
+proof liskov runtime-ssh integration rotate org-123 int_123 --oauth-client-id NEW_CLIENT_ID
+proof liskov runtime-ssh integration disable org-123 int_123
+proof liskov ssh proof-docs --print-command
+proof liskov ssh proof-docs --deployment dep-123 --job job-123
 proof liskov custody account ensure proof-docs --chain acurast --yes
 proof liskov custody preflight proof-docs --json
 proof liskov custody execution run-one proof-docs --plan-item-id PLAN_ITEM_ID_FROM_ONE_ITEM --idempotency-key OPAQUE_KEY_FROM_SAME_ITEM --expect-kind acurast.deploy --expect-policy-digest POLICY_DIGEST_FROM_SAME_ITEM --yes-spend --yes
@@ -83,6 +90,24 @@ Pause, resume, delete, and identity backfill dry-run by default and require
 require `--yes`; live execution submit also requires `--yes-spend`. The plugin does
 not expose the old direct manual Acurast spend fallback; diagnostics and
 machine catalog reads stay server-side.
+
+Runtime SSH is a private-preview, bring-your-own Tailscale capability. Starter,
+Team, and Enterprise organization owners or administrators connect their own
+Tailscale account and tailnet; Liskov does not provide a shared tailnet or
+automatically create, install, authenticate, or switch a local Tailscale
+client. Creating or rotating an integration reads the OAuth client secret from
+stdin when input is piped, or from a protected no-echo terminal prompt. Do not
+put the secret in a command-line flag or environment variable.
+
+Before enabling Runtime SSH, confirm that the customer-owned Tailscale SSH
+policy grants only the intended operators access as the PRoot `root` identity.
+The customer owns the account, tailnet, tag, grants, identity policy, audit,
+and provider charges. `proof liskov ssh APP` asks the server to resolve one
+ready exact-job attachment, checks that the existing local Tailscale client is
+authenticated to that attachment's expected tailnet, then launches
+`tailscale ssh root@HOST`. Use `--deployment` or `--job` when more than one
+attachment is ready. `--print-command` performs the same resolution and local
+tailnet check without opening an SSH session.
 
 Application import accepts authored manifests only, never publishes, and
 returns both `authoredDigest` and `releaseIntentDigest`. Build-release

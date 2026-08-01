@@ -115,3 +115,20 @@ export {
   type SlipwaySetEnvironmentAction,
   type SlipwayWhoamiInput
 } from "./session.js";
+
+export {
+  runRuntimeSshConnection,
+  runRuntimeSshIntegrationCreate,
+  runRuntimeSshIntegrationDisable,
+  runRuntimeSshIntegrationList,
+  runRuntimeSshIntegrationRotate,
+  runRuntimeSshIntegrationValidate,
+  type RuntimeSshCliOptions,
+  type RuntimeSshCommandInput,
+  type RuntimeSshConnectionInput,
+  type RuntimeSshIntegrationCreateInput,
+  type RuntimeSshIntegrationInput,
+  type RuntimeSshIntegrationRotateInput,
+  type RuntimeSshProcessResult,
+  type RuntimeSshProcessRunner
+} from "./runtime-ssh.js";
