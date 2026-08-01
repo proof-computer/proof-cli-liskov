@@ -181,4 +181,55 @@ describe("local application-manifest v4 tools", () => {
         && error.pointer === "/runtime/maxGenerations"));
     }
   });
+
+  it("validates Runtime SSH as a closed provider-discriminated union", () => {
+    const withSsh = (ssh: unknown): Record<string, unknown> => {
+      const input = manifest();
+      input.ingress = { ssh };
+      return input;
+    };
+
+    assert.deepEqual(validateApplicationManifestV4(withSsh({ mode: "disabled" })), []);
+    assert.deepEqual(validateApplicationManifestV4(withSsh({
+      mode: "required",
+      provider: {
+        kind: "tailscale",
+        integrationId: "int_tailnet"
+      }
+    })), []);
+    assert.deepEqual(validateApplicationManifestV4(withSsh({
+      mode: "required",
+      provider: {
+        kind: "tailscale",
+        integrationId: "int_tailnet",
+        port: 22
+      }
+    })), []);
+
+    const invalidDeclarations = [
+      { mode: "required" },
+      { mode: "required", integrationId: "int_legacy", port: 22 },
+      { mode: "required", provider: { kind: "future", integrationId: "int_future" } },
+      { mode: "required", provider: { kind: "tailscale", integrationId: "" } },
+      { mode: "required", provider: { kind: "tailscale", integrationId: "int_tailnet", port: 2022 } },
+      { mode: "optional" },
+      { mode: "disabled", provider: { kind: "tailscale", integrationId: "int_tailnet" } }
+    ];
+
+    for (const invalid of invalidDeclarations) {
+      assert.notDeepEqual(
+        validateApplicationManifestV4(withSsh(invalid)),
+        [],
+        `invalid Runtime SSH declaration was accepted: ${JSON.stringify(invalid)}`
+      );
+    }
+
+    const wrongPort = validateApplicationManifestV4(withSsh({
+      mode: "required",
+      provider: { kind: "tailscale", integrationId: "int_tailnet", port: 2022 }
+    }));
+    assert.ok(wrongPort.some((error) =>
+      error.code === "invalid_manifest"
+      && error.pointer === "/ingress/ssh/provider/port"));
+  });
 });
