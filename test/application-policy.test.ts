@@ -219,6 +219,23 @@ describe("local application-manifest v4 tools", () => {
         integrationId: "int_tailnet"
       }
     })), []);
+    const managedKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    assert.deepEqual(validateApplicationManifestV4(withSsh({
+      mode: "required",
+      provider: {
+        kind: "liskov",
+        authorizedKeys: [managedKey]
+      }
+    })), []);
+    const simultaneous = withSsh({
+      mode: "required",
+      provider: { kind: "liskov", authorizedKeys: [managedKey] }
+    });
+    simultaneous.ingress = {
+      ...(simultaneous.ingress as Record<string, unknown>),
+      http: { mode: "required", port: 8080, healthPath: "/health" }
+    };
+    assert.deepEqual(validateApplicationManifestV4(simultaneous), []);
     assert.deepEqual(validateApplicationManifestV4(withSsh({
       mode: "required",
       provider: {
@@ -235,7 +252,11 @@ describe("local application-manifest v4 tools", () => {
       { mode: "required", provider: { kind: "tailscale", integrationId: "" } },
       { mode: "required", provider: { kind: "tailscale", integrationId: "int_tailnet", port: 2022 } },
       { mode: "optional" },
-      { mode: "disabled", provider: { kind: "tailscale", integrationId: "int_tailnet" } }
+      { mode: "disabled", provider: { kind: "tailscale", integrationId: "int_tailnet" } },
+      { mode: "required", provider: { kind: "liskov", authorizedKeys: [] } },
+      { mode: "required", provider: { kind: "liskov", authorizedKeys: [managedKey, managedKey] } },
+      { mode: "required", provider: { kind: "liskov", authorizedKeys: [`${managedKey} comment`] } },
+      { mode: "required", provider: { kind: "liskov", authorizedKeys: [managedKey], port: 22 } }
     ];
 
     for (const invalid of invalidDeclarations) {

@@ -19,7 +19,7 @@ import {
 test("managed proxy accepts only a credential-free WSS origin", () => {
   assert.equal(
     buildSessionEndpoint("wss://access.example/", "tunnel_123"),
-    "wss://access.example/v0/sessions/tunnel_123"
+    "wss://access.example/v1/sessions/tunnel_123"
   );
   for (const value of [
     "ws://access.example",
@@ -64,7 +64,7 @@ test("proxy copies stdin and stdout bytes without framing text or diagnostics", 
   const sent: Buffer[] = [];
   const emitter = new EventEmitter();
   const fake = Object.assign(emitter, {
-    protocol: "liskov-access.v0",
+    protocol: "liskov-access.v1",
     pause: () => undefined,
     resume: () => undefined,
     terminate: () => undefined,
@@ -79,7 +79,7 @@ test("proxy copies stdin and stdout bytes without framing text or diagnostics", 
     { stdin: input, stdout: output },
     {
       createSocket: (endpoint, token) => {
-        assert.equal(endpoint, "wss://access.example/v0/sessions/tunnel_test");
+        assert.equal(endpoint, "wss://access.example/v1/sessions/tunnel_test");
         assert.equal(token, "one-time-token");
         queueMicrotask(() => emitter.emit("open"));
         return fake;

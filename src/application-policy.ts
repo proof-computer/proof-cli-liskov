@@ -19,10 +19,15 @@ export interface TailscaleSshProvider {
   port?: 22;
 }
 
+export interface LiskovSshProvider {
+  authorizedKeys: string[];
+  kind: "liskov";
+}
+
 export type RuntimeSshIngressPolicy =
   | { mode: "disabled" }
   | { mode: "optional" }
-  | { mode: "required"; provider: TailscaleSshProvider };
+  | { mode: "required"; provider: LiskovSshProvider | TailscaleSshProvider };
 
 function object(value: unknown): JsonObject | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -164,6 +169,46 @@ function checkDuplicateStrings(value: unknown, at: string, errors: PolicyValidat
     } else {
       seen.set(entry, index);
     }
+  });
+}
+
+function checkManagedAuthorizedKeys(value: unknown, errors: PolicyValidationError[]): void {
+  const at = "/ingress/ssh/provider/authorizedKeys";
+  if (!Array.isArray(value) || value.length < 1 || value.length > 8) {
+    errors.push({ code: "invalid_manifest", message: "must contain one to eight Ed25519 public keys", pointer: at });
+    return;
+  }
+  const fingerprints = new Set<string>();
+  value.forEach((key, index) => {
+    const pointer = `${at}/${index}`;
+    if (typeof key !== "string" || key.trim() !== key || key.split(" ").length !== 2) {
+      errors.push({ code: "invalid_manifest", message: "must be normalized ssh-ed25519 key material without options or comments", pointer });
+      return;
+    }
+    const [algorithm, encoded] = key.split(" ");
+    let blob: Buffer;
+    try {
+      blob = Buffer.from(encoded, "base64");
+    } catch {
+      errors.push({ code: "invalid_manifest", message: "must be a canonical Ed25519 SSH public key", pointer });
+      return;
+    }
+    if (
+      algorithm !== "ssh-ed25519"
+      || blob.length !== 51
+      || blob.readUInt32BE(0) !== 11
+      || blob.subarray(4, 15).toString("ascii") !== "ssh-ed25519"
+      || blob.readUInt32BE(15) !== 32
+      || blob.toString("base64") !== encoded
+    ) {
+      errors.push({ code: "invalid_manifest", message: "must be a canonical Ed25519 SSH public key", pointer });
+      return;
+    }
+    const fingerprint = createHash("sha256").update(blob).digest("base64url");
+    if (fingerprints.has(fingerprint)) {
+      errors.push({ code: "invalid_manifest", message: "authorized key fingerprints must be unique", pointer });
+    }
+    fingerprints.add(fingerprint);
   });
 }
 
@@ -596,22 +641,25 @@ export function validateApplicationManifestV4(value: unknown): PolicyValidationE
     checkObject(ingress.ssh, "/ingress/ssh", ["mode"], errors, ["mode"]);
   } else if (ingress.ssh !== undefined && ssh.mode === "required") {
     checkObject(ingress.ssh, "/ingress/ssh", ["mode", "provider"], errors, ["mode", "provider"]);
-    const provider = checkObject(ssh.provider, "/ingress/ssh/provider", ["kind", "integrationId", "port"], errors, ["kind", "integrationId"]);
-    checkEnum(provider.kind, ["tailscale"], "/ingress/ssh/provider/kind", errors);
-    checkNonEmptyString(provider.integrationId, "/ingress/ssh/provider/integrationId", errors);
-    if (provider.port !== undefined && provider.port !== 22) {
-      errors.push({
-        code: "invalid_manifest",
-        message: "Tailscale Runtime SSH port must be 22",
-        pointer: "/ingress/ssh/provider/port"
-      });
+    const rawProvider = object(ssh.provider);
+    if (rawProvider?.kind === "liskov") {
+      const provider = checkObject(ssh.provider, "/ingress/ssh/provider", ["kind", "authorizedKeys"], errors, ["kind", "authorizedKeys"]);
+      checkManagedAuthorizedKeys(provider.authorizedKeys, errors);
+    } else {
+      const provider = checkObject(ssh.provider, "/ingress/ssh/provider", ["kind", "integrationId", "port"], errors, ["kind", "integrationId"]);
+      checkEnum(provider.kind, ["tailscale"], "/ingress/ssh/provider/kind", errors);
+      checkNonEmptyString(provider.integrationId, "/ingress/ssh/provider/integrationId", errors);
+      if (provider.port !== undefined && provider.port !== 22) {
+        errors.push({
+          code: "invalid_manifest",
+          message: "Tailscale Runtime SSH port must be 22",
+          pointer: "/ingress/ssh/provider/port"
+        });
+      }
     }
   }
   if (http.mode === "optional" || ssh.mode === "optional") {
     errors.push({ code: "unsupported_policy_feature", message: "optional ingress is not enabled", pointer: "/ingress" });
-  }
-  if (ingress.http !== undefined && ingress.ssh !== undefined) {
-    errors.push({ code: "unsupported_policy_feature", message: "simultaneous HTTP and SSH ingress is not enabled", pointer: "/ingress" });
   }
   const observability = checkOptionalObject(root, "observability", "", ["logs", "runtimeDiagnostics"], errors);
   const logs = checkOptionalObject(observability, "logs", "/observability", ["enabled", "profileId", "sinkName", "context"], errors);

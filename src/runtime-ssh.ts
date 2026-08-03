@@ -1,6 +1,9 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { createHash, randomBytes } from "node:crypto";
+import { chmod, lstat, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { emitKeypressEvents } from "node:readline";
+import { createInterface } from "node:readline/promises";
 
 import { isOrganizationListResponse, organizationListPath } from "./organization-client.js";
 import {
@@ -16,6 +19,7 @@ export interface RuntimeSshCliOptions {
   fetchImpl?: typeof fetch;
   organization?: string;
   readSecret?: (prompt: string) => Promise<string>;
+  confirmHostKey?: (prompt: string) => Promise<boolean>;
   runProcess?: RuntimeSshProcessRunner;
   stdout?: (line: string) => void;
   stderr?: (line: string) => void;
@@ -45,8 +49,11 @@ export interface RuntimeSshIntegrationRotateInput extends RuntimeSshIntegrationI
 }
 
 export interface RuntimeSshConnectionInput extends RuntimeSshCommandInput {
+  acceptHostKey?: boolean;
   applicationRef: string;
+  cliBin?: string;
   deploymentId?: string;
+  identity?: string;
   jobId?: string;
   printCommand?: boolean;
 }
@@ -82,20 +89,59 @@ interface IntegrationResponse {
   integrations?: RuntimeSshIntegration[];
 }
 
+interface TailscaleConnection {
+  provider: "tailscale";
+  attachmentId: string;
+  deploymentId: string;
+  jobId: string;
+  expectedTailnet: string;
+  hostname: string;
+  user: "root";
+  port: 22;
+  command: ["tailscale", "ssh", string];
+}
+
+interface ManagedConnection {
+  provider: "liskov";
+  attachmentId: string;
+  applicationId: string;
+  applicationUid: string;
+  liskovDeploymentId: string;
+  deploymentId: string;
+  liskovJobId: string;
+  jobId: string;
+  user: "root";
+  port: 22;
+  authorizedKeyFingerprints: string[];
+  host: { publicKey: string; fingerprint: string; signedEvidence: string };
+  trust: {
+    claim: string;
+    runtimeContactSha256: string;
+    dropbearVersion: string;
+    dropbearSha256: string;
+    dropbearkeySha256: string;
+  };
+}
+
+type RuntimeSshConnection = TailscaleConnection | ManagedConnection;
+
 interface ConnectionResponse {
   ok?: boolean;
   error?: string;
   candidates?: Array<{ attachmentId: string; deploymentId: string; jobId: string }>;
-  connection?: {
-    provider: "tailscale";
-    attachmentId: string;
-    deploymentId: string;
-    jobId: string;
-    expectedTailnet: string;
-    hostname: string;
-    user: "root";
-    port: 22;
-    command: ["tailscale", "ssh", string];
+  connection?: RuntimeSshConnection;
+}
+
+interface ManagedTicketResponse {
+  ok?: boolean;
+  error?: string;
+  ticket?: {
+    gatewayUrl: string;
+    tunnelId: string;
+    protocol: "liskov-access.v1";
+    bearerToken: string;
+    expiresAtMs: number;
+    limits: { maxFrameBytes: number; maxBytesPerDirection: number; maxDurationMs: number };
   };
 }
 
@@ -221,9 +267,19 @@ export async function runRuntimeSshConnection(
     return apiFailure(input.json, options, response.response.status, response.body?.error, hint, response.body);
   }
   if (!validConnection(connection)) {
-    return localFailure(input.json, options, "RUNTIME_SSH_CONNECTION_INVALID", "Liskov returned an invalid Tailscale connection descriptor.");
+    return localFailure(input.json, options, "RUNTIME_SSH_CONNECTION_INVALID", "Liskov returned an invalid Runtime SSH connection descriptor.");
   }
 
+  return connection.provider === "tailscale"
+    ? await runTailscaleConnection(input, options, connection)
+    : await runManagedConnection(input, options, connection);
+}
+
+async function runTailscaleConnection(
+  input: RuntimeSshConnectionInput,
+  options: RuntimeSshCliOptions,
+  connection: TailscaleConnection
+): Promise<number> {
   const runner = options.runProcess ?? defaultProcessRunner;
   let statusResult: RuntimeSshProcessResult;
   try {
@@ -260,6 +316,119 @@ export async function runRuntimeSshConnection(
     return localFailure(input.json, options, "TAILSCALE_SSH_FAILED", `Could not start Tailscale SSH: ${errorMessage(error)}`);
   }
   return sshResult.exitCode;
+}
+
+async function runManagedConnection(
+  input: RuntimeSshConnectionInput,
+  options: RuntimeSshCliOptions,
+  connection: ManagedConnection
+): Promise<number> {
+  const identity = input.identity?.trim();
+  if (!identity) {
+    return localFailure(input.json, options, "RUNTIME_SSH_IDENTITY_REQUIRED", "Managed Runtime SSH requires --identity with a customer-owned Ed25519 private key path.");
+  }
+  const runner = options.runProcess ?? defaultProcessRunner;
+  const selectedKey = await readIdentityPublicKey(identity, runner);
+  if (!selectedKey.ok) {
+    return localFailure(input.json, options, selectedKey.error, selectedKey.message);
+  }
+  const selectedFingerprint = sshFingerprint(selectedKey.publicKey);
+  if (!connection.authorizedKeyFingerprints.includes(selectedFingerprint)) {
+    return localFailure(input.json, options, "RUNTIME_SSH_IDENTITY_NOT_AUTHORIZED", `The selected identity fingerprint ${selectedFingerprint} is not authorized by this runtime policy.`);
+  }
+
+  const alias = `liskov-runtime-ssh-${connection.attachmentId}`;
+  const sessionFile = resolveSlipwaySessionFile({ config: input.config, env: options.env });
+  const knownHostsFile = path.join(path.dirname(sessionFile), "runtime-ssh-known-hosts");
+  const known = await inspectKnownHost(knownHostsFile, alias, connection.host.publicKey);
+  if (!known.ok) {
+    return localFailure(input.json, options, known.error, known.message);
+  }
+
+  if (input.printCommand) {
+    writeOutput(input.json, options, {
+      ok: true,
+      connection: {
+        provider: "liskov",
+        attachmentId: connection.attachmentId,
+        applicationId: connection.applicationId,
+        applicationUid: connection.applicationUid,
+        liskovDeploymentId: connection.liskovDeploymentId,
+        deploymentId: connection.deploymentId,
+        liskovJobId: connection.liskovJobId,
+        jobId: connection.jobId,
+        hostFingerprint: connection.host.fingerprint,
+        selectedIdentityFingerprint: selectedFingerprint,
+        trust: connection.trust
+      },
+      command: "managed Runtime SSH (one-time ticket minted only when connecting)"
+    }, `managed Runtime SSH root@${connection.applicationUid} (${connection.deploymentId}/${connection.jobId}); one-time ticket not minted`);
+    return 0;
+  }
+
+  if (!known.exists) {
+    writeHostTrustNotice(options, connection, selectedFingerprint);
+    const accepted = input.acceptHostKey === true || await confirmHostKey(options, input.json);
+    if (!accepted) {
+      return localFailure(input.json, options, "RUNTIME_SSH_HOST_KEY_NOT_ACCEPTED", "The managed runtime host key was not accepted.");
+    }
+    const persisted = await persistKnownHost(knownHostsFile, alias, connection.host.publicKey);
+    if (!persisted.ok) {
+      return localFailure(input.json, options, persisted.error, persisted.message);
+    }
+  }
+
+  const ticketResponse = await runtimeSshRequest<ManagedTicketResponse>(input, options, {
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/runtime-ssh/attachments/${encodeURIComponent(connection.attachmentId)}/tickets`,
+    body: {
+      selectedPublicKey: selectedKey.publicKey,
+      confirmedHostFingerprint: connection.host.fingerprint
+    }
+  });
+  if (!ticketResponse.ok) return ticketResponse.exitCode;
+  const ticket = ticketResponse.body?.ticket;
+  if (!ticketResponse.response.ok || ticketResponse.body?.ok !== true || !validManagedTicket(ticket)) {
+    return apiFailure(input.json, options, ticketResponse.response.status, ticketResponse.body?.error);
+  }
+
+  const ticketDirectory = await mkdtemp(path.join(path.dirname(sessionFile), ".runtime-ssh-ticket-"));
+  const ticketFile = path.join(ticketDirectory, "operator.token");
+  await writeFile(ticketFile, ticket.bearerToken, { encoding: "utf8", flag: "wx", mode: 0o600 });
+  await chmod(ticketFile, 0o600);
+  const proxyCommand = [
+    input.cliBin ?? "proof",
+    "liskov", "access", "proxy",
+    "--gateway", ticket.gatewayUrl,
+    "--tunnel-id", ticket.tunnelId,
+    "--token-file", ticketFile
+  ].map(shellQuote).join(" ");
+  const sshArgs = [
+    "-i", identity,
+    "-o", "IdentitiesOnly=yes",
+    "-o", "StrictHostKeyChecking=yes",
+    "-o", `UserKnownHostsFile=${knownHostsFile}`,
+    "-o", "GlobalKnownHostsFile=/dev/null",
+    "-o", `HostKeyAlias=${alias}`,
+    "-o", "ClearAllForwardings=yes",
+    "-o", "ForwardAgent=no",
+    "-o", "ForwardX11=no",
+    "-o", "ForwardX11Trusted=no",
+    "-o", "PermitLocalCommand=no",
+    "-o", `ProxyCommand=${proxyCommand}`,
+    "-p", "22",
+    "root@127.0.0.1"
+  ] as const;
+  const removeSignalCleanup = installSignalCleanup(ticketDirectory);
+  try {
+    const result = await runner("ssh", sshArgs, "inherit");
+    return result.exitCode;
+  } catch (error) {
+    return localFailure(input.json, options, "RUNTIME_SSH_OPENSSH_FAILED", `Could not start OpenSSH: ${errorMessage(error)}`);
+  } finally {
+    removeSignalCleanup();
+    await rm(ticketDirectory, { recursive: true, force: true });
+  }
 }
 
 async function runtimeSshRequest<T>(
@@ -537,17 +706,232 @@ function formatIntegration(integration: RuntimeSshIntegration): string {
   return `${integration.integrationId}\t${integration.name}\t${integration.tailnet}\t${integration.tag}\t${integration.lifecycle}\t${integration.validation}`;
 }
 
-function validConnection(connection: ConnectionResponse["connection"]): connection is NonNullable<ConnectionResponse["connection"]> {
+function validConnection(connection: ConnectionResponse["connection"]): connection is RuntimeSshConnection {
   if (!connection) return false;
-  const hostname = connection.hostname;
-  return connection.provider === "tailscale"
-    && connection.user === "root"
-    && connection.port === 22
-    && /^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$/iu.test(hostname)
-    && connection.command.length === 3
-    && connection.command[0] === "tailscale"
-    && connection.command[1] === "ssh"
-    && connection.command[2] === `root@${hostname}`;
+  if (connection.provider === "tailscale") {
+    const hostname = connection.hostname;
+    return connection.user === "root"
+      && connection.port === 22
+      && /^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$/iu.test(hostname)
+      && connection.command.length === 3
+      && connection.command[0] === "tailscale"
+      && connection.command[1] === "ssh"
+      && connection.command[2] === `root@${hostname}`;
+  }
+  if (connection.provider !== "liskov") return false;
+  const ids = [
+    connection.attachmentId, connection.applicationId, connection.applicationUid,
+    connection.liskovDeploymentId, connection.deploymentId, connection.liskovJobId,
+    connection.jobId
+  ];
+  if (connection.user !== "root" || connection.port !== 22 || !ids.every(validDescriptorId)) return false;
+  let hostFingerprint: string;
+  try {
+    const normalizedHostKey = normalizeEd25519PublicKey(connection.host.publicKey);
+    if (normalizedHostKey !== connection.host.publicKey) return false;
+    hostFingerprint = sshFingerprint(normalizedHostKey);
+  } catch {
+    return false;
+  }
+  return hostFingerprint === connection.host.fingerprint
+    && /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(connection.host.signedEvidence)
+    && connection.host.signedEvidence.length <= 16_384
+    && Array.isArray(connection.authorizedKeyFingerprints)
+    && connection.authorizedKeyFingerprints.length >= 1
+    && connection.authorizedKeyFingerprints.length <= 8
+    && new Set(connection.authorizedKeyFingerprints).size === connection.authorizedKeyFingerprints.length
+    && connection.authorizedKeyFingerprints.every((value) => /^SHA256:[A-Za-z0-9+/]{43}$/u.test(value))
+    && connection.trust.claim === "Liskov-supplied runtime-contact and Dropbear binaries were digest verified; the customer runtime image is not attested"
+    && validSha256(connection.trust.runtimeContactSha256)
+    && validSha256(connection.trust.dropbearSha256)
+    && validSha256(connection.trust.dropbearkeySha256)
+    && typeof connection.trust.dropbearVersion === "string"
+    && connection.trust.dropbearVersion.length >= 1
+    && connection.trust.dropbearVersion.length <= 64;
+}
+
+async function readIdentityPublicKey(
+  identity: string,
+  runner: RuntimeSshProcessRunner
+): Promise<{ ok: true; publicKey: string } | { ok: false; error: string; message: string }> {
+  let value: string;
+  try {
+    value = await readFile(`${identity}.pub`, "utf8");
+  } catch (error) {
+    if (!isNodeError(error) || error.code !== "ENOENT") {
+      return { ok: false, error: "RUNTIME_SSH_IDENTITY_PUBLIC_KEY_FAILED", message: `Could not read the identity's .pub companion: ${errorMessage(error)}` };
+    }
+    let result: RuntimeSshProcessResult;
+    try {
+      result = await runner("ssh-keygen", ["-y", "-f", identity], "capture");
+    } catch (spawnError) {
+      return { ok: false, error: "RUNTIME_SSH_IDENTITY_PUBLIC_KEY_FAILED", message: `Could not derive the identity public key with ssh-keygen: ${errorMessage(spawnError)}` };
+    }
+    if (result.exitCode !== 0) {
+      return { ok: false, error: "RUNTIME_SSH_IDENTITY_PUBLIC_KEY_FAILED", message: "ssh-keygen could not derive an Ed25519 public key from the selected identity." };
+    }
+    value = result.stdout;
+  }
+  try {
+    return { ok: true, publicKey: normalizeEd25519PublicKey(value) };
+  } catch {
+    return { ok: false, error: "RUNTIME_SSH_IDENTITY_NOT_ED25519", message: "The selected identity must have a canonical Ed25519 public key." };
+  }
+}
+
+function normalizeEd25519PublicKey(value: string): string {
+  const parts = value.trim().split(/\s+/u);
+  if (parts.length < 2 || parts[0] !== "ssh-ed25519") throw new Error("not Ed25519");
+  const blob = Buffer.from(parts[1], "base64");
+  if (
+    blob.length !== 51
+    || blob.readUInt32BE(0) !== 11
+    || blob.subarray(4, 15).toString("ascii") !== "ssh-ed25519"
+    || blob.readUInt32BE(15) !== 32
+    || blob.toString("base64") !== parts[1]
+  ) throw new Error("malformed Ed25519 key");
+  return `ssh-ed25519 ${parts[1]}`;
+}
+
+function sshFingerprint(publicKey: string): string {
+  const encoded = normalizeEd25519PublicKey(publicKey).split(" ")[1];
+  return `SHA256:${createHash("sha256").update(Buffer.from(encoded, "base64")).digest("base64").replace(/=+$/u, "")}`;
+}
+
+async function inspectKnownHost(
+  knownHostsFile: string,
+  alias: string,
+  publicKey: string
+): Promise<{ ok: true; exists: boolean } | { ok: false; error: string; message: string }> {
+  try {
+    const metadata = await lstat(knownHostsFile);
+    if (!metadata.isFile() || metadata.isSymbolicLink() || (metadata.mode & 0o777) !== 0o600) {
+      return { ok: false, error: "RUNTIME_SSH_KNOWN_HOSTS_UNSAFE", message: `The Liskov known_hosts file must be a regular mode-0600 file: ${knownHostsFile}` };
+    }
+    const content = await readFile(knownHostsFile, "utf8");
+    const entries = content.split("\n").filter((line) => line.split(/\s+/u)[0] === alias);
+    if (entries.some((line) => line !== `${alias} ${publicKey}`)) {
+      return { ok: false, error: "RUNTIME_SSH_HOST_KEY_MISMATCH", message: `The pinned host key for ${alias} does not match the signed runtime host evidence.` };
+    }
+    return { ok: true, exists: entries.length > 0 };
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") return { ok: true, exists: false };
+    return { ok: false, error: "RUNTIME_SSH_KNOWN_HOSTS_READ_FAILED", message: `Could not inspect the Liskov known_hosts file: ${errorMessage(error)}` };
+  }
+}
+
+async function persistKnownHost(
+  knownHostsFile: string,
+  alias: string,
+  publicKey: string
+): Promise<{ ok: true } | { ok: false; error: string; message: string }> {
+  const inspected = await inspectKnownHost(knownHostsFile, alias, publicKey);
+  if (!inspected.ok) return inspected;
+  if (inspected.exists) return { ok: true };
+  try {
+    const directory = path.dirname(knownHostsFile);
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    let existing = "";
+    try {
+      existing = await readFile(knownHostsFile, "utf8");
+    } catch (error) {
+      if (!isNodeError(error) || error.code !== "ENOENT") throw error;
+    }
+    const suffix = existing === "" || existing.endsWith("\n") ? "" : "\n";
+    const temporary = path.join(directory, `.runtime-ssh-known-hosts-${randomBytes(12).toString("hex")}.tmp`);
+    await writeFile(temporary, `${existing}${suffix}${alias} ${publicKey}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
+    await rename(temporary, knownHostsFile);
+    await chmod(knownHostsFile, 0o600);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: "RUNTIME_SSH_KNOWN_HOSTS_WRITE_FAILED", message: `Could not atomically pin the managed runtime host key: ${errorMessage(error)}` };
+  }
+}
+
+function writeHostTrustNotice(
+  options: RuntimeSshCliOptions,
+  connection: ManagedConnection,
+  selectedFingerprint: string
+): void {
+  const message = [
+    "Managed Runtime SSH first-use host-key confirmation:",
+    `  application: ${connection.applicationId} (${connection.applicationUid})`,
+    `  deployment: ${connection.liskovDeploymentId} / ${connection.deploymentId}`,
+    `  job: ${connection.liskovJobId} / ${connection.jobId}`,
+    `  host key: ${connection.host.fingerprint}`,
+    `  identity: ${selectedFingerprint}`,
+    `  trust: ${connection.trust.claim}`
+  ].join("\n");
+  (options.stderr ?? console.error)(message);
+}
+
+async function confirmHostKey(options: RuntimeSshCliOptions, json: boolean | undefined): Promise<boolean> {
+  if (options.confirmHostKey) return await options.confirmHostKey("Accept and pin this host key? [yes/no] ");
+  if (json || !process.stdin.isTTY || !process.stderr.isTTY) return false;
+  const terminal = createInterface({ input: process.stdin, output: process.stderr, terminal: true });
+  try {
+    return (await terminal.question("Accept and pin this host key? Type yes to continue: ")).trim().toLowerCase() === "yes";
+  } finally {
+    terminal.close();
+  }
+}
+
+function validManagedTicket(ticket: ManagedTicketResponse["ticket"]): ticket is NonNullable<ManagedTicketResponse["ticket"]> {
+  if (!ticket) return false;
+  let gateway: URL;
+  try {
+    gateway = new URL(ticket.gatewayUrl);
+  } catch {
+    return false;
+  }
+  return gateway.protocol === "wss:"
+    && gateway.hostname !== ""
+    && gateway.username === ""
+    && gateway.password === ""
+    && gateway.pathname === "/"
+    && gateway.search === ""
+    && gateway.hash === ""
+    && /^[A-Za-z0-9_-]{1,256}$/u.test(ticket.tunnelId)
+    && ticket.protocol === "liskov-access.v1"
+    && /^[\x21-\x7e]{1,16384}$/u.test(ticket.bearerToken)
+    && Number.isSafeInteger(ticket.expiresAtMs)
+    && ticket.expiresAtMs > Date.now()
+    && ticket.limits.maxFrameBytes === 65_536
+    && ticket.limits.maxBytesPerDirection === 1_073_741_824
+    && ticket.limits.maxDurationMs === 7_200_000;
+}
+
+function shellQuote(value: string): string {
+  if (value.includes("\0")) throw new Error("NUL is not shell-safe");
+  return `'${value.replaceAll("'", `'"'"'`)}'`;
+}
+
+function installSignalCleanup(directory: string): () => void {
+  const signals: NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGHUP"];
+  const handlers = new Map<NodeJS.Signals, () => void>();
+  for (const signal of signals) {
+    const handler = (): void => {
+      for (const [registeredSignal, registered] of handlers) process.off(registeredSignal, registered);
+      void rm(directory, { recursive: true, force: true }).finally(() => process.kill(process.pid, signal));
+    };
+    handlers.set(signal, handler);
+    process.once(signal, handler);
+  }
+  return () => {
+    for (const [signal, handler] of handlers) process.off(signal, handler);
+  };
+}
+
+function validDescriptorId(value: unknown): value is string {
+  return typeof value === "string" && value.length >= 1 && value.length <= 512 && !/[\0-\x1f\x7f]/u.test(value);
+}
+
+function validSha256(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
 }
 
 function readCurrentTailnet(output: string): string | undefined {
