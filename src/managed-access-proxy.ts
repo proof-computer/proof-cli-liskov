@@ -4,9 +4,9 @@ import type { Readable, Writable } from "node:stream";
 
 import WebSocket, { type RawData } from "ws";
 
-export const ACCESS_SUBPROTOCOL = "liskov-access.v0";
+export const ACCESS_SUBPROTOCOL = "liskov-access.v1";
 export const MAX_ACCESS_FRAME_BYTES = 64 * 1024;
-const MAX_TOKEN_BYTES = 1024;
+const MAX_TOKEN_BYTES = 16 * 1024;
 
 export class ManagedAccessProxyError extends Error {
   constructor(public readonly code: string) {
@@ -61,7 +61,7 @@ export function validateTunnelId(value: string): string {
 export function buildSessionEndpoint(gateway: string, tunnelId: string): string {
   const origin = validateGatewayOrigin(gateway);
   const id = validateTunnelId(tunnelId);
-  origin.pathname = `/v0/sessions/${id}`;
+  origin.pathname = `/v1/sessions/${id}`;
   return origin.toString();
 }
 
