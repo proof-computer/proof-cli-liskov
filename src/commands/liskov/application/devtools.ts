@@ -1,6 +1,6 @@
-import { Command } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../organization-context.js";
 
-export default class SlipwayApplicationDevtools extends Command {
+export default class SlipwayApplicationDevtools extends OrganizationScopedCommand {
   static description = "Inspect Liskov Applications in Acurast DevTools.";
   static examples = [
     "<%= config.bin %> liskov application devtools view-key proof-docs 66059"

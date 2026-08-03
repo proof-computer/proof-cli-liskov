@@ -31,6 +31,7 @@ try {
   const loginHelp = run(process.execPath, [proofDevBin, "liskov", "login", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(loginHelp.stdout, "Start Liskov CLI login");
   assertIncludes(loginHelp.stdout, "--no-browser");
+  assertExcludes(loginHelp.stdout, "--organization");
 
   const applicationHelp = run(process.execPath, [proofDevBin, "liskov", "application", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationHelp.stdout, "Read Liskov Application state");
@@ -42,6 +43,8 @@ try {
   assertIncludes(applicationLogsHelp.stdout, "Read recent Liskov Application logs");
   assertIncludes(applicationLogsHelp.stdout, "--origin");
   assertIncludes(applicationLogsHelp.stdout, "runtime-ssh");
+  assertIncludes(applicationLogsHelp.stdout, "--organization <selector>");
+  assertIncludes(applicationLogsHelp.stdout, "LISKOV_ORGANIZATION");
 
   const applicationListHelp = run(process.execPath, [proofDevBin, "liskov", "application", "list", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationListHelp.stdout, "List readable Liskov Applications");
@@ -51,6 +54,10 @@ try {
   assertIncludes(organizationUseHelp.stdout, "Select the active organization");
   assertIncludes(organizationUseHelp.stdout, "ORG_ID");
   assertIncludes(organizationUseHelp.stdout, "--json");
+  assertIncludes(organizationUseHelp.stdout, "--organization <selector>");
+
+  const organizationListHelp = run(process.execPath, [proofDevBin, "liskov", "organization", "list", "--help"], { cwd: proofCliRoot, env });
+  assertExcludes(organizationListHelp.stdout, "--organization");
 
   const applicationBackfillIdentitiesHelp = run(process.execPath, [proofDevBin, "liskov", "application", "backfill-identities", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationBackfillIdentitiesHelp.stdout, "Backfill Liskov Application identity fields");
@@ -123,6 +130,10 @@ try {
   assertIncludes(runtimeImageWorkflowHelp.stdout, "APP_ID");
   assertIncludes(runtimeImageWorkflowHelp.stdout, "--manifest=<value>");
   assertIncludes(runtimeImageWorkflowHelp.stdout, "(required)");
+  assertExcludes(runtimeImageWorkflowHelp.stdout, "--organization");
+
+  const manifestValidateHelp = run(process.execPath, [proofDevBin, "liskov", "application", "manifest", "validate", "--help"], { cwd: proofCliRoot, env });
+  assertExcludes(manifestValidateHelp.stdout, "--organization");
 
   const custodyHelp = run(process.execPath, [proofDevBin, "liskov", "custody", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(custodyHelp.stdout, "Operate Liskov live custody");
@@ -146,6 +157,7 @@ try {
   assertIncludes(reconcileHelp.stdout, "--expect-deployment");
   assertIncludes(reconcileHelp.stdout, "--expect-job");
   assertIncludes(reconcileHelp.stdout, "--yes");
+  assertExcludes(reconcileHelp.stdout, "--organization <selector>");
 
   const deploySpendResolveHelp = run(process.execPath, [proofDevBin, "liskov", "admin", "deploy-spend", "resolve", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(deploySpendResolveHelp.stdout, "Resolve a deploy-spend review hold");
@@ -157,6 +169,7 @@ try {
   const whoamiHelp = run(process.execPath, [proofDevBin, "liskov", "whoami", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(whoamiHelp.stdout, "Read the current Liskov CLI session");
   assertIncludes(whoamiHelp.stdout, "--json");
+  assertIncludes(whoamiHelp.stdout, "--organization <selector>");
 
   const logoutHelp = run(process.execPath, [proofDevBin, "liskov", "logout", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(logoutHelp.stdout, "Remove the local Liskov CLI session");

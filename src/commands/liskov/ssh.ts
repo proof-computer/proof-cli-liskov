@@ -1,8 +1,9 @@
-import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+import { Args, Flags, type Interfaces } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../organization-context.js";
 
 import { runRuntimeSshConnection } from "../../runtime-ssh.js";
 
-export default class LiskovSsh extends Command {
+export default class LiskovSsh extends OrganizationScopedCommand {
   static args = { app: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true }) };
   static description = "Connect to an exact ready runtime through your existing Tailscale login.";
   static examples = [
@@ -31,7 +32,7 @@ export default class LiskovSsh extends Command {
       config: flags.config as string | undefined,
       json: flags.json as boolean | undefined,
       slipwayUrl: flags["slipway-url"] as string | undefined
-    }, { stdout: (line) => this.log(line), stderr: (line) => this.warn(line) });
+    }, { organization: flags.organization as string | undefined, stdout: (line) => this.log(line), stderr: (line) => this.warn(line) });
     if (code !== 0) this.exit(code);
   }
 }

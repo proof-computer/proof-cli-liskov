@@ -1,6 +1,6 @@
-import { Command } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../organization-context.js";
 
-export default class SlipwayCustodyEnvironment extends Command {
+export default class SlipwayCustodyEnvironment extends OrganizationScopedCommand {
   static description = "Manage encrypted live custody environment handoffs.";
   static summary = "Manage encrypted live custody environment handoffs.";
 

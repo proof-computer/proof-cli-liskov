@@ -4,6 +4,7 @@ import path from "node:path";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packageJson = JSON.parse(await readFile(path.join(repoRoot, "package.json"), "utf8"));
+const oclifManifest = JSON.parse(await readFile(path.join(repoRoot, "oclif.manifest.json"), "utf8"));
 
 const requiredArtifacts = [
   "dist/commands/liskov.js",
@@ -46,6 +47,7 @@ const requiredArtifacts = [
   "dist/commands/liskov/logout.js",
   "dist/commands/liskov/whoami.js",
   "dist/index.js",
+  "dist/organization-context.js",
   "dist/session.js",
   "oclif.manifest.json",
   "README.md"
@@ -120,6 +122,42 @@ const dependencyBlocks = [
 for (const forbidden of forbiddenDependencies) {
   if (dependencyBlocks.some((block) => Object.hasOwn(block, forbidden))) {
     errors.push(`Liskov plugin must not depend on sibling product package ${forbidden}`);
+  }
+}
+
+const locallyUnscopedCommands = new Set([
+  "liskov:login",
+  "liskov:logout",
+  "liskov:organization:list",
+  "liskov:application:manifest:validate",
+  "liskov:application:runtime-image:workflow"
+]);
+const scopedLeafCommands = Object.values(oclifManifest.commands).filter((command) => {
+  if (!command.strict || locallyUnscopedCommands.has(command.id)) return false;
+  return command.id === "liskov:whoami" ||
+    command.id === "liskov:ssh" ||
+    command.id.startsWith("liskov:application:") ||
+    command.id.startsWith("liskov:custody:") ||
+    command.id.startsWith("liskov:organization:billing") ||
+    command.id === "liskov:organization:service-credits" ||
+    command.id === "liskov:organization:use" ||
+    command.id.startsWith("liskov:runtime-ssh:integration:");
+});
+for (const command of scopedLeafCommands) {
+  const organizationFlag = command.flags?.organization;
+  if (organizationFlag?.env !== "LISKOV_ORGANIZATION" || organizationFlag.char !== undefined) {
+    errors.push(`${command.id} must expose --organization with LISKOV_ORGANIZATION and no short alias`);
+  }
+}
+
+const unscopedCommands = Object.values(oclifManifest.commands).filter((command) =>
+  locallyUnscopedCommands.has(command.id) ||
+  command.id === "liskov:access:proxy" ||
+  command.id.startsWith("liskov:admin:")
+);
+for (const command of unscopedCommands) {
+  if (command.flags?.organization !== undefined) {
+    errors.push(`${command.id} must not expose --organization`);
   }
 }
 

@@ -1,6 +1,6 @@
-import { Command } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../organization-context.js";
 
-export default class SlipwayApplicationRuntimeImage extends Command {
+export default class SlipwayApplicationRuntimeImage extends OrganizationScopedCommand {
   static description = "Manage Liskov Application runtime-image upload wiring.";
   static examples = [
     "<%= config.bin %> liskov application runtime-image workflow proof-docs --manifest .liskov/proof-docs.json --output .github/workflows/liskov-runtime-image.yml"

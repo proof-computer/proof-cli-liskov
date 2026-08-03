@@ -1,6 +1,6 @@
-import { Command } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../organization-context.js";
 
-export default class SlipwayCustodyAccount extends Command {
+export default class SlipwayCustodyAccount extends OrganizationScopedCommand {
   static description = "Manage Liskov live custody accounts.";
   static summary = "Manage Liskov live custody accounts.";
 

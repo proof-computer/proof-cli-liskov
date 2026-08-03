@@ -1,6 +1,6 @@
-import { Command } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../organization-context.js";
 
-export default class SlipwayApplicationDeployment extends Command {
+export default class SlipwayApplicationDeployment extends OrganizationScopedCommand {
   static description = "Manage Liskov Application deployment imports.";
   static examples = [
     "<%= config.bin %> liskov application deployment import proof-docs --sequence 701 --origin 5..."

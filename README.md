@@ -13,6 +13,8 @@ proof liskov organization billing transactions org-123 --limit 25 --before 17192
 proof liskov application manifest validate --file .slipway/application-policy.json
 proof liskov application import --github proof-computer/docs:.slipway/application-policy.json@main --server-fetch
 proof liskov application list
+proof liskov application list --organization org-123
+LISKOV_ORGANIZATION=team-slug proof liskov application status proof-docs
 proof liskov application status proof-docs
 proof liskov application plans proof-docs --json
 proof liskov application logs proof-docs --limit 100
@@ -68,12 +70,19 @@ the server's readable-Application checks. The private `liskov:ops` sr25519
 login remains an operator recovery path, not the normal builder-facing command.
 
 Organization billing, Service Credit, and billing-transaction commands are
-read-only projections of the existing Liskov routes. `organization use ORG_ID`
-changes only the selected organization on the existing server-side session.
-Their `--json` output is the raw response object. Human transaction rows omit
-provider references and memos. Execution-history reads remain unbounded when
-pagination flags are omitted; human output reports returned count, total, and
-next offset.
+read-only projections of the existing Liskov routes. Network-backed
+organization-scoped commands accept an exact organization ID or slug through
+`--organization SELECTOR` or `LISKOV_ORGANIZATION`. The flag takes precedence
+over the environment, and both override only the current command; otherwise
+the saved session organization is used. Existing positional organization
+selectors take precedence over both sources. `organization use [SELECTOR]` is
+the one command that intentionally changes the selected organization on the
+server-side session. `organization list`, login/logout, access/admin commands,
+local manifest validation, and local workflow generation are unscoped. The
+billing commands' `--json` output is the raw response object. Human transaction
+rows omit provider references and memos. Execution-history reads remain
+unbounded when pagination flags are omitted; human output reports returned
+count, total, and next offset.
 
 Application logging is opt-in through Manifest V4
 `observability.logs.enabled`. Liskov provisions and reads it as a managed

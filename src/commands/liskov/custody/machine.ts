@@ -1,6 +1,6 @@
-import { Command } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../organization-context.js";
 
-export default class SlipwayCustodyMachine extends Command {
+export default class SlipwayCustodyMachine extends OrganizationScopedCommand {
   static description = "Read Acurast machine-class data from Liskov.";
   static summary = "Read Acurast machine-class data.";
 

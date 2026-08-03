@@ -1,6 +1,6 @@
-import { Command } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../organization-context.js";
 
-export default class SlipwayApplicationLockbox extends Command {
+export default class SlipwayApplicationLockbox extends OrganizationScopedCommand {
   static description = "Read Liskov Application Lockbox state.";
   static strict = false;
   static summary = "Read Liskov Application Lockbox state.";

@@ -1,8 +1,9 @@
-import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+import { Args, Flags, type Interfaces } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../../organization-context.js";
 
 import { runSlipwayApplicationArtifactPinRestore } from "../../../../session.js";
 
-export default class SlipwayApplicationArtifactPinRestore extends Command {
+export default class SlipwayApplicationArtifactPinRestore extends OrganizationScopedCommand {
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true }),
     pin_id: Args.string({ description: "Artifact pin id to restore.", required: true })
@@ -30,7 +31,7 @@ export default class SlipwayApplicationArtifactPinRestore extends Command {
       pinId: args.pin_id,
       slipwayUrl: flags["slipway-url"] as string | undefined,
       yes: flags.yes as boolean | undefined
-    }, { stdout: (line) => this.log(line) });
+    }, { organization: flags.organization as string | undefined, stdout: (line) => this.log(line) });
     if (code !== 0) this.exit(code);
   }
 }
