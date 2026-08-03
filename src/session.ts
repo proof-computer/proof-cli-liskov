@@ -30,6 +30,12 @@ import {
   formatOrganizationTransactions,
   formatOrganizationUse
 } from "./organization-output.js";
+import {
+  canonicalOrganizationId,
+  organizationRequestHeaders,
+  organizationSelector,
+  OrganizationSelectorError
+} from "./organization-context.js";
 import { validateApplicationManifestV4 } from "./application-policy.js";
 import {
   formatApplicationLogs,
@@ -47,6 +53,7 @@ const DEFAULT_RUNTIME_IMAGE_ACTIONS_REF =
 export interface SlipwayCliOptions {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
+  organization?: string;
   environmentHandoffBuilder?: (input: SlipwayEnvironmentHandoffBuildInput) => Promise<SlipwayEncryptedEnvironmentHandoff>;
   openBrowser?: (url: string) => boolean | Promise<boolean>;
   sleepMs?: (ms: number) => Promise<void>;
@@ -145,28 +152,28 @@ export interface SlipwayOrganizationListInput {
 }
 
 export interface SlipwayOrganizationUseInput {
-  organizationId: string;
+  organizationId?: string;
   slipwayUrl?: string;
   config?: string;
   json?: boolean;
 }
 
 export interface SlipwayOrganizationBillingInput {
-  organizationId: string;
+  organizationId?: string;
   slipwayUrl?: string;
   config?: string;
   json?: boolean;
 }
 
 export interface SlipwayOrganizationServiceCreditsInput {
-  organizationId: string;
+  organizationId?: string;
   slipwayUrl?: string;
   config?: string;
   json?: boolean;
 }
 
 export interface SlipwayOrganizationTransactionsInput {
-  organizationId: string;
+  organizationId?: string;
   limit?: number;
   beforeMs?: number;
   slipwayUrl?: string;
@@ -672,6 +679,11 @@ interface SlipwayApiSessionResponse {
   session?: PublicSlipwaySession;
   organization?: LiskovOrganizationSummary;
   organizations?: LiskovOrganizationSummary[];
+  organizationContext?: {
+    source: "request" | "session";
+    effective: LiskovOrganizationSummary;
+    sessionDefault: LiskovOrganizationSummary | null;
+  };
   error?: string;
   reason?: string;
 }
@@ -1150,6 +1162,12 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
 
 export async function runSlipwayWhoami(input: SlipwayWhoamiInput, options: SlipwayCliOptions = {}): Promise<number> {
   const env = options.env ?? process.env;
+  let requestOrganization: string | undefined;
+  try {
+    requestOrganization = organizationSelector(options.organization);
+  } catch (error) {
+    return writeOrganizationSelectorError(options, input.json, error);
+  }
   const sessionFile = resolveSlipwaySessionFile({ config: input.config, env });
   const saved = await readSlipwaySession(sessionFile);
   if (!saved) {
@@ -1164,14 +1182,17 @@ export async function runSlipwayWhoami(input: SlipwayWhoamiInput, options: Slipw
 
   const slipwayUrl = normalizeBaseUrl(input.slipwayUrl ?? saved.slipwayUrl);
   const fetchImpl = options.fetchImpl ?? fetch;
+  let headers: Record<string, string>;
+  try {
+    headers = organizationRequestHeaders(saved.sessionToken, requestOrganization);
+  } catch (error) {
+    return writeOrganizationSelectorError(options, input.json, error);
+  }
   let response: Response;
   try {
     response = await fetchImpl(new URL("/api/session", slipwayUrl), {
       method: "GET",
-      headers: {
-        accept: "application/json",
-        authorization: `Bearer ${saved.sessionToken}`
-      }
+      headers
     });
   } catch (error) {
     writeStructuredOrHuman(options, input.json, {
@@ -1186,7 +1207,12 @@ export async function runSlipwayWhoami(input: SlipwayWhoamiInput, options: Slipw
 
   const body = await readJsonResponse<SlipwayApiSessionResponse>(response);
   if (!response.ok || body?.ok !== true || !body.session) {
-    const error = response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_SESSION_READ_FAILED";
+    if (writeOrganizationServerFailure(options, input.json, body)) return 1;
+    const error = response.status === 401
+      ? "SLIPWAY_SESSION_UNAUTHORIZED"
+      : body?.error === "invalid_organization_selector" || body?.error === "not_a_member"
+        ? body.error
+        : "SLIPWAY_SESSION_READ_FAILED";
     writeStructuredOrHuman(options, input.json, {
       ok: false,
       error,
@@ -1210,12 +1236,20 @@ export async function runSlipwayWhoami(input: SlipwayWhoamiInput, options: Slipw
     sessionFile,
     session: body.session,
     organization: body.organization,
-    organizations: body.organizations
+    organizations: body.organizations,
+    organizationContext: body.organizationContext
   }, [
     `Logged in to ${slipwayUrl} as ${formatSessionIdentity(body.session)}.`,
-    body.organization
-      ? `Active organization: ${body.organization.name} (${body.organization.id}, ${body.organization.slug}, role ${body.organization.role}).`
-      : undefined
+    (body.organizationContext?.effective ?? body.organization)
+      ? `Effective organization: ${formatOrganizationIdentity((body.organizationContext?.effective ?? body.organization)!)}.`
+      : undefined,
+    body.organizationContext
+      ? body.organizationContext.sessionDefault
+        ? `Persistent organization: ${formatOrganizationIdentity(body.organizationContext.sessionDefault)}.`
+        : "Persistent organization: unavailable (the stored selection is not an active membership)."
+      : body.organization
+        ? `Persistent organization: ${formatOrganizationIdentity(body.organization)}.`
+        : undefined
   ].filter((line): line is string => line !== undefined).join(" "));
   return 0;
 }
@@ -1304,6 +1338,7 @@ export async function runSlipwayOrganizationList(
 ): Promise<number> {
   return runSlipwayOrganizationRead(input, {
     path: organizationListPath(),
+    organizationSelector: null,
     errorCode: "SLIPWAY_ORGANIZATION_LIST_FAILED",
     fetchFailedMessage: "could not list Liskov organizations",
     validate: isOrganizationListResponse,
@@ -1316,13 +1351,16 @@ export async function runSlipwayOrganizationUse(
   options: SlipwayCliOptions = {}
 ): Promise<number> {
   const errorCode = "SLIPWAY_ORGANIZATION_USE_FAILED";
+  const organization = await resolveExplicitOrganization(input, options, errorCode);
+  if (!organization.ok) return organization.exitCode;
   const request = await authenticatedSlipwayJsonRequest<LiskovOrganizationUseResponse>({
     config: input.config,
     slipwayUrl: input.slipwayUrl,
     json: input.json,
     method: "POST",
     path: organizationUsePath(),
-    body: { organizationId: input.organizationId },
+    body: { organizationId: organization.organizationId },
+    organizationSelector: null,
     requestErrorCode: errorCode,
     notFoundMessage: "No Liskov CLI session is stored locally.",
     fetchFailedMessage: "could not select the active Liskov organization"
@@ -1355,8 +1393,11 @@ export async function runSlipwayOrganizationBilling(
   input: SlipwayOrganizationBillingInput,
   options: SlipwayCliOptions = {}
 ): Promise<number> {
+  const organization = await resolveExplicitOrganization(input, options, "SLIPWAY_ORGANIZATION_BILLING_FAILED");
+  if (!organization.ok) return organization.exitCode;
   return runSlipwayOrganizationRead(input, {
-    path: organizationBillingPath(input.organizationId),
+    path: organizationBillingPath(organization.organizationId),
+    organizationSelector: null,
     errorCode: "SLIPWAY_ORGANIZATION_BILLING_FAILED",
     fetchFailedMessage: "could not read Liskov organization billing",
     validate: isOrganizationBillingResponse,
@@ -1368,8 +1409,11 @@ export async function runSlipwayOrganizationServiceCredits(
   input: SlipwayOrganizationServiceCreditsInput,
   options: SlipwayCliOptions = {}
 ): Promise<number> {
+  const organization = await resolveExplicitOrganization(input, options, "SLIPWAY_ORGANIZATION_SERVICE_CREDITS_FAILED");
+  if (!organization.ok) return organization.exitCode;
   return runSlipwayOrganizationRead(input, {
-    path: organizationServiceCreditsPath(input.organizationId),
+    path: organizationServiceCreditsPath(organization.organizationId),
+    organizationSelector: null,
     errorCode: "SLIPWAY_ORGANIZATION_SERVICE_CREDITS_FAILED",
     fetchFailedMessage: "could not read Liskov organization Service Credits",
     validate: isOrganizationServiceCreditsResponse,
@@ -1381,16 +1425,73 @@ export async function runSlipwayOrganizationTransactions(
   input: SlipwayOrganizationTransactionsInput,
   options: SlipwayCliOptions = {}
 ): Promise<number> {
+  const organization = await resolveExplicitOrganization(input, options, "SLIPWAY_ORGANIZATION_TRANSACTIONS_FAILED");
+  if (!organization.ok) return organization.exitCode;
   return runSlipwayOrganizationRead(input, {
-    path: organizationTransactionsPath(input.organizationId, {
+    path: organizationTransactionsPath(organization.organizationId, {
       limit: input.limit,
       beforeMs: input.beforeMs
     }),
+    organizationSelector: null,
     errorCode: "SLIPWAY_ORGANIZATION_TRANSACTIONS_FAILED",
     fetchFailedMessage: "could not list Liskov organization billing transactions",
     validate: isOrganizationTransactionsResponse,
-    format: (body) => formatOrganizationTransactions(input.organizationId, body)
+    format: (body) => formatOrganizationTransactions(organization.organizationId, body)
   }, options);
+}
+
+async function resolveExplicitOrganization(
+  input: { organizationId?: string; config?: string; slipwayUrl?: string; json?: boolean },
+  options: SlipwayCliOptions,
+  errorCode: string
+): Promise<{ ok: true; organizationId: string } | { ok: false; exitCode: number }> {
+  let selector: string;
+  try {
+    selector = organizationSelector(input.organizationId ?? options.organization, { required: true })!;
+  } catch (error) {
+    return { ok: false, exitCode: writeOrganizationSelectorError(options, input.json, error) };
+  }
+  const request = await authenticatedSlipwayRequest<unknown>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: organizationListPath(),
+    organizationSelector: null,
+    requestErrorCode: errorCode,
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not resolve the Liskov organization selector"
+  }, options);
+  if (!request.ok) return request;
+  if (!request.response.ok) {
+    return {
+      ok: false,
+      exitCode: writeCommandResponse({
+        body: request.body as { ok?: boolean; error?: string; reason?: string } | undefined,
+        response: request.response,
+        errorCode,
+        json: input.json,
+        human: () => "Liskov organization resolution failed.",
+        options
+      })
+    };
+  }
+  if (!isOrganizationListResponse(request.body)) {
+    return {
+      ok: false,
+      exitCode: writeMalformedReadResponse(errorCode, request.response, input.json, options)
+    };
+  }
+  const organizationId = canonicalOrganizationId(selector, request.body.organizations);
+  if (organizationId === undefined) {
+    writeStructuredOrHuman(
+      options,
+      input.json,
+      { ok: false, error: "not_a_member", selector },
+      `Error (not_a_member): no active organization membership exactly matches ${selector}.`
+    );
+    return { ok: false, exitCode: 1 };
+  }
+  return { ok: true, organizationId };
 }
 
 async function runSlipwayOrganizationRead<
@@ -1399,6 +1500,7 @@ async function runSlipwayOrganizationRead<
   input: { config?: string; slipwayUrl?: string; json?: boolean },
   command: {
     path: string;
+    organizationSelector?: string | null;
     errorCode: string;
     fetchFailedMessage: string;
     validate: (value: unknown) => value is T;
@@ -1411,6 +1513,7 @@ async function runSlipwayOrganizationRead<
     slipwayUrl: input.slipwayUrl,
     json: input.json,
     path: command.path,
+    organizationSelector: command.organizationSelector,
     requestErrorCode: command.errorCode,
     notFoundMessage: "No Liskov CLI session is stored locally.",
     fetchFailedMessage: command.fetchFailedMessage
@@ -3470,6 +3573,12 @@ async function selectFreshRunOnePlanItem(
   if (!saved) return fail("session_not_found");
 
   const slipwayUrl = normalizeBaseUrl(input.slipwayUrl ?? saved.slipwayUrl);
+  let headers: Record<string, string>;
+  try {
+    headers = organizationRequestHeaders(saved.sessionToken, options.organization);
+  } catch (error) {
+    return { ok: false, exitCode: writeOrganizationSelectorError(options, input.json, error) };
+  }
   let response: Response;
   let preflight: SlipwayLiveCustodyCommandResponse | undefined;
   try {
@@ -3477,10 +3586,7 @@ async function selectFreshRunOnePlanItem(
       new URL(`/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/preflight`, slipwayUrl),
       {
         method: "GET",
-        headers: {
-          accept: "application/json",
-          authorization: `Bearer ${saved.sessionToken}`
-        }
+        headers
       }
     );
     preflight = await readJsonResponse<SlipwayLiveCustodyCommandResponse>(response);
@@ -3902,6 +4008,7 @@ async function authenticatedSlipwayRequest<T>(
     json?: boolean;
     path: string;
     authToken?: string;
+    organizationSelector?: string | null;
     requestErrorCode: string;
     notFoundMessage: string;
     fetchFailedMessage: string;
@@ -3918,6 +4025,16 @@ async function authenticatedSlipwayRequest<T>(
     }
   | { ok: false; exitCode: number }
 > {
+  let requestOrganization: string | undefined;
+  try {
+    requestOrganization = organizationSelector(
+      input.authToken === undefined
+        ? input.organizationSelector === undefined ? options.organization : input.organizationSelector ?? undefined
+        : undefined
+    );
+  } catch (error) {
+    return { ok: false, exitCode: writeOrganizationSelectorError(options, input.json, error) };
+  }
   const env = options.env ?? process.env;
   const sessionFile = resolveSlipwaySessionFile({ config: input.config, env });
   const saved = await readSlipwaySession(sessionFile);
@@ -3933,14 +4050,20 @@ async function authenticatedSlipwayRequest<T>(
 
   const slipwayUrl = normalizeBaseUrl(input.slipwayUrl ?? saved.slipwayUrl);
   const fetchImpl = options.fetchImpl ?? fetch;
+  let headers: Record<string, string>;
+  try {
+    headers = organizationRequestHeaders(
+      input.authToken ?? saved.sessionToken,
+      requestOrganization
+    );
+  } catch (error) {
+    return { ok: false, exitCode: writeOrganizationSelectorError(options, input.json, error) };
+  }
   let response: Response;
   try {
     response = await fetchImpl(new URL(input.path, slipwayUrl), {
       method: "GET",
-      headers: {
-        accept: "application/json",
-        authorization: `Bearer ${input.authToken ?? saved.sessionToken}`
-      }
+      headers
     });
   } catch (error) {
     writeStructuredOrHuman(options, input.json, {
@@ -3953,9 +4076,13 @@ async function authenticatedSlipwayRequest<T>(
     return { ok: false, exitCode: 1 };
   }
 
+  const body = await readJsonResponse<T>(response);
+  if (!response.ok && writeOrganizationServerFailure(options, input.json, body)) {
+    return { ok: false, exitCode: 1 };
+  }
   return {
     ok: true,
-    body: await readJsonResponse<T>(response),
+    body,
     response,
     slipwayUrl,
     sessionFile
@@ -3983,6 +4110,7 @@ async function authenticatedSlipwayJsonRequest<T>(
     path: string;
     body: unknown;
     authToken?: string;
+    organizationSelector?: string | null;
     requestErrorCode: string;
     notFoundMessage: string;
     fetchFailedMessage: string;
@@ -4000,6 +4128,16 @@ async function authenticatedSlipwayJsonRequest<T>(
     }
   | { ok: false; exitCode: number }
 > {
+  let requestOrganization: string | undefined;
+  try {
+    requestOrganization = organizationSelector(
+      input.authToken === undefined
+        ? input.organizationSelector === undefined ? options.organization : input.organizationSelector ?? undefined
+        : undefined
+    );
+  } catch (error) {
+    return { ok: false, exitCode: writeOrganizationSelectorError(options, input.json, error) };
+  }
   const env = options.env ?? process.env;
   const sessionFile = resolveSlipwaySessionFile({ config: input.config, env });
   const saved = await readSlipwaySession(sessionFile);
@@ -4015,15 +4153,23 @@ async function authenticatedSlipwayJsonRequest<T>(
 
   const slipwayUrl = normalizeBaseUrl(input.slipwayUrl ?? saved.slipwayUrl);
   const fetchImpl = options.fetchImpl ?? fetch;
+  let headers: Record<string, string>;
+  try {
+    headers = {
+      ...organizationRequestHeaders(
+        input.authToken ?? saved.sessionToken,
+        requestOrganization
+      ),
+      "content-type": "application/json"
+    };
+  } catch (error) {
+    return { ok: false, exitCode: writeOrganizationSelectorError(options, input.json, error) };
+  }
   let response: Response;
   try {
     response = await fetchImpl(new URL(input.path, slipwayUrl), {
       method: input.method,
-      headers: {
-        accept: "application/json",
-        authorization: `Bearer ${input.authToken ?? saved.sessionToken}`,
-        "content-type": "application/json"
-      },
+      headers,
       body: JSON.stringify(input.body)
     });
   } catch (error) {
@@ -4038,9 +4184,13 @@ async function authenticatedSlipwayJsonRequest<T>(
     return { ok: false, exitCode: 1 };
   }
 
+  const responseBody = await readJsonResponse<T>(response);
+  if (!response.ok && writeOrganizationServerFailure(options, input.json, responseBody)) {
+    return { ok: false, exitCode: 1 };
+  }
   return {
     ok: true,
-    body: await readJsonResponse<T>(response),
+    body: responseBody,
     response,
     slipwayUrl,
     sessionFile
@@ -4094,17 +4244,55 @@ function writeCommandResponse(input: {
   options: SlipwayCliOptions;
 }): number {
   if (!input.response.ok || input.body?.ok === false) {
-    const error = input.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : input.errorCode;
+    const error = input.response.status === 401
+      ? "SLIPWAY_SESSION_UNAUTHORIZED"
+      : input.body?.error === "invalid_organization_selector" || input.body?.error === "not_a_member"
+        ? input.body.error
+        : input.errorCode;
     writeStructuredOrHuman(input.options, input.json, {
       ok: false,
       error,
       status: input.response.status,
       reason: input.body?.reason ?? input.body?.error
-    }, `Error (${error}): Liskov request failed.`);
+    }, `Error (${error}): ${input.body?.reason ?? input.body?.error ?? "Liskov request failed."}`);
     return 1;
   }
   writeStructuredOrHuman(input.options, input.json, input.body, input.human(input.body));
   return 0;
+}
+
+function writeOrganizationSelectorError(
+  options: SlipwayCliOptions,
+  json: boolean | undefined,
+  error: unknown
+): number {
+  if (!(error instanceof OrganizationSelectorError)) throw error;
+  writeStructuredOrHuman(
+    options,
+    json,
+    { ok: false, error: error.code, message: error.message },
+    `Error (${error.code}): ${error.message}`
+  );
+  return 1;
+}
+
+function writeOrganizationServerFailure(
+  options: SlipwayCliOptions,
+  json: boolean | undefined,
+  body: unknown
+): boolean {
+  const response = objectRecord(body);
+  const error = stringValue(response.error);
+  if (error !== "invalid_organization_selector" && error !== "not_a_member") return false;
+  writeStructuredOrHuman(
+    options,
+    json,
+    body,
+    `Error (${error}): ${stringValue(response.reason) ?? (error === "not_a_member"
+      ? "The session does not have an active membership matching that exact organization selector."
+      : "The organization selector is invalid.")}`
+  );
+  return true;
 }
 
 function writeMalformedReadResponse(
@@ -5332,6 +5520,10 @@ function formatSessionIdentity(session: PublicSlipwaySession): string {
     return address ?? session.address ?? "wallet";
   }
   return session.address ?? session.sessionId ?? "unknown";
+}
+
+function formatOrganizationIdentity(organization: LiskovOrganizationSummary): string {
+  return `${organization.name} (${organization.id}, ${organization.slug}, role ${organization.role})`;
 }
 
 function errorMessage(error: unknown): string {

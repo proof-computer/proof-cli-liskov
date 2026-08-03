@@ -1,8 +1,9 @@
-import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+import { Args, Flags, type Interfaces } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../organization-context.js";
 
 import { runSlipwayApplicationRename } from "../../../session.js";
 
-export default class SlipwayApplicationRename extends Command {
+export default class SlipwayApplicationRename extends OrganizationScopedCommand {
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true }),
     display_name: Args.string({ description: "New human display name for the Application.", required: true })
@@ -34,6 +35,7 @@ export default class SlipwayApplicationRename extends Command {
       slipwayUrl: flags["slipway-url"] as string | undefined,
       yes: flags.yes as boolean | undefined
     }, {
+      organization: flags.organization as string | undefined,
       stdout: (line) => this.log(line)
     });
     if (code !== 0) this.exit(code);

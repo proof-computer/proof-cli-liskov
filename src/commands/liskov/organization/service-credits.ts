@@ -1,10 +1,11 @@
-import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+import { Args, Flags, type Interfaces } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../organization-context.js";
 
 import { runSlipwayOrganizationServiceCredits } from "../../../session.js";
 
-export default class LiskovOrganizationServiceCredits extends Command {
+export default class LiskovOrganizationServiceCredits extends OrganizationScopedCommand {
   static args = {
-    org_id: Args.string({ description: "Liskov organization ID.", required: true })
+    org_id: Args.string({ description: "Exact Liskov organization ID or slug.", required: false })
   };
   static description = "Read organization Service Credit balances.";
   static flags: Interfaces.FlagInput = {
@@ -22,7 +23,7 @@ export default class LiskovOrganizationServiceCredits extends Command {
       config: flags.config as string | undefined,
       json: flags.json as boolean | undefined,
       slipwayUrl: flags["slipway-url"] as string | undefined
-    }, { stdout: (line) => this.log(line) });
+    }, { organization: flags.organization as string | undefined, stdout: (line) => this.log(line) });
     if (code !== 0) this.exit(code);
   }
 }

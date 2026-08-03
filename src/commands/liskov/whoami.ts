@@ -1,8 +1,9 @@
-import { Command, Flags, type Interfaces } from "@oclif/core";
+import { Flags, type Interfaces } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../organization-context.js";
 
 import { runSlipwayWhoami } from "../../session.js";
 
-export default class SlipwayWhoami extends Command {
+export default class SlipwayWhoami extends OrganizationScopedCommand {
   static description = "Read the current Liskov CLI session.";
   static examples = [
     "<%= config.bin %> liskov whoami",
@@ -24,6 +25,7 @@ export default class SlipwayWhoami extends Command {
       json: flags.json as boolean | undefined,
       slipwayUrl: flags["slipway-url"] as string | undefined
     }, {
+      organization: flags.organization as string | undefined,
       stdout: (line) => this.log(line)
     });
     if (code !== 0) this.exit(code);

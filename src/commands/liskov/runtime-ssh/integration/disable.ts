@@ -1,11 +1,12 @@
-import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+import { Args, Flags, type Interfaces } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../../organization-context.js";
 
 import { runRuntimeSshIntegrationDisable } from "../../../../runtime-ssh.js";
 
-export default class RuntimeSshIntegrationDisable extends Command {
+export default class RuntimeSshIntegrationDisable extends OrganizationScopedCommand {
   static args = {
-    organization_id: Args.string({ description: "Liskov organization id.", required: true }),
-    integration_id: Args.string({ description: "Runtime SSH integration id.", required: true })
+    organization_id: Args.string({ description: "Organization selector when an integration ID follows; otherwise the integration ID.", required: false }),
+    integration_id: Args.string({ description: "Runtime SSH integration id.", required: false })
   };
   static description = "Disable a Runtime SSH integration and tear down its exact live attachments.";
   static flags: Interfaces.FlagInput = commonFlags();
@@ -14,12 +15,12 @@ export default class RuntimeSshIntegrationDisable extends Command {
   async run(): Promise<void> {
     const { args, flags } = await this.parse(RuntimeSshIntegrationDisable);
     const code = await runRuntimeSshIntegrationDisable({
-      organizationId: args.organization_id,
-      integrationId: args.integration_id,
+      organizationId: args.integration_id === undefined ? undefined : args.organization_id,
+      integrationId: args.integration_id ?? args.organization_id,
       config: flags.config as string | undefined,
       json: flags.json as boolean | undefined,
       slipwayUrl: flags["slipway-url"] as string | undefined
-    }, { stdout: (line) => this.log(line), stderr: (line) => this.warn(line) });
+    }, { organization: flags.organization as string | undefined, stdout: (line) => this.log(line), stderr: (line) => this.warn(line) });
     if (code !== 0) this.exit(code);
   }
 }

@@ -1,8 +1,9 @@
-import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+import { Args, Flags, type Interfaces } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../../organization-context.js";
 
 import { runSlipwayApplicationDevtoolsViewKey } from "../../../../session.js";
 
-export default class SlipwayApplicationDevtoolsViewKey extends Command {
+export default class SlipwayApplicationDevtoolsViewKey extends OrganizationScopedCommand {
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true }),
     deployment_id: Args.string({ description: "Acurast deployment id recorded for the Application.", required: true })
@@ -32,6 +33,7 @@ export default class SlipwayApplicationDevtoolsViewKey extends Command {
       json: flags.json as boolean | undefined,
       slipwayUrl: flags["slipway-url"] as string | undefined
     }, {
+      organization: flags.organization as string | undefined,
       stdout: (line) => this.log(line)
     });
     if (code !== 0) this.exit(code);

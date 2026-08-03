@@ -2,11 +2,19 @@ import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { emitKeypressEvents } from "node:readline";
 
+import { isOrganizationListResponse, organizationListPath } from "./organization-client.js";
+import {
+  canonicalOrganizationId,
+  organizationRequestHeaders,
+  organizationSelector,
+  OrganizationSelectorError
+} from "./organization-context.js";
 import { DEFAULT_SLIPWAY_URL, resolveSlipwaySessionFile, type SlipwaySessionFile } from "./session.js";
 
 export interface RuntimeSshCliOptions {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
+  organization?: string;
   readSecret?: (prompt: string) => Promise<string>;
   runProcess?: RuntimeSshProcessRunner;
   stdout?: (line: string) => void;
@@ -20,7 +28,7 @@ export interface RuntimeSshCommandInput {
 }
 
 export interface RuntimeSshIntegrationInput extends RuntimeSshCommandInput {
-  organizationId: string;
+  organizationId?: string;
   integrationId?: string;
 }
 
@@ -32,7 +40,7 @@ export interface RuntimeSshIntegrationCreateInput extends RuntimeSshIntegrationI
 }
 
 export interface RuntimeSshIntegrationRotateInput extends RuntimeSshIntegrationInput {
-  integrationId: string;
+  integrationId?: string;
   oauthClientId: string;
 }
 
@@ -99,9 +107,12 @@ export async function runRuntimeSshIntegrationList(
   input: RuntimeSshIntegrationInput,
   options: RuntimeSshCliOptions = {}
 ): Promise<number> {
+  const organization = await resolveRuntimeSshOrganization(input, options);
+  if (!organization.ok) return organization.exitCode;
   const response = await runtimeSshRequest<IntegrationResponse>(input, options, {
     method: "GET",
-    path: integrationCollectionPath(input.organizationId)
+    path: integrationCollectionPath(organization.organizationId),
+    organizationSelector: null
   });
   if (!response.ok) return response.exitCode;
   if (!response.response.ok || response.body?.ok !== true || !Array.isArray(response.body.integrations)) {
@@ -117,11 +128,14 @@ export async function runRuntimeSshIntegrationCreate(
   input: RuntimeSshIntegrationCreateInput,
   options: RuntimeSshCliOptions = {}
 ): Promise<number> {
+  const organization = await resolveRuntimeSshOrganization(input, options);
+  if (!organization.ok) return organization.exitCode;
   const secret = await readRequiredSecret("Tailscale OAuth client secret: ", options);
   if (!secret.ok) return secret.exitCode;
   const response = await runtimeSshRequest<IntegrationResponse>(input, options, {
     method: "POST",
-    path: integrationCollectionPath(input.organizationId),
+    path: integrationCollectionPath(organization.organizationId),
+    organizationSelector: null,
     body: {
       kind: "tailscale",
       name: input.name,
@@ -136,12 +150,17 @@ export async function runRuntimeSshIntegrationCreate(
 }
 
 export async function runRuntimeSshIntegrationValidate(
-  input: RuntimeSshIntegrationInput & { integrationId: string },
+  input: RuntimeSshIntegrationInput,
   options: RuntimeSshCliOptions = {}
 ): Promise<number> {
+  const integrationId = requiredIntegrationId(input, options);
+  if (!integrationId.ok) return integrationId.exitCode;
+  const organization = await resolveRuntimeSshOrganization(input, options);
+  if (!organization.ok) return organization.exitCode;
   const response = await runtimeSshRequest<IntegrationResponse>(input, options, {
     method: "POST",
-    path: `${integrationPath(input.organizationId, input.integrationId)}/validate`,
+    path: `${integrationPath(organization.organizationId, integrationId.integrationId)}/validate`,
+    organizationSelector: null,
     body: {}
   });
   return integrationMutationResult(input.json, options, response, "validated");
@@ -151,11 +170,16 @@ export async function runRuntimeSshIntegrationRotate(
   input: RuntimeSshIntegrationRotateInput,
   options: RuntimeSshCliOptions = {}
 ): Promise<number> {
+  const integrationId = requiredIntegrationId(input, options);
+  if (!integrationId.ok) return integrationId.exitCode;
+  const organization = await resolveRuntimeSshOrganization(input, options);
+  if (!organization.ok) return organization.exitCode;
   const secret = await readRequiredSecret("New Tailscale OAuth client secret: ", options);
   if (!secret.ok) return secret.exitCode;
   const response = await runtimeSshRequest<IntegrationResponse>(input, options, {
     method: "POST",
-    path: `${integrationPath(input.organizationId, input.integrationId)}/rotate`,
+    path: `${integrationPath(organization.organizationId, integrationId.integrationId)}/rotate`,
+    organizationSelector: null,
     body: { oauthClientId: input.oauthClientId, oauthClientSecret: secret.value }
   });
   secret.value = "";
@@ -163,12 +187,17 @@ export async function runRuntimeSshIntegrationRotate(
 }
 
 export async function runRuntimeSshIntegrationDisable(
-  input: RuntimeSshIntegrationInput & { integrationId: string },
+  input: RuntimeSshIntegrationInput,
   options: RuntimeSshCliOptions = {}
 ): Promise<number> {
+  const integrationId = requiredIntegrationId(input, options);
+  if (!integrationId.ok) return integrationId.exitCode;
+  const organization = await resolveRuntimeSshOrganization(input, options);
+  if (!organization.ok) return organization.exitCode;
   const response = await runtimeSshRequest<IntegrationResponse>(input, options, {
     method: "DELETE",
-    path: integrationPath(input.organizationId, input.integrationId),
+    path: integrationPath(organization.organizationId, integrationId.integrationId),
+    organizationSelector: null,
     body: {}
   });
   return integrationMutationResult(input.json, options, response, "disabled");
@@ -236,37 +265,43 @@ export async function runRuntimeSshConnection(
 async function runtimeSshRequest<T>(
   input: RuntimeSshCommandInput,
   options: RuntimeSshCliOptions,
-  request: { method: "DELETE" | "GET" | "POST"; path: string; body?: unknown }
-): Promise<{ ok: true; response: Response; body?: T } | { ok: false; exitCode: number }> {
-  const sessionFile = resolveSlipwaySessionFile({ config: input.config, env: options.env });
-  let session: SlipwaySessionFile;
-  try {
-    const parsed = JSON.parse(await readFile(sessionFile, "utf8")) as Partial<SlipwaySessionFile>;
-    if (parsed.version !== 1 || typeof parsed.slipwayUrl !== "string" || typeof parsed.sessionToken !== "string") {
-      throw new Error("session file is not version 1");
-    }
-    session = parsed as SlipwaySessionFile;
-  } catch (error) {
-    return { ok: false, exitCode: localFailure(input.json, options, "SLIPWAY_SESSION_NOT_FOUND", `No valid Liskov CLI session was found at ${sessionFile}. Run \`proof liskov login\` first. (${errorMessage(error)})`) };
+  request: {
+    method: "DELETE" | "GET" | "POST";
+    path: string;
+    body?: unknown;
+    organizationSelector?: string | null;
   }
-  let baseUrl: URL;
+): Promise<{ ok: true; response: Response; body?: T } | { ok: false; exitCode: number }> {
+  let requestOrganization: string | undefined;
   try {
-    baseUrl = new URL(input.slipwayUrl ?? session.slipwayUrl ?? DEFAULT_SLIPWAY_URL);
-  } catch {
-    return { ok: false, exitCode: localFailure(input.json, options, "SLIPWAY_URL_INVALID", "The Liskov service URL is invalid.") };
+    requestOrganization = organizationSelector(
+      request.organizationSelector === undefined ? options.organization : request.organizationSelector ?? undefined
+    );
+  } catch (error) {
+    return { ok: false, exitCode: organizationSelectorFailure(input.json, options, error) };
+  }
+  const context = await runtimeSshContext(input, options);
+  if (!context.ok) return context;
+  let headers: Record<string, string>;
+  try {
+    headers = organizationRequestHeaders(
+      context.session.sessionToken,
+      requestOrganization
+    );
+  } catch (error) {
+    return { ok: false, exitCode: organizationSelectorFailure(input.json, options, error) };
   }
   const init: RequestInit = {
     method: request.method,
     headers: {
-      accept: "application/json",
-      authorization: `Bearer ${session.sessionToken}`,
+      ...headers,
       ...(request.body === undefined ? {} : { "content-type": "application/json" })
     },
     ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) })
   };
   let response: Response;
   try {
-    response = await (options.fetchImpl ?? fetch)(new URL(request.path, baseUrl), init);
+    response = await (options.fetchImpl ?? fetch)(new URL(request.path, context.baseUrl), init);
   } catch (error) {
     return { ok: false, exitCode: localFailure(input.json, options, "RUNTIME_SSH_REQUEST_FAILED", `Could not contact Liskov: ${errorMessage(error)}`) };
   }
@@ -278,6 +313,106 @@ async function runtimeSshRequest<T>(
     body = undefined;
   }
   return { ok: true, response, body };
+}
+
+async function resolveRuntimeSshOrganization(
+  input: RuntimeSshIntegrationInput,
+  options: RuntimeSshCliOptions
+): Promise<{ ok: true; organizationId: string } | { ok: false; exitCode: number }> {
+  let selector: string;
+  try {
+    selector = organizationSelector(input.organizationId ?? options.organization, { required: true })!;
+  } catch (error) {
+    return { ok: false, exitCode: organizationSelectorFailure(input.json, options, error) };
+  }
+  const context = await runtimeSshContext(input, options);
+  if (!context.ok) return context;
+  let response: Response;
+  try {
+    response = await (options.fetchImpl ?? fetch)(new URL(organizationListPath(), context.baseUrl), {
+      method: "GET",
+      headers: organizationRequestHeaders(context.session.sessionToken, undefined)
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      exitCode: localFailure(input.json, options, "RUNTIME_SSH_REQUEST_FAILED", `Could not resolve the Liskov organization: ${errorMessage(error)}`)
+    };
+  }
+  const body = await readRuntimeSshJson(response);
+  if (!response.ok) {
+    return {
+      ok: false,
+      exitCode: apiFailure(
+        input.json,
+        options,
+        response.status,
+        typeof body?.error === "string" ? body.error : undefined
+      )
+    };
+  }
+  if (!isOrganizationListResponse(body)) {
+    return { ok: false, exitCode: localFailure(input.json, options, "RUNTIME_SSH_ORGANIZATION_RESPONSE_INVALID", "Liskov returned an invalid organization list.") };
+  }
+  const organizationId = canonicalOrganizationId(selector, body.organizations);
+  if (organizationId === undefined) {
+    return { ok: false, exitCode: localFailure(input.json, options, "not_a_member", `No active organization membership exactly matches ${selector}.`) };
+  }
+  return { ok: true, organizationId };
+}
+
+async function runtimeSshContext(
+  input: RuntimeSshCommandInput,
+  options: RuntimeSshCliOptions
+): Promise<{ ok: true; session: SlipwaySessionFile; baseUrl: URL } | { ok: false; exitCode: number }> {
+  const sessionFile = resolveSlipwaySessionFile({ config: input.config, env: options.env });
+  let session: SlipwaySessionFile;
+  try {
+    const parsed = JSON.parse(await readFile(sessionFile, "utf8")) as Partial<SlipwaySessionFile>;
+    if (parsed.version !== 1 || typeof parsed.slipwayUrl !== "string" || typeof parsed.sessionToken !== "string") {
+      throw new Error("session file is not version 1");
+    }
+    session = parsed as SlipwaySessionFile;
+  } catch (error) {
+    return { ok: false, exitCode: localFailure(input.json, options, "SLIPWAY_SESSION_NOT_FOUND", `No valid Liskov CLI session was found at ${sessionFile}. Run \`proof liskov login\` first. (${errorMessage(error)})`) };
+  }
+  try {
+    return { ok: true, session, baseUrl: new URL(input.slipwayUrl ?? session.slipwayUrl ?? DEFAULT_SLIPWAY_URL) };
+  } catch {
+    return { ok: false, exitCode: localFailure(input.json, options, "SLIPWAY_URL_INVALID", "The Liskov service URL is invalid.") };
+  }
+}
+
+async function readRuntimeSshJson(response: Response): Promise<Record<string, unknown> | undefined> {
+  const text = await response.text();
+  if (!text.trim()) return undefined;
+  try {
+    const value = JSON.parse(text) as unknown;
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function organizationSelectorFailure(json: boolean | undefined, options: RuntimeSshCliOptions, error: unknown): number {
+  if (!(error instanceof OrganizationSelectorError)) throw error;
+  return localFailure(json, options, error.code, error.message);
+}
+
+function requiredIntegrationId(
+  input: RuntimeSshIntegrationInput,
+  options: RuntimeSshCliOptions
+): { ok: true; integrationId: string } | { ok: false; exitCode: number } {
+  const integrationId = input.integrationId?.trim();
+  if (!integrationId) {
+    return {
+      ok: false,
+      exitCode: localFailure(input.json, options, "RUNTIME_SSH_INTEGRATION_ID_REQUIRED", "Provide a Runtime SSH integration ID.")
+    };
+  }
+  return { ok: true, integrationId };
 }
 
 async function readRequiredSecret(

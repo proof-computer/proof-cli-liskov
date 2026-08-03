@@ -1,8 +1,9 @@
-import { Command, Flags, type Interfaces } from "@oclif/core";
+import { Flags, type Interfaces } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../organization-context.js";
 
 import { runSlipwayApplicationImport } from "../../../session.js";
 
-export default class SlipwayApplicationImport extends Command {
+export default class SlipwayApplicationImport extends OrganizationScopedCommand {
   static description = "Import a Liskov Application manifest as a draft.";
   static examples = [
     "<%= config.bin %> liskov application import --github proof-computer/docs:.liskov/application-manifest.json@main --server-fetch",
@@ -30,6 +31,7 @@ export default class SlipwayApplicationImport extends Command {
       serverFetch: flags["server-fetch"] as boolean | undefined,
       slipwayUrl: flags["slipway-url"] as string | undefined
     }, {
+      organization: flags.organization as string | undefined,
       stdout: (line) => this.log(line)
     });
     if (code !== 0) this.exit(code);

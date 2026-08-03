@@ -1,6 +1,6 @@
-import { Command } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../organization-context.js";
 
-export default class LiskovApplicationManifest extends Command {
+export default class LiskovApplicationManifest extends OrganizationScopedCommand {
   static description = "Validate authored Liskov Application manifests.";
   static summary = "Authored Application manifest commands.";
 

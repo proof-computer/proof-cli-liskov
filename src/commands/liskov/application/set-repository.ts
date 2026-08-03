@@ -1,8 +1,9 @@
-import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+import { Args, Flags, type Interfaces } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../organization-context.js";
 
 import { runSlipwayApplicationSetRepository } from "../../../session.js";
 
-export default class SlipwayApplicationSetRepository extends Command {
+export default class SlipwayApplicationSetRepository extends OrganizationScopedCommand {
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true }),
     repository: Args.string({ description: "New GitHub repository as owner/repo (e.g. proof-computer/liskov-diagnostic).", required: true })
@@ -36,6 +37,7 @@ export default class SlipwayApplicationSetRepository extends Command {
       workflowRef: flags["workflow-ref"] as string | undefined,
       yes: flags.yes as boolean | undefined
     }, {
+      organization: flags.organization as string | undefined,
       stdout: (line) => this.log(line)
     });
     if (code !== 0) this.exit(code);

@@ -1,9 +1,10 @@
-import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+import { Args, Flags, type Interfaces } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../../organization-context.js";
 
 import { runRuntimeSshIntegrationCreate } from "../../../../runtime-ssh.js";
 
-export default class RuntimeSshIntegrationCreate extends Command {
-  static args = { organization_id: Args.string({ description: "Liskov organization id.", required: true }) };
+export default class RuntimeSshIntegrationCreate extends OrganizationScopedCommand {
+  static args = { organization_id: Args.string({ description: "Exact Liskov organization ID or slug.", required: false }) };
   static description = "Connect your Tailscale account/tailnet. The OAuth secret is read from stdin or a protected prompt.";
   static examples = [
     "printf '%s\\n' \"$TAILSCALE_OAUTH_SECRET\" | <%= config.bin %> liskov runtime-ssh integration create org_123 --name 'Production tailnet' --tailnet example.com --tag tag:liskov-runtime --oauth-client-id client-id"
@@ -31,7 +32,7 @@ export default class RuntimeSshIntegrationCreate extends Command {
       config: flags.config as string | undefined,
       json: flags.json as boolean | undefined,
       slipwayUrl: flags["slipway-url"] as string | undefined
-    }, { stdout: (line) => this.log(line), stderr: (line) => this.warn(line) });
+    }, { organization: flags.organization as string | undefined, stdout: (line) => this.log(line), stderr: (line) => this.warn(line) });
     if (code !== 0) this.exit(code);
   }
 }

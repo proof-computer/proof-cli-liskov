@@ -1,8 +1,9 @@
-import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+import { Args, Flags, type Interfaces } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../../../organization-context.js";
 
 import { runSlipwayApplicationLockboxGrantVerify } from "../../../../../session.js";
 
-export default class SlipwayApplicationLockboxGrantVerify extends Command {
+export default class SlipwayApplicationLockboxGrantVerify extends OrganizationScopedCommand {
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true }),
     grant_id: Args.string({ description: "Lockbox grant id.", required: true })
@@ -29,7 +30,7 @@ export default class SlipwayApplicationLockboxGrantVerify extends Command {
       json: flags.json as boolean | undefined,
       slipwayUrl: flags["slipway-url"] as string | undefined,
       yes: flags.yes as boolean | undefined
-    }, { stdout: (line) => this.log(line) });
+    }, { organization: flags.organization as string | undefined, stdout: (line) => this.log(line) });
     if (code !== 0) this.exit(code);
   }
 }

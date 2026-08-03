@@ -1,6 +1,6 @@
-import { Command } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../organization-context.js";
 
-export default class SlipwayApplicationArtifactPin extends Command {
+export default class SlipwayApplicationArtifactPin extends OrganizationScopedCommand {
   static description = "Manage Liskov Application artifact pins.";
   static examples = [
     "<%= config.bin %> liskov application artifact-pin list proof-docs"

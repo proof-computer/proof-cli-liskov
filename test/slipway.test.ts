@@ -390,6 +390,156 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.applications[1]?.deleteReason, "test cleanup");
   });
 
+  it("propagates one trimmed request organization across GET, POST, and DELETE", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "request_organization_transport_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const requests: Array<{ method: string; authorization?: string; organization?: string }> = [];
+    const fetchImpl = async (_url: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
+      const headers = init?.headers as Record<string, string>;
+      const method = init?.method ?? "GET";
+      requests.push({
+        method,
+        authorization: headers.authorization,
+        organization: headers["x-liskov-organization"]
+      });
+      if (method === "GET") return jsonResponse({ ok: true, count: 0, applications: [] });
+      if (method === "POST") {
+        return jsonResponse({ ok: true, dryRun: true, changed: false, scanned: 0, changedCount: 0, changes: [] });
+      }
+      return jsonResponse({
+        ok: true,
+        dryRun: false,
+        deleted: true,
+        changed: true,
+        application: { applicationUid: "app-1", applicationName: "one", status: "deleted" },
+        impact: {}
+      });
+    };
+    const options = { fetchImpl, organization: "  Exact-Slug  ", stdout: () => undefined };
+    assert.equal(await runSlipwayApplicationList({ config: sessionFile, json: true }, options), 0);
+    assert.equal(await runSlipwayApplicationBackfillIdentities({ config: sessionFile, json: true }, options), 0);
+    assert.equal(await runSlipwayApplicationDelete({
+      applicationRef: "app-1",
+      reason: "done",
+      yes: true,
+      config: sessionFile,
+      json: true
+    }, options), 0);
+    assert.deepEqual(requests, ["GET", "POST", "DELETE"].map((method) => ({
+      method,
+      authorization: `Liskov-Organization ${token}`,
+      organization: "Exact-Slug"
+    })));
+  });
+
+  it("shows effective and persistent organizations under a whoami override", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "request_organization_whoami_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const effective = { id: "org-2", name: "Requested", slug: "requested", isPersonal: false, role: "developer" };
+    const sessionDefault = { id: "org-1", name: "Persistent", slug: "persistent", isPersonal: false, role: "owner" };
+    const fetchImpl = async (_url: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
+      const headers = init?.headers as Record<string, string>;
+      assert.equal(headers.authorization, `Liskov-Organization ${token}`);
+      assert.equal(headers["x-liskov-organization"], "requested");
+      return jsonResponse({
+        ok: true,
+        session: { sessionId: "session-1", identity: { kind: "github_app", login: "octo" } },
+        organization: effective,
+        organizations: [sessionDefault, effective],
+        organizationContext: { source: "request", effective, sessionDefault }
+      });
+    };
+    const json = writer();
+    assert.equal(await runSlipwayWhoami({ config: sessionFile, json: true }, {
+      fetchImpl,
+      organization: "requested",
+      stdout: json.write
+    }), 0);
+    assert.deepEqual((JSON.parse(json.text) as { organizationContext: unknown }).organizationContext, {
+      source: "request",
+      effective,
+      sessionDefault
+    });
+    const human = writer();
+    assert.equal(await runSlipwayWhoami({ config: sessionFile }, {
+      fetchImpl,
+      organization: "requested",
+      stdout: human.write
+    }), 0);
+    assert.match(human.text, /Effective organization: Requested/u);
+    assert.match(human.text, /Persistent organization: Persistent/u);
+    assert.equal(human.text.includes(token), false);
+  });
+
+  it("reports an unavailable persistent organization without mislabeling the override", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "request_organization_stale_default_token_do_not_print",
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const effective = { id: "org-2", name: "Requested", slug: "requested", isPersonal: false, role: "developer" };
+    const fetchImpl = async (): Promise<Response> => jsonResponse({
+      ok: true,
+      session: { sessionId: "session-1", identity: { kind: "github_app", login: "octo" } },
+      organization: effective,
+      organizations: [effective],
+      organizationContext: { source: "request", effective, sessionDefault: null }
+    });
+
+    const json = writer();
+    assert.equal(await runSlipwayWhoami({ config: sessionFile, json: true }, {
+      fetchImpl,
+      organization: "requested",
+      stdout: json.write
+    }), 0);
+    assert.equal(
+      (JSON.parse(json.text) as { organizationContext: { sessionDefault: unknown } }).organizationContext.sessionDefault,
+      null
+    );
+
+    const human = writer();
+    assert.equal(await runSlipwayWhoami({ config: sessionFile }, {
+      fetchImpl,
+      organization: "requested",
+      stdout: human.write
+    }), 0);
+    assert.match(human.text, /Effective organization: Requested/u);
+    assert.match(human.text, /Persistent organization: unavailable/u);
+    assert.doesNotMatch(human.text, /Persistent organization: Requested/u);
+  });
+
+  it("rejects an invalid request organization before network I/O", async () => {
+    let calls = 0;
+    const out = writer();
+    assert.equal(await runSlipwayApplicationList({ json: true }, {
+      fetchImpl: async () => {
+        calls += 1;
+        return jsonResponse({ ok: true });
+      },
+      organization: "   ",
+      stdout: out.write
+    }), 1);
+    assert.equal(calls, 0);
+    assert.equal((JSON.parse(out.text) as { error: string }).error, "LISKOV_ORGANIZATION_SELECTOR_INVALID");
+  });
+
   it("shows organization and UID in human Application list output", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
@@ -495,11 +645,19 @@ describe("proof-cli Liskov runner", () => {
         organizations
       ],
       [
-        () => runSlipwayOrganizationBilling({ organizationId: "org-1", config: sessionFile, json: true }, { fetchImpl, stdout: current.write }),
+        () => runSlipwayOrganizationBilling({ organizationId: " example-org ", config: sessionFile, json: true }, {
+          fetchImpl,
+          organization: "flag-loser",
+          stdout: current.write
+        }),
         billing
       ],
       [
-        () => runSlipwayOrganizationServiceCredits({ organizationId: "org-1", config: sessionFile, json: true }, { fetchImpl, stdout: current.write }),
+        () => runSlipwayOrganizationServiceCredits({ config: sessionFile, json: true }, {
+          fetchImpl,
+          organization: "example-org",
+          stdout: current.write
+        }),
         credits
       ],
       [
@@ -518,7 +676,15 @@ describe("proof-cli Liskov runner", () => {
       assert.equal(current.text, `${JSON.stringify(body)}\n`);
       assert.equal(current.text.includes(token), false);
     }
-    assert.deepEqual(requested, [...expected.keys()]);
+    assert.deepEqual(requested, [
+      "https://slipway.test/api/organizations",
+      "https://slipway.test/api/organizations",
+      "https://slipway.test/api/organizations/org-1/billing",
+      "https://slipway.test/api/organizations",
+      "https://slipway.test/api/organizations/org-1/service-credits",
+      "https://slipway.test/api/organizations",
+      "https://slipway.test/api/organizations/org-1/billing/transactions?limit=25&before=1719230000000"
+    ]);
   });
 
   it("formats organization and execution history reads without leaking private fields", async () => {
@@ -533,6 +699,18 @@ describe("proof-cli Liskov runner", () => {
     }, { config: sessionFile });
     const out = writer();
     const fetchImpl = async (url: URL | RequestInfo): Promise<Response> => {
+      if (String(url).endsWith("/api/organizations")) {
+        return jsonResponse({
+          ok: true,
+          organizations: [{
+            id: "org-1",
+            name: "Example Org",
+            slug: "example-org",
+            isPersonal: false,
+            role: "owner"
+          }]
+        });
+      }
       if (String(url).endsWith("/billing")) {
         return jsonResponse({
           ok: true,
@@ -679,18 +857,26 @@ describe("proof-cli Liskov runner", () => {
       role: "developer"
     });
     assert.deepEqual(
-      requests.slice(0, 2).map((request) => ({
+      requests.slice(0, 4).map((request) => ({
         url: request.url,
         method: request.method,
         body: request.body,
         authorization: request.authorization
       })),
-      [0, 1].map(() => ({
-        url: "https://slipway.test/api/session/organization",
-        method: "POST",
-        body: JSON.stringify({ organizationId: "org-2" }),
-        authorization: `Bearer ${token}`
-      }))
+      [0, 1].flatMap(() => ([
+        {
+          url: "https://slipway.test/api/organizations",
+          method: "GET",
+          body: undefined,
+          authorization: `Bearer ${token}`
+        },
+        {
+          url: "https://slipway.test/api/session/organization",
+          method: "POST",
+          body: JSON.stringify({ organizationId: "org-2" }),
+          authorization: `Bearer ${token}`
+        }
+      ]))
     );
     assert.equal(whoami.text.includes(token), false);
   });
@@ -718,7 +904,13 @@ describe("proof-cli Liskov runner", () => {
           isPersonal: false,
           role: "developer"
         },
-        organizations: []
+        organizations: [{
+          id: "org-2",
+          name: "Selected Org",
+          slug: "selected-org",
+          isPersonal: false,
+          role: "developer"
+        }]
       }),
       stdout: out.write
     }), 0);
@@ -741,7 +933,7 @@ describe("proof-cli Liskov runner", () => {
 
     for (const [status, responseBody, expectedError, expectedReason] of [
       [401, { ok: false, error: "unauthorized" }, "SLIPWAY_SESSION_UNAUTHORIZED", "unauthorized"],
-      [403, { ok: false, error: "not_a_member" }, "SLIPWAY_ORGANIZATION_USE_FAILED", "not_a_member"],
+      [403, { ok: false, error: "not_a_member" }, "not_a_member", undefined],
       [200, { ok: true, organization: { id: "org-2" } }, "SLIPWAY_ORGANIZATION_USE_FAILED", "malformed_response"]
     ] as const) {
       const out = writer();
@@ -750,7 +942,18 @@ describe("proof-cli Liskov runner", () => {
         config: sessionFile,
         json: true
       }, {
-        fetchImpl: async () => jsonResponse(responseBody, status),
+        fetchImpl: async (url) => String(url).endsWith("/api/organizations")
+          ? jsonResponse({
+              ok: true,
+              organizations: [{
+                id: "org-2",
+                name: "Selected Org",
+                slug: "selected-org",
+                isPersonal: false,
+                role: "developer"
+              }]
+            })
+          : jsonResponse(responseBody, status),
         stdout: out.write
       }), 1);
       const parsed = JSON.parse(out.text) as { error: string; reason?: string };
@@ -789,7 +992,7 @@ describe("proof-cli Liskov runner", () => {
 
     for (const [status, responseBody, expectedError] of [
       [401, { ok: false, error: "unauthorized" }, "SLIPWAY_SESSION_UNAUTHORIZED"],
-      [403, { ok: false, error: "not_a_member" }, "SLIPWAY_ORGANIZATION_LIST_FAILED"],
+      [403, { ok: false, error: "not_a_member" }, "not_a_member"],
       [200, { ok: true, organizations: "not-an-array" }, "SLIPWAY_ORGANIZATION_LIST_FAILED"]
     ] as const) {
       const out = writer();
@@ -3021,7 +3224,7 @@ describe("proof-cli Liskov runner", () => {
       savedAtMs: 0
     }, { config: sessionFile });
 
-    const requests: Array<{ url: string; method: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const requests: Array<{ url: string; method: string; authorization?: string; organization?: string; body?: Record<string, unknown> }> = [];
     const out = writer();
     const code = await runSlipwayCustodyExecutionRunOne({
       applicationRef: "app-uid-1",
@@ -3039,6 +3242,7 @@ describe("proof-cli Liskov runner", () => {
           url: String(url),
           method: init?.method ?? "GET",
           authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          organization: (init?.headers as Record<string, string> | undefined)?.["x-liskov-organization"],
           body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
         });
         if ((init?.method ?? "GET") === "GET") {
@@ -3051,6 +3255,7 @@ describe("proof-cli Liskov runner", () => {
         }
         return jsonResponse({ ok: true, mode: "submit", attempt: { executionId: "exec-1", status: "submitted" } });
       },
+      organization: "  org-concurrent  ",
       stdout: out.write
     });
 
@@ -3069,7 +3274,11 @@ describe("proof-cli Liskov runner", () => {
       yesSpend: true,
       spendAcknowledgement: "yes-spend"
     });
-    assert.equal(requests[1]?.authorization, `Bearer ${token}`);
+    assert.deepEqual(requests.map((request) => request.authorization), [
+      `Liskov-Organization ${token}`,
+      `Liskov-Organization ${token}`
+    ]);
+    assert.deepEqual(requests.map((request) => request.organization), ["org-concurrent", "org-concurrent"]);
     assert.equal(out.text.includes(token), false);
   });
 

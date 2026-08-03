@@ -32,9 +32,10 @@ async function withSession(run: (sessionFile: string) => Promise<void>): Promise
 test("integration create reads its OAuth secret out of band and never prints it", async () => {
   await withSession(async (sessionFile) => {
     const output: string[] = [];
+    const requestUrls: string[] = [];
     let requestBody = "";
     const code = await runRuntimeSshIntegrationCreate({
-      organizationId: "org_1",
+      organizationId: "organization-one",
       name: "Production tailnet",
       tailnet: "example.com",
       tag: "tag:liskov-runtime",
@@ -44,9 +45,22 @@ test("integration create reads its OAuth secret out of band and never prints it"
       readSecret: async () => secret,
       stdout: (line) => output.push(line),
       stderr: (line) => output.push(line),
-      fetchImpl: async (_url, init) => {
-        requestBody = String(init?.body);
+      fetchImpl: async (url, init) => {
+        requestUrls.push(String(url));
         assert.equal((init?.headers as Record<string, string>).authorization, `Bearer ${token}`);
+        if (String(url).endsWith("/api/organizations")) {
+          return Response.json({
+            ok: true,
+            organizations: [{
+              id: "org_1",
+              name: "Organization One",
+              slug: "organization-one",
+              isPersonal: false,
+              role: "owner"
+            }]
+          });
+        }
+        requestBody = String(init?.body);
         return Response.json({
           ok: true,
           integration: {
@@ -63,8 +77,54 @@ test("integration create reads its OAuth secret out of band and never prints it"
       }
     });
     assert.equal(code, 0);
+    assert.deepEqual(requestUrls, [
+      "https://liskov.test/api/organizations",
+      "https://liskov.test/api/organizations/org_1/runtime-ssh/integrations"
+    ]);
     assert.equal(JSON.parse(requestBody).oauthClientSecret, secret);
     assert.doesNotMatch(output.join("\n"), new RegExp(secret));
+    assert.doesNotMatch(output.join("\n"), new RegExp(token));
+  });
+});
+
+test("Runtime SSH connection requests propagate the request organization without leaking the token", async () => {
+  await withSession(async (sessionFile) => {
+    const output: string[] = [];
+    const code = await runRuntimeSshConnection({
+      applicationRef: "app",
+      config: sessionFile,
+      printCommand: true
+    }, {
+      fetchImpl: async (url, init) => {
+        assert.match(String(url), /\/api\/applications\/app\/runtime-ssh\/connection-requests$/u);
+        const headers = init?.headers as Record<string, string>;
+        assert.equal(headers.authorization, `Liskov-Organization ${token}`);
+        assert.equal(headers["x-liskov-organization"], "Exact-Runtime");
+        return Response.json({
+          ok: true,
+          connection: {
+            provider: "tailscale",
+            attachmentId: "att_1",
+            deploymentId: "dep_1",
+            jobId: "job_1",
+            expectedTailnet: "example.com",
+            hostname: "runtime.example.com",
+            user: "root",
+            port: 22,
+            command: ["tailscale", "ssh", "root@runtime.example.com"]
+          }
+        });
+      },
+      organization: " Exact-Runtime ",
+      runProcess: async () => ({
+        exitCode: 0,
+        stdout: JSON.stringify({ CurrentTailnet: { Name: "example.com" } }),
+        stderr: ""
+      }),
+      stdout: (line) => output.push(line)
+    });
+    assert.equal(code, 0);
+    assert.deepEqual(output, ["tailscale ssh root@runtime.example.com"]);
     assert.doesNotMatch(output.join("\n"), new RegExp(token));
   });
 });

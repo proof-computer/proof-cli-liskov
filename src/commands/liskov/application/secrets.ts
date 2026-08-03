@@ -1,8 +1,9 @@
-import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+import { Args, Flags, type Interfaces } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../organization-context.js";
 
 import { runSlipwayApplicationSecrets } from "../../../session.js";
 
-export default class SlipwayApplicationSecrets extends Command {
+export default class SlipwayApplicationSecrets extends OrganizationScopedCommand {
   static args = {
     application_id: Args.string({ description: "Liskov Application id.", required: true })
   };
@@ -29,6 +30,7 @@ export default class SlipwayApplicationSecrets extends Command {
       json: flags.json as boolean | undefined,
       slipwayUrl: flags["slipway-url"] as string | undefined
     }, {
+      organization: flags.organization as string | undefined,
       stdout: (line) => this.log(line)
     });
     if (code !== 0) this.exit(code);

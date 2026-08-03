@@ -1,8 +1,9 @@
-import { Command, Flags, type Interfaces } from "@oclif/core";
+import { Flags, type Interfaces } from "@oclif/core";
+import { OrganizationScopedCommand } from "../../../organization-context.js";
 
 import { runSlipwayApplicationBackfillIdentities } from "../../../session.js";
 
-export default class SlipwayApplicationBackfillIdentities extends Command {
+export default class SlipwayApplicationBackfillIdentities extends OrganizationScopedCommand {
   static description = "Backfill Liskov Application identity fields.";
   static examples = [
     "<%= config.bin %> liskov application backfill-identities",
@@ -26,6 +27,7 @@ export default class SlipwayApplicationBackfillIdentities extends Command {
       slipwayUrl: flags["slipway-url"] as string | undefined,
       yes: flags.yes as boolean | undefined
     }, {
+      organization: flags.organization as string | undefined,
       stdout: (line) => this.log(line)
     });
     if (code !== 0) this.exit(code);
