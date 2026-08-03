@@ -15,6 +15,8 @@ proof liskov application import --github proof-computer/docs:.slipway/applicatio
 proof liskov application list
 proof liskov application status proof-docs
 proof liskov application plans proof-docs --json
+proof liskov application logs proof-docs --limit 100
+proof liskov application logs proof-docs --deployment dep-123 --job job-123 --origin runtime-ssh --json
 proof liskov application publish proof-docs --artifact-version av-... --dry-run
 proof liskov application publish proof-docs --artifact-version av-... --yes
 proof liskov application publish proof-docs --paused --reason "failure-matrix initialization" --yes
@@ -31,7 +33,6 @@ proof liskov application lockbox dispatch proof-docs --yes
 proof liskov application lockbox grant ensure proof-docs --yes
 proof liskov application lockbox grant status proof-docs --json
 proof liskov application lockbox grant-status proof-docs --json
-proof liskov application blackbox configure proof-docs --yes
 proof liskov runtime-ssh integration list org-123
 proof liskov runtime-ssh integration create org-123 --name "Production tailnet" --tailnet example.com --tag tag:liskov-runtime --oauth-client-id CLIENT_ID
 proof liskov runtime-ssh integration validate org-123 int_123
@@ -73,6 +74,13 @@ Their `--json` output is the raw response object. Human transaction rows omit
 provider references and memos. Execution-history reads remain unbounded when
 pagination flags are omitted; human output reports returned count, total, and
 next offset.
+
+Application logging is opt-in through Manifest V4
+`observability.logs.enabled`. Liskov provisions and reads it as a managed
+capability; `application logs` is read-only and its `--json` output is the core
+`/logs` response. Human output escapes terminal control characters in log
+messages. A successful degraded response exits zero and reports its stable
+availability reason.
 
 Application deletion is a logical Liskov tombstone. Without `--yes`, the CLI
 uses the read-only deletion-preview endpoint and sends no mutation body. With

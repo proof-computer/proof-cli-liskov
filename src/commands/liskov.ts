@@ -43,6 +43,7 @@ COMMANDS
   application plans APPLICATION_ID
   application action-plan APP_REF
   application action-plan retry APP_REF --decision-id ID --reason TEXT --yes
+  application logs APP_REF [--limit N] [--deployment ID] [--job ID] [--origin all|customer|runtime-ssh] [--json]
   application devtools view-key APP_REF DEPLOYMENT_ID
   application runtime-image workflow APP_ID --manifest PATH [--output PATH]
   application deployment import APP_REF --sequence N --origin ADDRESS --yes
@@ -51,7 +52,6 @@ COMMANDS
   application lockbox grant ensure APP_REF --yes
   application lockbox grant status APP_REF
   application lockbox grant-status APPLICATION_ID
-  application blackbox configure APP_REF --yes
   custody account ensure APP_REF --chain acurast --yes
   custody preflight APP_REF
   custody environment upload APP_REF --secrets-file PATH --yes
