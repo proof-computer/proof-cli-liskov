@@ -27,10 +27,12 @@
   },
   "dependencies": {
     "@acurast/sdk": "1.2.1",
-    "@oclif/core": "^4.11.3"
+    "@oclif/core": "^4.11.3",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "@types/ws": "^8.18.1",
     "oclif": "^4.23.7",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
