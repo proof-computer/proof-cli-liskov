@@ -65,6 +65,7 @@ COMMANDS
   custody execution retry APP_REF --execution-id ID --reason TEXT --yes
   custody machine catalog
   admin executor-operation reconcile OPERATION_ID --expect-application APP --expect-kind KIND --expect-deployment DEPLOYMENT --expect-job JOB --expect-status STATUS --reason TEXT [--yes]
+  admin executor-operation recover-deploy-submit OPERATION_ID --expect-organization ORG --expect-application APP --expect-application-uid UID --expect-deployment DEPLOYMENT --expect-local-job JOB --expect-execution EXECUTION --expect-proposal PROPOSAL --expect-reserve RESERVE --expect-operation-status STATUS --expect-local-job-status STATUS --expect-reserve-status STATUS --finalized-block-number N --finalized-block-hash HASH --extrinsic-index N --transaction-hash HASH --reason TEXT [--yes]
   admin deploy-spend resolve RESERVE --expect-organization ORG --expect-application APP --expect-deployment DEP --expect-execution EXEC --expect-billing-transaction TX --expect-status review_required --final-usd-micros N --evidence-ref REF --evidence-sha256 SHA256 --reason TEXT [--yes]
   whoami
   logout

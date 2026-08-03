@@ -1,5 +1,6 @@
 export {
   DEFAULT_SLIPWAY_URL,
+  runSlipwayAdminDeploySubmitRecovery,
   runSlipwayAdminExecutorOperationReconcile,
   runSlipwayAdminDeploySpendResolve,
   runSlipwayAdminProcessorClearGreylist,
@@ -57,6 +58,7 @@ export {
   runSlipwayWhoami,
   saveSlipwaySession,
   type SlipwayAdminProcessorClearGreylistInput,
+  type SlipwayAdminDeploySubmitRecoveryInput,
   type SlipwayAdminExecutorOperationReconcileInput,
   type SlipwayAdminDeploySpendResolveInput,
   type SlipwayAdminProcessorListInput,
