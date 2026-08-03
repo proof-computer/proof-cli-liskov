@@ -35,7 +35,13 @@ try {
   const applicationHelp = run(process.execPath, [proofDevBin, "liskov", "application", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationHelp.stdout, "Read Liskov Application state");
   assertIncludes(applicationHelp.stdout, "liskov application deployment");
-  assertIncludes(applicationHelp.stdout, "liskov application blackbox");
+  assertIncludes(applicationHelp.stdout, "liskov application logs");
+  assertExcludes(applicationHelp.stdout, "blackbox");
+
+  const applicationLogsHelp = run(process.execPath, [proofDevBin, "liskov", "application", "logs", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationLogsHelp.stdout, "Read recent Liskov Application logs");
+  assertIncludes(applicationLogsHelp.stdout, "--origin");
+  assertIncludes(applicationLogsHelp.stdout, "runtime-ssh");
 
   const applicationListHelp = run(process.execPath, [proofDevBin, "liskov", "application", "list", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationListHelp.stdout, "List readable Liskov Applications");
@@ -183,5 +189,11 @@ function run(command, args, options) {
 function assertIncludes(value, expected) {
   if (!value.includes(expected)) {
     throw new Error(`Expected output to include ${JSON.stringify(expected)}.\nOutput:\n${value}`);
+  }
+}
+
+function assertExcludes(value, forbidden) {
+  if (value.includes(forbidden)) {
+    throw new Error(`Expected output to exclude ${JSON.stringify(forbidden)}.\nOutput:\n${value}`);
   }
 }

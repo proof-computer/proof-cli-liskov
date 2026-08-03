@@ -37,6 +37,8 @@ export default class LiskovApplicationManifestValidate extends Command {
       diagnostic.code === "invalid_manifest" || diagnostic.code === "unknown_field");
     const capabilityDiagnostics = diagnostics.filter((diagnostic) =>
       diagnostic.code === "unsupported_policy_feature" || diagnostic.code === "entitlement_exceeded");
+    const deprecationDiagnostics = diagnostics.filter((diagnostic) =>
+      diagnostic.code === "deprecated_manifest_field");
     const manifestValid = errors.length === 0;
     const result = {
       ok: manifestValid,
@@ -46,7 +48,8 @@ export default class LiskovApplicationManifestValidate extends Command {
         : {}),
       firstPublicReady: manifestValid && capabilityDiagnostics.length === 0,
       errors,
-      capabilityDiagnostics
+      capabilityDiagnostics,
+      deprecationDiagnostics
     };
     if (flags.json) this.log(JSON.stringify(result));
     else if (manifestValid) {
@@ -55,6 +58,9 @@ authoredDigest: ${result.authoredDigest}
 releaseIntentDigest: ${result.releaseIntentDigest}
 firstPublicReady: ${String(result.firstPublicReady)}`);
       for (const diagnostic of capabilityDiagnostics) {
+        this.log(`${diagnostic.code} ${diagnostic.pointer || "/"}: ${diagnostic.message}`);
+      }
+      for (const diagnostic of deprecationDiagnostics) {
         this.log(`${diagnostic.code} ${diagnostic.pointer || "/"}: ${diagnostic.message}`);
       }
     }
