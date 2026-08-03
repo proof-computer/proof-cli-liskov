@@ -5,6 +5,6 @@ export default class SlipwayAdminExecutorOperation extends Command {
   static summary = "Guarded executor-operation repair commands.";
 
   async run(): Promise<void> {
-    this.log("Use `proof liskov admin executor-operation reconcile --help`.");
+    this.log("Use `proof liskov admin executor-operation reconcile --help` or `proof liskov admin executor-operation recover-deploy-submit --help`.");
   }
 }

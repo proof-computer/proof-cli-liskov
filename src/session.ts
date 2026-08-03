@@ -386,6 +386,31 @@ export interface SlipwayAdminExecutorOperationReconcileInput {
   json?: boolean;
 }
 
+export interface SlipwayAdminDeploySubmitRecoveryInput {
+  operationId: string;
+  expectOrganization: string;
+  expectApplication: string;
+  expectApplicationUid: string;
+  expectDeployment: string;
+  expectLocalJob: string;
+  expectExecution: string;
+  expectProposal: string;
+  expectReserve: string;
+  expectOperationStatus: string;
+  expectLocalJobStatus: string;
+  expectReserveStatus: string;
+  finalizedBlockNumber: number;
+  finalizedBlockHash: string;
+  extrinsicIndex: number;
+  transactionHash: string;
+  reason: string;
+  yes?: boolean;
+  adminToken?: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayAdminDeploySpendResolveInput {
   reserveId: string;
   expectOrganization: string;
@@ -2384,6 +2409,203 @@ export async function runSlipwayAdminExecutorOperationReconcile(
   return 0;
 }
 
+/**
+ * Adopt one exact, independently finalized Acurast deploy receipt without ever
+ * invoking the submitter. Confirmation is deliberately a two-request protocol:
+ * the server must prove the exact caller-supplied bindings first, and the CLI
+ * echoes that proof fingerprint into an otherwise unchanged confirmation.
+ */
+export async function runSlipwayAdminDeploySubmitRecovery(
+  input: SlipwayAdminDeploySubmitRecoveryInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  const reason = input.reason?.trim();
+  const requiredBindings: Array<[name: string, value: string]> = [
+    ["operation id", input.operationId],
+    ["organization", input.expectOrganization],
+    ["application", input.expectApplication],
+    ["application UID", input.expectApplicationUid],
+    ["deployment", input.expectDeployment],
+    ["local job", input.expectLocalJob],
+    ["execution", input.expectExecution],
+    ["proposal", input.expectProposal],
+    ["reserve", input.expectReserve],
+    ["operation status", input.expectOperationStatus],
+    ["local-job status", input.expectLocalJobStatus],
+    ["reserve status", input.expectReserveStatus]
+  ];
+  const invalidBinding = requiredBindings.find(([, value]) => typeof value !== "string" || value.trim().length === 0);
+  const hashPattern = /^0x[0-9a-f]{64}$/u;
+  const blockNumberValid = Number.isSafeInteger(input.finalizedBlockNumber) && input.finalizedBlockNumber >= 0;
+  const extrinsicIndexValid = Number.isSafeInteger(input.extrinsicIndex) && input.extrinsicIndex >= 0;
+  if (!reason || invalidBinding || !blockNumberValid || !extrinsicIndexValid
+      || !hashPattern.test(input.finalizedBlockHash) || !hashPattern.test(input.transactionHash)) {
+    const error = "SLIPWAY_ADMIN_DEPLOY_SUBMIT_RECOVERY_INPUT_INVALID";
+    const invalid = [
+      !reason ? "reason" : undefined,
+      invalidBinding?.[0],
+      !blockNumberValid ? "finalized block number" : undefined,
+      !extrinsicIndexValid ? "extrinsic index" : undefined,
+      !hashPattern.test(input.finalizedBlockHash) ? "finalized block hash" : undefined,
+      !hashPattern.test(input.transactionHash) ? "transaction hash" : undefined
+    ].filter((value): value is string => value !== undefined);
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      operationId: input.operationId,
+      invalid
+    }, `Error (${error}): invalid ${invalid.join(", ")}; provide every exact binding, non-negative safe integer positions, and lowercase 0x-prefixed 32-byte hashes.`);
+    return 2;
+  }
+
+  const bindings = {
+    expectOrganization: input.expectOrganization,
+    expectApplication: input.expectApplication,
+    expectApplicationUid: input.expectApplicationUid,
+    expectDeployment: input.expectDeployment,
+    expectLocalJob: input.expectLocalJob,
+    expectExecution: input.expectExecution,
+    expectProposal: input.expectProposal,
+    expectReserve: input.expectReserve,
+    expectOperationStatus: input.expectOperationStatus,
+    expectLocalJobStatus: input.expectLocalJobStatus,
+    expectReserveStatus: input.expectReserveStatus,
+    finalizedBlockNumber: input.finalizedBlockNumber,
+    finalizedBlockHash: input.finalizedBlockHash,
+    extrinsicIndex: input.extrinsicIndex,
+    transactionHash: input.transactionHash,
+    reason
+  } as const;
+  const requestInput = {
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST" as const,
+    path: `/api/admin/executor-operations/${encodeURIComponent(input.operationId)}/recover-deploy-submit`,
+    authToken: resolveAdminToken({ token: input.adminToken, env: options.env ?? process.env }),
+    requestErrorCode: "SLIPWAY_ADMIN_DEPLOY_SUBMIT_RECOVERY_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not recover the finalized Liskov deploy submission",
+    redactFetchError: true
+  };
+
+  const dryRun = await authenticatedSlipwayJsonRequest<SlipwayGenericResponse>({
+    ...requestInput,
+    body: { ...bindings, confirm: false }
+  }, options);
+  if (!dryRun.ok) return dryRun.exitCode;
+  if (!dryRun.response.ok || dryRun.body?.ok !== true) {
+    return writeDeploySubmitRecoveryFailure({
+      body: dryRun.body,
+      operationId: input.operationId,
+      options,
+      json: input.json,
+      response: dryRun.response,
+      slipwayUrl: dryRun.slipwayUrl,
+      sessionFile: dryRun.sessionFile,
+      phase: "dry_run"
+    });
+  }
+
+  const proofFingerprint = typeof dryRun.body.proofFingerprint === "string"
+    ? dryRun.body.proofFingerprint
+    : "";
+  if (dryRun.body.mode !== "dry_run"
+      || dryRun.body.operationId !== input.operationId
+      || !proofFingerprint.trim()) {
+    const error = "SLIPWAY_ADMIN_DEPLOY_SUBMIT_RECOVERY_DRY_RUN_RESPONSE_INVALID";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      operationId: input.operationId,
+      phase: "dry_run",
+      status: dryRun.response.status
+    }, `Error (${error}): the dry run did not return the exact operation id, dry_run mode, and a nonempty proof fingerprint, so confirmation was not sent. Re-read the operation and investigate the server response.`);
+    return 1;
+  }
+
+  if (input.yes !== true) {
+    writeStructuredOrHuman(options, input.json, dryRun.body,
+      `Dry run: finalized deploy evidence for executor operation ${input.operationId} is eligible. Pass --yes with the same exact bindings to recover it.`);
+    return 0;
+  }
+
+  const confirmation = await authenticatedSlipwayJsonRequest<SlipwayGenericResponse>({
+    ...requestInput,
+    body: {
+      ...bindings,
+      confirm: true,
+      confirmationFingerprint: proofFingerprint
+    }
+  }, options);
+  if (!confirmation.ok) return confirmation.exitCode;
+  if (!confirmation.response.ok || confirmation.body?.ok !== true) {
+    return writeDeploySubmitRecoveryFailure({
+      body: confirmation.body,
+      operationId: input.operationId,
+      options,
+      json: input.json,
+      response: confirmation.response,
+      slipwayUrl: confirmation.slipwayUrl,
+      sessionFile: confirmation.sessionFile,
+      phase: "confirm"
+    });
+  }
+  if (confirmation.body.mode !== "confirm"
+      || confirmation.body.operationId !== input.operationId
+      || confirmation.body.proofFingerprint !== proofFingerprint) {
+    const error = "SLIPWAY_ADMIN_DEPLOY_SUBMIT_RECOVERY_CONFIRM_RESPONSE_INVALID";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      operationId: input.operationId,
+      phase: "confirm",
+      status: confirmation.response.status
+    }, `Error (${error}): the confirmation response did not preserve the exact operation id, confirm mode, and dry-run proof fingerprint. Re-read the operation before taking any further action.`);
+    return 1;
+  }
+
+  writeStructuredOrHuman(options, input.json, confirmation.body,
+    confirmation.body.idempotentReplay === true
+      ? `Executor operation ${input.operationId} already carried this exact finalized deploy receipt.`
+      : `Recovered finalized deploy receipt for executor operation ${input.operationId}.`);
+  return 0;
+}
+
+function writeDeploySubmitRecoveryFailure(input: {
+  body: SlipwayGenericResponse | undefined;
+  operationId: string;
+  options: SlipwayCliOptions;
+  json: boolean | undefined;
+  response: Response;
+  slipwayUrl: string;
+  sessionFile: string;
+  phase: "dry_run" | "confirm";
+}): number {
+  const blockers = Array.isArray(input.body?.blockers)
+    ? input.body.blockers.filter((value): value is string => typeof value === "string")
+    : [];
+  const error = input.response.status === 401
+    ? "SLIPWAY_SESSION_UNAUTHORIZED"
+    : input.response.status === 403
+      ? "SLIPWAY_PLATFORM_ADMIN_REQUIRED"
+      : input.phase === "dry_run"
+        ? "SLIPWAY_ADMIN_DEPLOY_SUBMIT_RECOVERY_DRY_RUN_FAILED"
+        : "SLIPWAY_ADMIN_DEPLOY_SUBMIT_RECOVERY_CONFIRM_FAILED";
+  writeStructuredOrHuman(input.options, input.json, {
+    ok: false,
+    error,
+    status: input.response.status,
+    reason: input.body?.reason ?? input.body?.error,
+    blockers,
+    operationId: input.operationId,
+    phase: input.phase,
+    slipwayUrl: input.slipwayUrl,
+    sessionFile: input.sessionFile
+  }, `Error (${error}): ${input.phase === "dry_run" ? "dry-run proof failed" : "confirmation failed"} for executor operation ${input.operationId}${blockers.length ? ` (${blockers.join(", ")})` : ""}. Re-read the operation and finalized chain evidence before retrying.`);
+  return 1;
+}
+
 export async function runSlipwayAdminDeploySpendResolve(
   input: SlipwayAdminDeploySpendResolveInput,
   options: SlipwayCliOptions = {}
@@ -3765,6 +3987,7 @@ async function authenticatedSlipwayJsonRequest<T>(
     notFoundMessage: string;
     fetchFailedMessage: string;
     requestFailureDetails?: Record<string, unknown>;
+    redactFetchError?: boolean;
   },
   options: SlipwayCliOptions
 ): Promise<
@@ -3807,7 +4030,7 @@ async function authenticatedSlipwayJsonRequest<T>(
     writeStructuredOrHuman(options, input.json, {
       ok: false,
       error: input.requestErrorCode,
-      message: errorMessage(error),
+      message: input.redactFetchError ? "request_failed" : errorMessage(error),
       slipwayUrl,
       sessionFile,
       ...input.requestFailureDetails
