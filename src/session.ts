@@ -31,6 +31,11 @@ import {
   formatOrganizationUse
 } from "./organization-output.js";
 import { validateApplicationManifestV4 } from "./application-policy.js";
+import {
+  formatApplicationLogs,
+  isLiskovApplicationLogsResponse,
+  type LiskovApplicationLogsResponse
+} from "./application-logs.js";
 
 export const DEFAULT_SLIPWAY_URL = "https://liskov.proof.computer";
 const DEFAULT_RUNTIME_IMAGE_WORKFLOW_OUTPUT = ".github/workflows/liskov-runtime-image.yml";
@@ -297,6 +302,17 @@ export interface SlipwayApplicationActivityInput {
   json?: boolean;
 }
 
+export interface SlipwayApplicationLogsInput {
+  applicationRef: string;
+  limit?: number;
+  deploymentId?: string;
+  jobId?: string;
+  origin?: "all" | "customer" | "runtime-ssh";
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationActionPlanInput {
   applicationRef: string;
   slipwayUrl?: string;
@@ -451,14 +467,6 @@ export interface SlipwayApplicationLockboxGrantEnsureInput {
 export interface SlipwayApplicationLockboxGrantVerifyInput {
   applicationRef: string;
   grantId: string;
-  yes?: boolean;
-  slipwayUrl?: string;
-  config?: string;
-  json?: boolean;
-}
-
-export interface SlipwayApplicationBlackboxConfigureInput {
-  applicationRef: string;
   yes?: boolean;
   slipwayUrl?: string;
   config?: string;
@@ -2055,6 +2063,60 @@ export async function runSlipwayApplicationActivity(input: SlipwayApplicationAct
   return 0;
 }
 
+export async function runSlipwayApplicationLogs(input: SlipwayApplicationLogsInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const inputError = applicationLogsInputError(input);
+  if (inputError) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_LOGS_INPUT_INVALID",
+      message: inputError,
+      applicationRef: input.applicationRef
+    }, `Error (SLIPWAY_APPLICATION_LOGS_INPUT_INVALID): ${inputError}`);
+    return 1;
+  }
+
+  const query = new URLSearchParams();
+  if (input.limit !== undefined) query.set("limit", String(input.limit));
+  if (input.deploymentId !== undefined) query.set("deploymentId", input.deploymentId.trim());
+  if (input.jobId !== undefined) query.set("jobId", input.jobId.trim());
+  if (input.origin !== undefined) query.set("origin", input.origin === "runtime-ssh" ? "runtime_ssh" : input.origin);
+  const queryString = query.toString();
+  const request = await authenticatedSlipwayRequest<LiskovApplicationLogsResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/logs${queryString ? `?${queryString}` : ""}`,
+    requestErrorCode: "SLIPWAY_APPLICATION_LOGS_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application logs",
+    redactFetchError: true
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const body = request.body;
+  if (!request.response.ok || !isLiskovApplicationLogsResponse(body)) {
+    const error = request.response.status === 401
+      ? "SLIPWAY_SESSION_UNAUTHORIZED"
+      : request.response.status === 404
+        ? "SLIPWAY_APPLICATION_NOT_FOUND"
+        : body === undefined || request.response.ok
+          ? "SLIPWAY_APPLICATION_LOGS_RESPONSE_INVALID"
+          : "SLIPWAY_APPLICATION_LOGS_FAILED";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      applicationRef: input.applicationRef,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, `Error (${error}): Liskov could not read logs for Application ${input.applicationRef}.`);
+    return 1;
+  }
+
+  writeStructuredOrHuman(options, input.json, body, formatApplicationLogs(body, input.applicationRef));
+  return 0;
+}
+
 export async function runSlipwayApplicationActionPlan(input: SlipwayApplicationActionPlanInput, options: SlipwayCliOptions = {}): Promise<number> {
   const request = await authenticatedSlipwayRequest<SlipwayGenericResponse>({
     config: input.config,
@@ -2652,24 +2714,6 @@ export async function runSlipwayApplicationLockboxGrantVerify(input: SlipwayAppl
     human: (body) => {
       const grant = objectRecord(objectRecord(body).grant);
       return `Lockbox grant ${stringValue(grant.grantId) ?? input.grantId} ${stringValue(grant.status) ?? "verified"} for ${input.applicationRef}.`;
-    }
-  }, options);
-}
-
-export async function runSlipwayApplicationBlackboxConfigure(input: SlipwayApplicationBlackboxConfigureInput, options: SlipwayCliOptions = {}): Promise<number> {
-  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_BLACKBOX_CONFIGURE_CONFIRMATION_REQUIRED", "Blackbox configuration");
-  return runSlipwayJsonCommand({
-    config: input.config,
-    slipwayUrl: input.slipwayUrl,
-    json: input.json,
-    method: "POST",
-    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/blackbox/configurations`,
-    body: {},
-    errorCode: "SLIPWAY_APPLICATION_BLACKBOX_CONFIGURE_FAILED",
-    fetchFailedMessage: "could not configure Liskov Blackbox",
-    human: (body) => {
-      const configuration = objectRecord(objectRecord(body).configuration);
-      return `Blackbox configuration ${stringValue(configuration.configurationId) ?? "recorded"} for ${input.applicationRef}.`;
     }
   }, options);
 }
@@ -3639,6 +3683,7 @@ async function authenticatedSlipwayRequest<T>(
     requestErrorCode: string;
     notFoundMessage: string;
     fetchFailedMessage: string;
+    redactFetchError?: boolean;
   },
   options: SlipwayCliOptions
 ): Promise<
@@ -3679,7 +3724,7 @@ async function authenticatedSlipwayRequest<T>(
     writeStructuredOrHuman(options, input.json, {
       ok: false,
       error: input.requestErrorCode,
-      message: errorMessage(error),
+      message: input.redactFetchError ? "Request failed." : errorMessage(error),
       slipwayUrl,
       sessionFile
     }, `Error (${input.requestErrorCode}): ${input.fetchFailedMessage} at ${slipwayUrl}.`);
@@ -3693,6 +3738,18 @@ async function authenticatedSlipwayRequest<T>(
     slipwayUrl,
     sessionFile
   };
+}
+
+function applicationLogsInputError(input: SlipwayApplicationLogsInput): string | undefined {
+  if (input.limit !== undefined && (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 500)) {
+    return "--limit must be an integer from 1 through 500.";
+  }
+  if (input.deploymentId !== undefined && input.deploymentId.trim() === "") return "--deployment must not be empty.";
+  if (input.jobId !== undefined && input.jobId.trim() === "") return "--job must not be empty.";
+  if (input.origin !== undefined && !["all", "customer", "runtime-ssh"].includes(input.origin)) {
+    return "--origin must be all, customer, or runtime-ssh.";
+  }
+  return undefined;
 }
 
 async function authenticatedSlipwayJsonRequest<T>(

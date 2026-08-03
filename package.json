@@ -1,6 +1,6 @@
 {
   "name": "@proof-computer/proof-cli-liskov",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Liskov plugin for the PROOF command line interface.",
   "private": false,
   "type": "module",
@@ -11,7 +11,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && oclif manifest",
+    "build": "node scripts/clean-build.mjs && tsc -p tsconfig.json && oclif manifest",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
     "prepare": "pnpm run build && node scripts/verify-package.mjs",

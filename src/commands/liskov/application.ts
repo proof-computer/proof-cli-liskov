@@ -42,6 +42,7 @@ COMMANDS
   plans APPLICATION_ID
   action-plan APP_REF
   action-plan retry APP_REF --decision-id ID --reason TEXT --yes
+  logs APP_REF [--limit N] [--deployment ID] [--job ID] [--origin all|customer|runtime-ssh] [--json]
   devtools view-key APP_REF DEPLOYMENT_ID
   runtime-image workflow APP_ID --manifest PATH [--output PATH]
   deployment import APP_REF --sequence N --origin ADDRESS --yes
@@ -51,7 +52,6 @@ COMMANDS
   lockbox grant verify APP_REF GRANT_ID --yes
   lockbox grant status APP_REF
   lockbox grant-status APPLICATION_ID
-  blackbox configure APP_REF --yes
 
 DESCRIPTION
   Application commands use the local proof liskov session created by

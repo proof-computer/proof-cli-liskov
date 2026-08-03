@@ -8,8 +8,7 @@ const packageJson = JSON.parse(await readFile(path.join(repoRoot, "package.json"
 const requiredArtifacts = [
   "dist/commands/liskov.js",
   "dist/commands/liskov/application.js",
-  "dist/commands/liskov/application/blackbox.js",
-  "dist/commands/liskov/application/blackbox/configure.js",
+  "dist/commands/liskov/application/logs.js",
   "dist/commands/liskov/application/deployment.js",
   "dist/commands/liskov/application/deployment/import.js",
   "dist/commands/liskov/application/delete.js",
@@ -62,6 +61,10 @@ const forbiddenDependencies = [
   "@proof-computer/proof-cli-lockbox",
   "@proof-computer/proof-cli-baran"
 ];
+const forbiddenArtifacts = [
+  "dist/commands/liskov/application/blackbox.js",
+  "dist/commands/liskov/application/blackbox/configure.js"
+];
 
 const errors = [];
 
@@ -78,6 +81,15 @@ for (const artifact of requiredArtifacts) {
     await access(path.join(repoRoot, artifact));
   } catch {
     errors.push(`Missing package artifact: ${artifact}`);
+  }
+}
+
+for (const artifact of forbiddenArtifacts) {
+  try {
+    await access(path.join(repoRoot, artifact));
+    errors.push(`Retired package artifact is still present: ${artifact}`);
+  } catch {
+    // Absence is the required state.
   }
 }
 

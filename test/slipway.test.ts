@@ -10,7 +10,6 @@ import {
   runSlipwayAdminDeploySpendResolve,
   runSlipwayAdminExecutorOperationReconcile,
   runSlipwayApplicationBackfillIdentities,
-  runSlipwayApplicationBlackboxConfigure,
   runSlipwayApplicationActivity,
   runSlipwayApplicationActionPlanRetry,
   runSlipwayApplicationDelete,
@@ -2208,20 +2207,6 @@ describe("proof-cli Liskov runner", () => {
           method: "POST",
           body: {}
         }
-      },
-      {
-        name: "blackbox configure",
-        run: () => runSlipwayApplicationBlackboxConfigure({
-          applicationRef: "alpha",
-          config: sessionFile,
-          json: true,
-          yes: true
-        }, sharedOptions()),
-        expected: {
-          url: "https://slipway.test/api/applications/alpha/blackbox/configurations",
-          method: "POST",
-          body: {}
-        }
       }
     ];
 
@@ -2236,7 +2221,7 @@ describe("proof-cli Liskov runner", () => {
             authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
             body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>
           });
-          return jsonResponse({ ok: true, child: { childSessionId: "child-1" }, grant: { grantId: "grant-1" }, configuration: { configurationId: "blackbox-1" } });
+          return jsonResponse({ ok: true, child: { childSessionId: "child-1" }, grant: { grantId: "grant-1" } });
         },
         stdout: out.write
       };
@@ -2276,11 +2261,10 @@ describe("proof-cli Liskov runner", () => {
       runSlipwayApplicationLockboxSetupPr({ applicationRef: "alpha", config: sessionFile, json: true }, options),
       runSlipwayApplicationLockboxDispatch({ applicationRef: "alpha", config: sessionFile, json: true }, options),
       runSlipwayApplicationLockboxGrantEnsure({ applicationRef: "alpha", config: sessionFile, json: true }, options),
-      runSlipwayApplicationLockboxGrantVerify({ applicationRef: "alpha", grantId: "grant-1", config: sessionFile, json: true }, options),
-      runSlipwayApplicationBlackboxConfigure({ applicationRef: "alpha", config: sessionFile, json: true }, options)
+      runSlipwayApplicationLockboxGrantVerify({ applicationRef: "alpha", grantId: "grant-1", config: sessionFile, json: true }, options)
     ];
     const codes = await Promise.all(commands);
-    assert.deepEqual(codes, [1, 1, 1, 1, 1, 1, 1]);
+    assert.deepEqual(codes, [1, 1, 1, 1, 1, 1]);
     assert.match(out.text, /CONFIRMATION_REQUIRED/u);
   });
 

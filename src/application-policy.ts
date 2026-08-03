@@ -6,7 +6,7 @@ export const ATTESTED_RUNTIME_PROFILE = "proof.liskov.attested-runtime.v1";
 export const ACURAST_SET_ENVIRONMENT_BOOTSTRAP_DELIVERY = "acurast-set-environment";
 
 export interface PolicyValidationError {
-  code: "invalid_manifest" | "unknown_field" | "unsupported_policy_feature" | "entitlement_exceeded";
+  code: "invalid_manifest" | "unknown_field" | "unsupported_policy_feature" | "entitlement_exceeded" | "deprecated_manifest_field";
   message: string;
   pointer: string;
 }
@@ -623,6 +623,15 @@ export function validateApplicationManifestV4(value: unknown): PolicyValidationE
   const context = object(logs.context);
   if (logs.context !== undefined && (!context || Object.values(context).some((entry) => typeof entry !== "string"))) {
     errors.push({ code: "invalid_manifest", message: "must be an object of string values", pointer: "/observability/logs/context" });
+  }
+  for (const field of ["profileId", "sinkName", "context"] as const) {
+    if (Object.prototype.hasOwnProperty.call(logs, field)) {
+      errors.push({
+        code: "deprecated_manifest_field",
+        message: `${field} is accepted for Manifest V4 compatibility but is deprecated; Liskov derives managed logging configuration automatically`,
+        pointer: `/observability/logs/${field}`
+      });
+    }
   }
   const runtimeDiagnostics = checkOptionalObject(observability, "runtimeDiagnostics", "/observability", ["signed"], errors);
   if (runtimeDiagnostics.signed !== undefined && typeof runtimeDiagnostics.signed !== "boolean") {

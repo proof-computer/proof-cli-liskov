@@ -149,6 +149,28 @@ describe("local application-manifest v4 tools", () => {
       && error.pointer === "/deployment/lifecycle/update/existingJobs/mode"));
   });
 
+  it("accepts legacy logging author fields with non-blocking deprecation diagnostics", () => {
+    const input = manifest();
+    input.observability = {
+      logs: {
+        enabled: true,
+        profileId: "profile-v1",
+        sinkName: "legacy-sink",
+        context: {}
+      },
+      runtimeDiagnostics: { signed: true }
+    };
+    const diagnostics = validateApplicationManifestV4(input);
+    assert.equal(diagnostics.filter((diagnostic) =>
+      diagnostic.code === "invalid_manifest" || diagnostic.code === "unknown_field").length, 0);
+    assert.deepEqual(diagnostics.filter((diagnostic) => diagnostic.code === "deprecated_manifest_field")
+      .map((diagnostic) => diagnostic.pointer), [
+      "/observability/logs/profileId",
+      "/observability/logs/sinkName",
+      "/observability/logs/context"
+    ]);
+  });
+
   it("accepts and preserves explicit environment bootstrap delivery and generation bounds", () => {
     const input = manifest();
     const runtime = input.runtime as Record<string, unknown>;
