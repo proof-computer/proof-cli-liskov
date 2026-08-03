@@ -14,10 +14,16 @@ importers:
       '@oclif/core':
         specifier: ^4.11.3
         version: 4.11.4
+      ws:
+        specifier: ^8.18.3
+        version: 8.21.0
     devDependencies:
       '@types/node':
         specifier: ^24.10.1
         version: 24.13.0
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
       oclif:
         specifier: ^4.23.7
         version: 4.23.10(@types/node@24.13.0)
@@ -754,6 +760,9 @@ packages:
 
   '@types/wrap-ansi@3.0.0':
     resolution: {integrity: sha512-ltIpx+kM7g/MLRZfkbL7EsCEjfzCcScLpkg37eXEtx5kmrAKBkTJwd1GIAjDSL8wTpM6Hzn5YO4pSb91BEwu1g==}
+
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
   adm-zip@0.5.17:
     resolution: {integrity: sha512-+Ut8d9LLqwEvHHJl1+PIHqoyDxFgVN847JTVM3Izi3xHDWPE4UtzzXysMZQs64DMcrJfBeS/uoEP4AD3HQHnQQ==}
@@ -2505,6 +2514,10 @@ snapshots:
       undici-types: 7.18.2
 
   '@types/wrap-ansi@3.0.0': {}
+
+  '@types/ws@8.18.1':
+    dependencies:
+      '@types/node': 24.13.0
 
   adm-zip@0.5.17: {}
 
