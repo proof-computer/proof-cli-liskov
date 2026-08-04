@@ -7,6 +7,18 @@ import WebSocket, { type RawData } from "ws";
 export const ACCESS_SUBPROTOCOL = "liskov-access.v1";
 export const MAX_ACCESS_FRAME_BYTES = 64 * 1024;
 const MAX_TOKEN_BYTES = 16 * 1024;
+const SAFE_CLOSE_CATEGORIES = new Set([
+  "byte_limit",
+  "connector_closed",
+  "connector_unavailable",
+  "frame_too_large",
+  "gateway_closed",
+  "heartbeat_timeout",
+  "operator_closed",
+  "peer_closed",
+  "session_limit",
+  "unexpected_text"
+]);
 
 export class ManagedAccessProxyError extends Error {
   constructor(public readonly code: string) {
@@ -184,12 +196,16 @@ export async function runManagedAccessProxy(
         streams.stdout.once("drain", () => socket.resume());
       }
     });
-    socket.once("close", (code) => {
+    socket.once("close", (code, reason) => {
       if (settled) return;
       settled = true;
       streams.stdin.pause();
       if (code === 1000) resolve();
-      else reject(new ManagedAccessProxyError("access_proxy_closed"));
+      else {
+        const category = reason.toString("utf8");
+        const suffix = SAFE_CLOSE_CATEGORIES.has(category) ? `_${category}` : "";
+        reject(new ManagedAccessProxyError(`access_proxy_closed${suffix}`));
+      }
     });
   });
 }
