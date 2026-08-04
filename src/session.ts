@@ -42,6 +42,11 @@ import {
   isLiskovApplicationLogsResponse,
   type LiskovApplicationLogsResponse
 } from "./application-logs.js";
+import {
+  formatLaunchEligibility,
+  readLaunchEligibility,
+  type LaunchEligibilityRead
+} from "./launch-eligibility.js";
 
 export const DEFAULT_SLIPWAY_URL = "https://liskov.proof.computer";
 const DEFAULT_RUNTIME_IMAGE_WORKFLOW_OUTPUT = ".github/workflows/liskov-runtime-image.yml";
@@ -3194,26 +3199,31 @@ export async function runSlipwayCustodyPreflight(input: SlipwayCustodyPreflightI
     human: (body) => {
       if (stringValue(objectRecord(body).mode) === "paused_preview") {
         const preview = objectRecord(objectRecord(body).pausedPreview);
-        const status = stringValue(preview.status) ?? "unknown";
         const itemCount = numberValue(preview.itemCount) ?? arrayValue(preview.items).length;
-        const readyCount = numberValue(preview.readyCount) ?? 0;
-        return `Paused read-only preflight for ${input.applicationRef}: ${status}; ${readyCount}/${itemCount} deploy item(s) ready. Submission is disabled.`;
+        const eligibility = readLaunchEligibility(preview.launchEligibility);
+        const status = eligibility.eligible ? stringValue(preview.status) ?? "unknown" : "unavailable";
+        const readyCount = eligibility.eligible ? numberValue(preview.readyCount) ?? 0 : 0;
+        return `Paused read-only preflight for ${input.applicationRef}: ${status}; ${readyCount}/${itemCount} deploy item(s) ready. Launch eligibility: ${formatLaunchEligibility(eligibility)}. Submission is disabled.`;
       }
       const actionPlan = objectRecord(objectRecord(body).actionPlan);
-      const count = numberValue(actionPlan.count) ?? arrayValue(actionPlan.items).length;
-      const selectionInstruction = count > 0
+      const items = arrayValue(actionPlan.items).map(objectRecord);
+      const count = numberValue(actionPlan.count) ?? items.length;
+      const deployItemCount = items.filter((item) => item.kind === "acurast.deploy").length;
+      const eligibility = readLaunchEligibility(objectRecord(body).launchEligibility);
+      const selectionInstruction = eligibility.eligible && deployItemCount > 0
         ? " Run preflight with --json, then copy both planItemId and the opaque idempotencyKey from the same custodial.live actionPlan item."
         : "";
+      const launchSummary = ` Launch eligibility: ${formatLaunchEligibility(eligibility)}.`;
       const reclaim = objectRecord(objectRecord(body).reclaim);
       const candidateCount = numberValue(reclaim.candidateCount);
-      if (candidateCount === undefined) return `${count} live custody plan item(s) for ${input.applicationRef}.${selectionInstruction}`;
+      if (candidateCount === undefined) return `${count} live custody plan item(s) for ${input.applicationRef}.${launchSummary}${selectionInstruction}`;
       const reclaimableCount = numberValue(reclaim.reclaimableCount) ?? 0;
       const blockedCount = numberValue(reclaim.blockedCount) ?? 0;
       const failedCount = numberValue(reclaim.failedCount) ?? 0;
       const alreadyReclaimedCount = numberValue(reclaim.alreadyReclaimedCount) ?? 0;
       const alreadyDeregisteredCount = numberValue(reclaim.alreadyDeregisteredCount) ?? 0;
       const skippedByLimitCount = numberValue(reclaim.skippedByLimitCount) ?? 0;
-      return `${count} live custody plan item(s) for ${input.applicationRef}. Reclaim: ${candidateCount} candidate(s), ${reclaimableCount} reclaimable, ${blockedCount} blocked, ${failedCount} failed, ${alreadyReclaimedCount} already reclaimed, ${alreadyDeregisteredCount} already deregistered, ${skippedByLimitCount} skipped by limit.${selectionInstruction}`;
+      return `${count} live custody plan item(s) for ${input.applicationRef}.${launchSummary} Reclaim: ${candidateCount} candidate(s), ${reclaimableCount} reclaimable, ${blockedCount} blocked, ${failedCount} failed, ${alreadyReclaimedCount} already reclaimed, ${alreadyDeregisteredCount} already deregistered, ${skippedByLimitCount} skipped by limit.${selectionInstruction}`;
     },
     options
   });
@@ -3360,6 +3370,8 @@ export async function runSlipwayCustodyExecutionList(input: SlipwayCustodyExecut
 export async function runSlipwayCustodyExecutionSubmit(input: SlipwayCustodyExecutionSubmitInput, options: SlipwayCliOptions = {}): Promise<number> {
   if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_CUSTODY_EXECUTION_SUBMIT_CONFIRMATION_REQUIRED", "custody execution submit");
   if (!input.yesSpend) return writeConfirmationRequired(options, input.json, "SLIPWAY_CUSTODY_EXECUTION_SUBMIT_SPEND_CONFIRMATION_REQUIRED", "custody execution submit spend", "--yes-spend");
+  const preflight = await verifyFreshExecutionSubmitPlanItem(input, options);
+  if (!preflight.ok) return preflight.exitCode;
   const body: Record<string, unknown> = {
     planItemId: input.planItemId,
     idempotencyKey: input.idempotencyKey,
@@ -3597,6 +3609,13 @@ async function selectFreshRunOnePlanItem(
     return fail(stringValue(preflight?.reason) ?? stringValue(preflight?.error) ?? "preflight_request_failed", response.status);
   }
 
+  if (input.expectKind === "acurast.deploy") {
+    const eligibility = readLaunchEligibility(preflight.launchEligibility);
+    if (!eligibility.known || !eligibility.eligible) {
+      return reject("launch_not_eligible", launchEligibilityRejectionDetails("launchEligibility", eligibility));
+    }
+  }
+
   const lifecyclePolicy = objectRecord(preflight.lifecyclePolicy);
   if (input.requireEnvironmentBootstrap) {
     const explicitServerEnvironmentReady = lifecyclePolicy.serverEnvironmentRequired === true
@@ -3717,6 +3736,12 @@ async function selectFreshRunOnePlanItem(
   const guardMismatch = (field: string, expected: unknown, actual: unknown): FreshRunOnePlanSelection =>
     reject("live_custody_run_one_guard_mismatch", { field, expected, actual });
   if (selected.kind !== input.expectKind) return guardMismatch("kind", input.expectKind, selected.kind);
+  if (selected.kind === "acurast.deploy") {
+    const eligibility = readLaunchEligibility(selected.launchEligibility);
+    if (!eligibility.known || !eligibility.eligible) {
+      return reject("launch_plan_item_not_eligible", launchEligibilityRejectionDetails("actionPlan.items.launchEligibility", eligibility));
+    }
+  }
   if (selected.policyDigest !== input.expectPolicyDigest) {
     return guardMismatch("policyDigest", input.expectPolicyDigest, selected.policyDigest);
   }
@@ -3736,6 +3761,86 @@ async function selectFreshRunOnePlanItem(
     planItemId: selected.planItemId as string,
     idempotencyKey: selected.idempotencyKey as string,
     expectedExecutionId: liveCustodyExecutionId(selected.idempotencyKey as string)
+  };
+}
+
+type FreshSubmitPlanVerification = { ok: true } | { ok: false; exitCode: number };
+
+async function verifyFreshExecutionSubmitPlanItem(
+  input: SlipwayCustodyExecutionSubmitInput,
+  options: SlipwayCliOptions
+): Promise<FreshSubmitPlanVerification> {
+  const reject = (reason: string, details: Record<string, unknown> = {}): FreshSubmitPlanVerification => {
+    const message = `Fresh preflight rejected execution submit; re-read \`proof liskov custody preflight ${input.applicationRef} --json\` and copy one exact planItemId/idempotencyKey pair.`;
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_CUSTODY_EXECUTION_SUBMIT_PREFLIGHT_REJECTED",
+      reason,
+      message,
+      ...details
+    }, `Error (SLIPWAY_CUSTODY_EXECUTION_SUBMIT_PREFLIGHT_REJECTED): ${message} (${reason})`);
+    return { ok: false, exitCode: 1 };
+  };
+  const request = await authenticatedSlipwayRequest<SlipwayLiveCustodyCommandResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/live-custody/preflight`,
+    requestErrorCode: "SLIPWAY_CUSTODY_EXECUTION_SUBMIT_PREFLIGHT_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read a fresh Liskov live custody preflight"
+  }, options);
+  if (!request.ok) return request;
+  if (!request.response.ok || request.body?.ok !== true) {
+    return reject(stringValue(request.body?.reason) ?? stringValue(request.body?.error) ?? "preflight_request_failed", {
+      status: request.response.status
+    });
+  }
+  const actionPlan = objectRecord(request.body.actionPlan);
+  const items = arrayValue(actionPlan.items).map(objectRecord);
+  const exact = items.filter((item) => item.executorMode === "custodial.live"
+    && item.planItemId === input.planItemId
+    && item.idempotencyKey === input.idempotencyKey);
+  if (exact.length !== 1) {
+    return reject(exact.length === 0 ? "plan_item_not_found" : "ambiguous_plan_item", { matches: exact.length });
+  }
+  const selected = exact[0];
+  if (!Array.isArray(selected.blockers)) {
+    return reject("invalid_live_custody_plan_item", { field: "actionPlan.items.blockers" });
+  }
+  if (selected.blockers.length > 0) {
+    return reject("live_custody_plan_blocked", { blockerCount: selected.blockers.length });
+  }
+  if (selected.kind === "acurast.deploy") {
+    const topLevel = readLaunchEligibility(request.body.launchEligibility);
+    if (!topLevel.known || !topLevel.eligible) {
+      return reject("launch_not_eligible", launchEligibilityRejectionDetails("launchEligibility", topLevel));
+    }
+    const itemEligibility = readLaunchEligibility(selected.launchEligibility);
+    if (!itemEligibility.known || !itemEligibility.eligible) {
+      return reject("launch_plan_item_not_eligible", launchEligibilityRejectionDetails("actionPlan.items.launchEligibility", itemEligibility));
+    }
+  }
+  return { ok: true };
+}
+
+function launchEligibilityRejectionDetails(field: string, eligibility: LaunchEligibilityRead): Record<string, unknown> {
+  if (!eligibility.known) {
+    return {
+      field,
+      launchEligibilityState: "unavailable",
+      launchEligibilityReason: eligibility.reason,
+      launchEligibilityCode: eligibility.rawCode ?? null
+    };
+  }
+  return {
+    field,
+    launchEligibilityState: "ineligible",
+    launchEligibilityCode: eligibility.value.code,
+    evidenceAuthority: eligibility.value.evidenceAuthority,
+    userActionable: eligibility.value.userActionable,
+    nextAction: eligibility.value.nextAction ?? null,
+    blockerCodes: eligibility.value.blockerCodes
   };
 }
 

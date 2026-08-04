@@ -3029,7 +3029,8 @@ describe("proof-cli Liskov runner", () => {
         });
         return jsonResponse({
           ok: true,
-          actionPlan: { count: 2, items: [{ planItemId: "plan-1" }, { planItemId: "plan-2" }] },
+          actionPlan: { count: 2, items: [{ planItemId: "plan-1", kind: "acurast.deploy" }, { planItemId: "plan-2", kind: "acurast.setEnvironment" }] },
+          launchEligibility: launchEligibility("eligible_now"),
           reclaim: {
             sweepEnabled: false,
             maxPerTick: 2,
@@ -3054,6 +3055,7 @@ describe("proof-cli Liskov runner", () => {
       authorization: `Bearer ${token}`
     }]);
     assert.match(out.text, /2 live custody plan item\(s\) for alpha\./u);
+    assert.match(out.text, /Launch eligibility: eligible now \(eligible_now\); evidence test_authority\./u);
     assert.match(out.text, /Reclaim: 7 candidate\(s\), 2 reclaimable, 1 blocked, 1 failed, 1 already reclaimed, 1 already deregistered, 1 skipped by limit\./u);
     assert.match(out.text, /copy both planItemId and the opaque idempotencyKey from the same custodial\.live actionPlan item/u);
     assert.equal(out.text.includes(token), false);
@@ -3095,6 +3097,7 @@ describe("proof-cli Liskov runner", () => {
             submitAllowed: false,
             itemCount: 1,
             readyCount: 1,
+            launchEligibility: launchEligibility("eligible_now"),
             items: [{
               planItemId: "preview-plan-1",
               previewOnly: true,
@@ -3113,7 +3116,7 @@ describe("proof-cli Liskov runner", () => {
       method: "GET",
       authorization: `Bearer ${token}`
     }]);
-    assert.match(out.text, /Paused read-only preflight for alpha: ready; 1\/1 deploy item\(s\) ready\. Submission is disabled\./u);
+    assert.match(out.text, /Paused read-only preflight for alpha: ready; 1\/1 deploy item\(s\) ready\. Launch eligibility: eligible now \(eligible_now\); evidence test_authority\. Submission is disabled\./u);
     assert.equal(out.text.includes("preview-plan-1"), false);
     assert.equal(out.text.includes(token), false);
   });
@@ -3803,6 +3806,16 @@ describe("proof-cli Liskov runner", () => {
           authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
           body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined
         });
+        if (String(url).endsWith("/api/applications/alpha/live-custody/preflight")) {
+          return jsonResponse(runOnePreflight([
+            runOnePreflightPlan({
+              planItemId: "set-env-1",
+              idempotencyKey: "idempotency-1",
+              kind: "acurast.setEnvironment",
+              deploymentId: "deployment-1"
+            })
+          ]));
+        }
         if (String(url).endsWith("/api/applications/alpha/action-plan")) {
           return jsonResponse({ ok: true, items: [setEnvironmentPlanItem()] });
         }
@@ -3825,18 +3838,19 @@ describe("proof-cli Liskov runner", () => {
 
     assert.equal(code, 0);
     assert.deepEqual(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`), [
+      "GET /api/applications/alpha/live-custody/preflight",
       "GET /api/applications/alpha/action-plan",
       "GET /api/applications/alpha",
       "POST /api/applications/alpha/live-custody/executions"
     ]);
-    assert.deepEqual(requests[2]?.body, {
+    assert.deepEqual(requests[3]?.body, {
       planItemId: "set-env-1",
       idempotencyKey: "idempotency-1",
       yesSpend: true,
       acknowledgement: "yes-spend",
       environmentHandoff: handoff
     });
-    assert.equal(requests[2]?.authorization, `Bearer ${token}`);
+    assert.equal(requests[3]?.authorization, `Bearer ${token}`);
     assert.equal(out.text.includes(token), false);
     assert.equal(out.text.includes(secretValue), false);
   });
@@ -4578,6 +4592,9 @@ function runOnePreflightPlan(overrides: {
     policyDigest: overrides.policyDigest ?? "policy-digest-1",
     executorMode: "custodial.live",
     blockers: overrides.blockers ?? [],
+    ...(overrides.kind === "acurast.setEnvironment"
+      ? {}
+      : { launchEligibility: launchEligibility("eligible_now") }),
     callSummary: {
       ...(overrides.deploymentId === undefined ? {} : { deploymentId: overrides.deploymentId })
     }
@@ -4587,10 +4604,21 @@ function runOnePreflightPlan(overrides: {
 function runOnePreflight(items: Record<string, unknown>[]): Record<string, unknown> {
   return {
     ok: true,
+    launchEligibility: launchEligibility("eligible_now"),
     actionPlan: {
       count: items.length,
       items
     }
+  };
+}
+
+function launchEligibility(code: string): Record<string, unknown> {
+  return {
+    schema: "proof.liskov.launch-eligibility.v1",
+    code,
+    evidenceAuthority: "test_authority",
+    userActionable: code === "blocked",
+    ...(code === "blocked" ? { nextAction: "resolve_blockers", blockerCodes: ["test_blocker"] } : {})
   };
 }
 
