@@ -591,7 +591,6 @@ export function validateApplicationManifestV4(value: unknown): PolicyValidationE
   if (existingJobs.mode === "cooperative_cease") {
     checkObject(update.existingJobs, "/deployment/lifecycle/update/existingJobs", ["mode", "trigger"], errors, ["mode", "trigger"]);
     checkEnum(existingJobs.trigger, ["rollout_started", "successor_processor_claimed", "successor_runtime_ready"], "/deployment/lifecycle/update/existingJobs/trigger", errors);
-    errors.push({ code: "unsupported_policy_feature", message: "cooperative cease is typed but command delivery is not enabled", pointer: "/deployment/lifecycle/update/existingJobs/mode" });
   } else if (existingJobs.mode === "run_until_scheduled_end") {
     checkObject(update.existingJobs, "/deployment/lifecycle/update/existingJobs", ["mode"], errors, ["mode"]);
   }

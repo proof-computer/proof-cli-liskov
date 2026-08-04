@@ -134,7 +134,7 @@ describe("local application-manifest v4 tools", () => {
     assert.equal(releaseIntentDigest(reorderedRefs), releaseIntentDigest(reverse));
   });
 
-  it("keeps contract validity separate from target capability diagnostics", () => {
+  it("accepts the implemented cooperative-cease lifecycle contract", () => {
     const input = manifest();
     const lifecycle = ((input.deployment as Record<string, unknown>).lifecycle as Record<string, unknown>);
     (lifecycle.update as Record<string, unknown>).existingJobs = {
@@ -142,11 +142,7 @@ describe("local application-manifest v4 tools", () => {
       trigger: "successor_runtime_ready"
     };
     const diagnostics = validateApplicationManifestV4(input);
-    assert.equal(diagnostics.filter((error) =>
-      error.code === "invalid_manifest" || error.code === "unknown_field").length, 0);
-    assert.ok(diagnostics.some((error) =>
-      error.code === "unsupported_policy_feature"
-      && error.pointer === "/deployment/lifecycle/update/existingJobs/mode"));
+    assert.deepEqual(diagnostics, []);
   });
 
   it("accepts legacy logging author fields with non-blocking deprecation diagnostics", () => {
