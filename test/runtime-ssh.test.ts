@@ -292,7 +292,8 @@ test("managed access pins host trust, mints one ticket, launches strict OpenSSH,
         calls.push({ executable, args, mode });
         assert.equal(executable, "ssh");
         assert.equal(mode, "inherit");
-        assert.deepEqual(args.slice(0, 16), [
+        assert.deepEqual(args.slice(0, 18), [
+          "-F", "/dev/null",
           "-i", identity,
           "-o", "IdentitiesOnly=yes",
           "-o", "StrictHostKeyChecking=yes",

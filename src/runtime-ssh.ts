@@ -404,6 +404,7 @@ async function runManagedConnection(
     "--token-file", ticketFile
   ].map(shellQuote).join(" ");
   const sshArgs = [
+    "-F", "/dev/null",
     "-i", identity,
     "-o", "IdentitiesOnly=yes",
     "-o", "StrictHostKeyChecking=yes",
