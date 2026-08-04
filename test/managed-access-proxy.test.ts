@@ -98,3 +98,40 @@ test("proxy copies stdin and stdout bytes without framing text or diagnostics", 
   assert.deepEqual(Buffer.concat(sent), outbound);
   assert.deepEqual(Buffer.concat(outputChunks), inbound);
 });
+
+test("proxy reports only allowlisted gateway close categories", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "liskov-access-close-"));
+  const tokenFile = path.join(root, "operator.token");
+  await writeFile(tokenFile, "one-time-token\n", { mode: 0o600 });
+
+  for (const [reason, expected] of [
+    ["connector_closed", "access_proxy_closed_connector_closed"],
+    ["secret bearer material", "access_proxy_closed"]
+  ]) {
+    const emitter = new EventEmitter();
+    const fake = Object.assign(emitter, {
+      protocol: "liskov-access.v1",
+      pause: () => undefined,
+      resume: () => undefined,
+      terminate: () => undefined,
+      send: () => undefined,
+      close: () => undefined
+    }) as unknown as WebSocket;
+    const proxy = runManagedAccessProxy(
+      { gateway: "wss://access.example", tokenFile, tunnelId: "tunnel_test" },
+      { stdin: new PassThrough(), stdout: new PassThrough() },
+      {
+        createSocket: () => {
+          queueMicrotask(() => {
+            emitter.emit("open");
+            emitter.emit("close", 1011, Buffer.from(reason));
+          });
+          return fake;
+        }
+      }
+    );
+    await assert.rejects(proxy, (error: unknown) =>
+      error instanceof Error && error.message === expected
+    );
+  }
+});
