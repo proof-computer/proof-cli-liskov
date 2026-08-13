@@ -8,6 +8,9 @@ import test from "node:test";
 import {
   runRuntimeSshConnection,
   runRuntimeSshIntegrationCreate,
+  runRuntimeSshOperatorKeyAdd,
+  runRuntimeSshOperatorKeyList,
+  runRuntimeSshOperatorKeyRemove,
   type RuntimeSshProcessRunner
 } from "../src/runtime-ssh.js";
 
@@ -400,3 +403,196 @@ async function connectionFetch(url: string | URL | Request, init?: RequestInit):
     }
   });
 }
+
+const organizationListBody = {
+  ok: true,
+  organizations: [{ id: "org_1", name: "Organization One", slug: "organization-one", isPersonal: false, role: "owner" }]
+};
+
+function operatorKeyRow(publicKey: string) {
+  return {
+    keyId: "key_1",
+    name: "patrick-mbp",
+    publicKey,
+    fingerprint: fingerprint(publicKey),
+    addedBy: "principal-1",
+    createdAtMs: 1_000
+  };
+}
+
+test("operator-key add registers the public half of --identity and never prints the session token", async () => {
+  await withSession(async (sessionFile) => {
+    const publicKey = ed25519PublicKey(9);
+    const output: string[] = [];
+    const requestUrls: string[] = [];
+    let requestBody = "";
+    const code = await runRuntimeSshOperatorKeyAdd({
+      organizationId: "organization-one",
+      name: "patrick-mbp",
+      identity: "/tmp/does-not-exist-id_ed25519",
+      config: sessionFile
+    }, {
+      // No .pub companion on disk, so the ssh-keygen derivation path runs —
+      // the same path `liskov ssh --identity` uses.
+      runProcess: async (executable, args) => {
+        assert.equal(executable, "ssh-keygen");
+        assert.deepEqual([...args], ["-y", "-f", "/tmp/does-not-exist-id_ed25519"]);
+        return { exitCode: 0, stdout: `${publicKey}\n`, stderr: "" };
+      },
+      stdout: (line) => output.push(line),
+      stderr: (line) => output.push(line),
+      fetchImpl: async (url, init) => {
+        requestUrls.push(String(url));
+        if (String(url).endsWith("/api/organizations")) return Response.json(organizationListBody);
+        requestBody = String(init?.body);
+        return Response.json({ ok: true, key: operatorKeyRow(publicKey) }, { status: 201 });
+      }
+    });
+    assert.equal(code, 0);
+    assert.deepEqual(requestUrls, [
+      "https://liskov.test/api/organizations",
+      "https://liskov.test/api/organizations/org_1/runtime-ssh/operator-keys"
+    ]);
+    const sent = JSON.parse(requestBody);
+    assert.equal(sent.publicKey, publicKey);
+    assert.equal(sent.name, "patrick-mbp");
+    // Registering is not granting; the human path has to say so.
+    assert.match(output.join("\n"), /does not grant access/u);
+    assert.doesNotMatch(output.join("\n"), new RegExp(token));
+  });
+});
+
+test("operator-key add accepts a public-key file and sends the identical body", async () => {
+  await withSession(async (sessionFile) => {
+    const publicKey = ed25519PublicKey(11);
+    const keyFile = path.join(path.dirname(sessionFile), "operator.pub");
+    await writeFile(keyFile, `${publicKey} patrick@laptop\n`);
+    let requestBody = "";
+    const code = await runRuntimeSshOperatorKeyAdd({
+      organizationId: "organization-one",
+      name: "patrick-mbp",
+      publicKeyFile: keyFile,
+      config: sessionFile
+    }, {
+      stdout: () => {},
+      stderr: () => {},
+      runProcess: async () => { throw new Error("no subprocess expected"); },
+      fetchImpl: async (url, init) => {
+        if (String(url).endsWith("/api/organizations")) return Response.json(organizationListBody);
+        requestBody = String(init?.body);
+        return Response.json({ ok: true, key: operatorKeyRow(publicKey) }, { status: 201 });
+      }
+    });
+    assert.equal(code, 0);
+    // The trailing comment is normalized away, so both input paths agree.
+    assert.equal(JSON.parse(requestBody).publicKey, publicKey);
+  });
+});
+
+test("operator-key add rejects a non-ed25519 key locally, before any request", async () => {
+  await withSession(async (sessionFile) => {
+    const keyFile = path.join(path.dirname(sessionFile), "rsa.pub");
+    await writeFile(keyFile, "ssh-rsa AAAAB3NzaC1yc2E\n");
+    const output: string[] = [];
+    const code = await runRuntimeSshOperatorKeyAdd({
+      organizationId: "organization-one",
+      name: "bad",
+      publicKeyFile: keyFile,
+      config: sessionFile
+    }, {
+      stdout: (line) => output.push(line),
+      stderr: (line) => output.push(line),
+      fetchImpl: async () => { throw new Error("no request expected for a malformed key"); }
+    });
+    assert.equal(code, 1);
+    assert.match(output.join("\n"), /RUNTIME_SSH_OPERATOR_KEY_NOT_ED25519/u);
+  });
+});
+
+test("operator-key add requires exactly one key source", async () => {
+  await withSession(async (sessionFile) => {
+    const noSource: string[] = [];
+    assert.equal(await runRuntimeSshOperatorKeyAdd(
+      { organizationId: "organization-one", name: "x", config: sessionFile },
+      { stdout: (line) => noSource.push(line), stderr: (line) => noSource.push(line), fetchImpl: async () => { throw new Error("no request expected"); } }
+    ), 1);
+    assert.match(noSource.join("\n"), /RUNTIME_SSH_OPERATOR_KEY_SOURCE_REQUIRED/u);
+
+    const bothSources: string[] = [];
+    assert.equal(await runRuntimeSshOperatorKeyAdd(
+      { organizationId: "organization-one", name: "x", identity: "/tmp/id", publicKeyFile: "/tmp/id.pub", config: sessionFile },
+      { stdout: (line) => bothSources.push(line), stderr: (line) => bothSources.push(line), fetchImpl: async () => { throw new Error("no request expected"); } }
+    ), 1);
+    assert.match(bothSources.join("\n"), /RUNTIME_SSH_OPERATOR_KEY_SOURCE_CONFLICT/u);
+  });
+});
+
+test("operator-key list renders one tab-separated row per key, and an empty state that points at the policy", async () => {
+  await withSession(async (sessionFile) => {
+    const publicKey = ed25519PublicKey(13);
+    const rows: string[] = [];
+    const listed = await runRuntimeSshOperatorKeyList({ organizationId: "organization-one", config: sessionFile }, {
+      stdout: (line) => rows.push(line),
+      stderr: (line) => rows.push(line),
+      fetchImpl: async (url) => String(url).endsWith("/api/organizations")
+        ? Response.json(organizationListBody)
+        : Response.json({ ok: true, keys: [operatorKeyRow(publicKey)] })
+    });
+    assert.equal(listed, 0);
+    assert.equal(rows.join("\n"), `key_1\tpatrick-mbp\t${fingerprint(publicKey)}\tprincipal-1\t1000`);
+
+    const empty: string[] = [];
+    const emptyCode = await runRuntimeSshOperatorKeyList({ organizationId: "organization-one", config: sessionFile }, {
+      stdout: (line) => empty.push(line),
+      stderr: (line) => empty.push(line),
+      fetchImpl: async (url) => String(url).endsWith("/api/organizations")
+        ? Response.json(organizationListBody)
+        : Response.json({ ok: true, keys: [] })
+    });
+    assert.equal(emptyCode, 0);
+    assert.match(empty.join("\n"), /list it in an application policy/u);
+  });
+});
+
+test("operator-key remove surfaces the server's non-revocation note on both output paths", async () => {
+  await withSession(async (sessionFile) => {
+    const publicKey = ed25519PublicKey(17);
+    const note = "Removal does not revoke access on deployed policies; update each policy's authorizedKeys and redeploy to do that.";
+    const removal = async (json: boolean, sink: string[]) => runRuntimeSshOperatorKeyRemove(
+      { organizationId: "organization-one", keyId: "key_1", json, config: sessionFile },
+      {
+        stdout: (line) => sink.push(line),
+        stderr: (line) => sink.push(line),
+        fetchImpl: async (url, init) => {
+          if (String(url).endsWith("/api/organizations")) return Response.json(organizationListBody);
+          assert.equal(init?.method, "DELETE");
+          assert.equal(String(url), "https://liskov.test/api/organizations/org_1/runtime-ssh/operator-keys/key_1");
+          return Response.json({ ok: true, removed: operatorKeyRow(publicKey), note });
+        }
+      }
+    );
+
+    const human: string[] = [];
+    assert.equal(await removal(false, human), 0);
+    assert.match(human.join("\n"), /removed from the registry/u);
+    assert.match(human.join("\n"), /does not revoke/u);
+
+    const machine: string[] = [];
+    assert.equal(await removal(true, machine), 0);
+    assert.equal(JSON.parse(machine.join("\n")).note, note);
+    assert.doesNotMatch(machine.join("\n"), new RegExp(token));
+  });
+});
+
+test("operator-key remove requires a key id", async () => {
+  await withSession(async (sessionFile) => {
+    const output: string[] = [];
+    const code = await runRuntimeSshOperatorKeyRemove({ organizationId: "organization-one", config: sessionFile }, {
+      stdout: (line) => output.push(line),
+      stderr: (line) => output.push(line),
+      fetchImpl: async () => { throw new Error("no request expected"); }
+    });
+    assert.equal(code, 1);
+    assert.match(output.join("\n"), /RUNTIME_SSH_OPERATOR_KEY_ID_REQUIRED/u);
+  });
+});

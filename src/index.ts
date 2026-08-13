@@ -125,12 +125,17 @@ export {
   runRuntimeSshIntegrationList,
   runRuntimeSshIntegrationRotate,
   runRuntimeSshIntegrationValidate,
+  runRuntimeSshOperatorKeyAdd,
+  runRuntimeSshOperatorKeyList,
+  runRuntimeSshOperatorKeyRemove,
   type RuntimeSshCliOptions,
   type RuntimeSshCommandInput,
   type RuntimeSshConnectionInput,
   type RuntimeSshIntegrationCreateInput,
   type RuntimeSshIntegrationInput,
   type RuntimeSshIntegrationRotateInput,
+  type RuntimeSshOperatorKeyAddInput,
+  type RuntimeSshOperatorKeyInput,
   type RuntimeSshProcessResult,
   type RuntimeSshProcessRunner
 } from "./runtime-ssh.js";

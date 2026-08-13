@@ -141,7 +141,7 @@ const scopedLeafCommands = Object.values(oclifManifest.commands).filter((command
     command.id.startsWith("liskov:organization:billing") ||
     command.id === "liskov:organization:service-credits" ||
     command.id === "liskov:organization:use" ||
-    command.id.startsWith("liskov:runtime-ssh:integration:");
+    command.id.startsWith("liskov:runtime-ssh:");
 });
 for (const command of scopedLeafCommands) {
   const organizationFlag = command.flags?.organization;

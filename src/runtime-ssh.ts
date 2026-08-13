@@ -48,6 +48,19 @@ export interface RuntimeSshIntegrationRotateInput extends RuntimeSshIntegrationI
   oauthClientId: string;
 }
 
+export interface RuntimeSshOperatorKeyInput extends RuntimeSshCommandInput {
+  organizationId?: string;
+  keyId?: string;
+}
+
+export interface RuntimeSshOperatorKeyAddInput extends RuntimeSshOperatorKeyInput {
+  name: string;
+  /** Private-key path whose public half is derived, as `liskov ssh --identity` does. */
+  identity?: string;
+  /** Public-key file, or `-` to read the key from stdin. */
+  publicKeyFile?: string;
+}
+
 export interface RuntimeSshConnectionInput extends RuntimeSshCommandInput {
   acceptHostKey?: boolean;
   applicationRef: string;
@@ -87,6 +100,25 @@ interface IntegrationResponse {
   error?: string;
   integration?: RuntimeSshIntegration;
   integrations?: RuntimeSshIntegration[];
+}
+
+interface RuntimeSshOperatorKey {
+  keyId: string;
+  name: string;
+  publicKey: string;
+  fingerprint: string;
+  addedBy: string;
+  createdAtMs: number;
+}
+
+interface OperatorKeyResponse {
+  ok?: boolean;
+  error?: string;
+  key?: RuntimeSshOperatorKey;
+  keys?: RuntimeSshOperatorKey[];
+  removed?: RuntimeSshOperatorKey;
+  /** The server's standing reminder that a registry removal is not a revocation. */
+  note?: string;
 }
 
 interface TailscaleConnection {
@@ -249,6 +281,83 @@ export async function runRuntimeSshIntegrationDisable(
   return integrationMutationResult(input.json, options, response, "disabled");
 }
 
+export async function runRuntimeSshOperatorKeyList(
+  input: RuntimeSshOperatorKeyInput,
+  options: RuntimeSshCliOptions = {}
+): Promise<number> {
+  const organization = await resolveRuntimeSshOrganization(input, options);
+  if (!organization.ok) return organization.exitCode;
+  const response = await runtimeSshRequest<OperatorKeyResponse>(input, options, {
+    method: "GET",
+    path: operatorKeyCollectionPath(organization.organizationId),
+    organizationSelector: null
+  });
+  if (!response.ok) return response.exitCode;
+  if (!response.response.ok || response.body?.ok !== true || !Array.isArray(response.body.keys)) {
+    return apiFailure(input.json, options, response.response.status, response.body?.error);
+  }
+  writeOutput(input.json, options, response.body, response.body.keys.length === 0
+    ? "No operator keys. Add an ssh-ed25519 public key, then list it in an application policy."
+    : response.body.keys.map(formatOperatorKey).join("\n"));
+  return 0;
+}
+
+export async function runRuntimeSshOperatorKeyAdd(
+  input: RuntimeSshOperatorKeyAddInput,
+  options: RuntimeSshCliOptions = {}
+): Promise<number> {
+  // Read the key before resolving the organization: a malformed key is a local
+  // mistake and should not cost a round-trip to report.
+  const publicKey = await readOperatorPublicKey(input, options);
+  if (!publicKey.ok) return publicKey.exitCode;
+  const organization = await resolveRuntimeSshOrganization(input, options);
+  if (!organization.ok) return organization.exitCode;
+  const response = await runtimeSshRequest<OperatorKeyResponse>(input, options, {
+    method: "POST",
+    path: operatorKeyCollectionPath(organization.organizationId),
+    organizationSelector: null,
+    body: { name: input.name, publicKey: publicKey.publicKey }
+  });
+  if (!response.ok) return response.exitCode;
+  if (!response.response.ok || response.body?.ok !== true || !response.body.key) {
+    return apiFailure(input.json, options, response.response.status, response.body?.error);
+  }
+  writeOutput(input.json, options, response.body, [
+    `Operator key added: ${formatOperatorKey(response.body.key)}`,
+    "Adding a key does not grant access. List it in the application policy's ingress.ssh.provider.authorizedKeys and deploy."
+  ].join("\n"));
+  return 0;
+}
+
+export async function runRuntimeSshOperatorKeyRemove(
+  input: RuntimeSshOperatorKeyInput,
+  options: RuntimeSshCliOptions = {}
+): Promise<number> {
+  const keyId = requiredOperatorKeyId(input, options);
+  if (!keyId.ok) return keyId.exitCode;
+  const organization = await resolveRuntimeSshOrganization(input, options);
+  if (!organization.ok) return organization.exitCode;
+  const response = await runtimeSshRequest<OperatorKeyResponse>(input, options, {
+    method: "DELETE",
+    path: operatorKeyPath(organization.organizationId, keyId.keyId),
+    organizationSelector: null,
+    body: {}
+  });
+  if (!response.ok) return response.exitCode;
+  if (!response.response.ok || response.body?.ok !== true || !response.body.removed) {
+    return apiFailure(input.json, options, response.response.status, response.body?.error);
+  }
+  // The non-revocation note travels on both paths: under --json it is part of
+  // the body the server sent, and here it is printed explicitly. Removing a
+  // registry row does not revoke anything a policy already authorizes.
+  writeOutput(input.json, options, response.body, [
+    `Operator key removed from the registry: ${formatOperatorKey(response.body.removed)}`,
+    response.body.note
+      ?? "Removal does not revoke access on deployed policies; update each policy's authorizedKeys and redeploy to do that."
+  ].join("\n"));
+  return 0;
+}
+
 export async function runRuntimeSshConnection(
   input: RuntimeSshConnectionInput,
   options: RuntimeSshCliOptions = {}
@@ -334,7 +443,7 @@ async function runManagedConnection(
   }
   const selectedFingerprint = sshFingerprint(selectedKey.publicKey);
   if (!connection.authorizedKeyFingerprints.includes(selectedFingerprint)) {
-    return localFailure(input.json, options, "RUNTIME_SSH_IDENTITY_NOT_AUTHORIZED", `The selected identity fingerprint ${selectedFingerprint} is not authorized by this runtime policy.`);
+    return localFailure(input.json, options, "RUNTIME_SSH_IDENTITY_NOT_AUTHORIZED", `The selected identity fingerprint ${selectedFingerprint} is not authorized by this runtime policy. Access comes from the policy, not the operator-key registry: add this key to the application policy's ingress.ssh.provider.authorizedKeys and deploy.`);
   }
 
   const alias = `liskov-runtime-ssh-${connection.attachmentId}`;
@@ -585,6 +694,58 @@ function requiredIntegrationId(
   return { ok: true, integrationId };
 }
 
+function requiredOperatorKeyId(
+  input: RuntimeSshOperatorKeyInput,
+  options: RuntimeSshCliOptions
+): { ok: true; keyId: string } | { ok: false; exitCode: number } {
+  const keyId = input.keyId?.trim();
+  if (!keyId) {
+    return {
+      ok: false,
+      exitCode: localFailure(input.json, options, "RUNTIME_SSH_OPERATOR_KEY_ID_REQUIRED", "Provide an operator key ID. Run `liskov runtime-ssh operator-key list` to see them.")
+    };
+  }
+  return { ok: true, keyId };
+}
+
+/// An operator public key is not a secret, so it is read as ordinary input —
+/// never through the protected-prompt path used for OAuth client secrets.
+async function readOperatorPublicKey(
+  input: RuntimeSshOperatorKeyAddInput,
+  options: RuntimeSshCliOptions
+): Promise<{ ok: true; publicKey: string } | { ok: false; exitCode: number }> {
+  const identity = input.identity?.trim();
+  const publicKeyFile = input.publicKeyFile?.trim();
+  if (identity && publicKeyFile) {
+    return { ok: false, exitCode: localFailure(input.json, options, "RUNTIME_SSH_OPERATOR_KEY_SOURCE_CONFLICT", "Provide either --identity or --public-key-file, not both.") };
+  }
+  if (identity) {
+    const derived = await readIdentityPublicKey(identity, options.runProcess ?? defaultProcessRunner);
+    if (!derived.ok) return { ok: false, exitCode: localFailure(input.json, options, derived.error, derived.message) };
+    return { ok: true, publicKey: derived.publicKey };
+  }
+  if (!publicKeyFile) {
+    return { ok: false, exitCode: localFailure(input.json, options, "RUNTIME_SSH_OPERATOR_KEY_SOURCE_REQUIRED", "Provide the public key with --identity <private-key-path> or --public-key-file <path|->.") };
+  }
+  let value: string;
+  try {
+    value = publicKeyFile === "-" ? await readAllStdin() : await readFile(publicKeyFile, "utf8");
+  } catch (error) {
+    return { ok: false, exitCode: localFailure(input.json, options, "RUNTIME_SSH_OPERATOR_KEY_FILE_UNREADABLE", `Could not read the public key: ${errorMessage(error)}`) };
+  }
+  try {
+    return { ok: true, publicKey: normalizeEd25519PublicKey(value) };
+  } catch {
+    return { ok: false, exitCode: localFailure(input.json, options, "RUNTIME_SSH_OPERATOR_KEY_NOT_ED25519", "The operator key must be a canonical ssh-ed25519 public key.") };
+  }
+}
+
+async function readAllStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 async function readRequiredSecret(
   prompt: string,
   options: RuntimeSshCliOptions
@@ -705,6 +866,10 @@ function integrationMutationResult(
 
 function formatIntegration(integration: RuntimeSshIntegration): string {
   return `${integration.integrationId}\t${integration.name}\t${integration.tailnet}\t${integration.tag}\t${integration.lifecycle}\t${integration.validation}`;
+}
+
+function formatOperatorKey(key: RuntimeSshOperatorKey): string {
+  return `${key.keyId}\t${key.name}\t${key.fingerprint}\t${key.addedBy}\t${key.createdAtMs}`;
 }
 
 function validConnection(connection: ConnectionResponse["connection"]): connection is RuntimeSshConnection {
@@ -943,6 +1108,14 @@ function readCurrentTailnet(output: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+function operatorKeyCollectionPath(organizationId: string): string {
+  return `/api/organizations/${encodeURIComponent(organizationId)}/runtime-ssh/operator-keys`;
+}
+
+function operatorKeyPath(organizationId: string, keyId: string): string {
+  return `${operatorKeyCollectionPath(organizationId)}/${encodeURIComponent(keyId)}`;
 }
 
 function integrationCollectionPath(organizationId: string): string {

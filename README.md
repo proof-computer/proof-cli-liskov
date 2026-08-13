@@ -40,6 +40,9 @@ proof liskov runtime-ssh integration create org-123 --name "Production tailnet" 
 proof liskov runtime-ssh integration validate org-123 int_123
 proof liskov runtime-ssh integration rotate org-123 int_123 --oauth-client-id NEW_CLIENT_ID
 proof liskov runtime-ssh integration disable org-123 int_123
+proof liskov runtime-ssh operator-key list org-123
+proof liskov runtime-ssh operator-key add org-123 --name patrick-mbp --identity ~/.ssh/id_ed25519
+proof liskov runtime-ssh operator-key remove org-123 key_123
 proof liskov ssh proof-docs --print-command
 proof liskov ssh proof-docs --deployment dep-123 --job job-123
 proof liskov custody account ensure proof-docs --chain acurast --yes
