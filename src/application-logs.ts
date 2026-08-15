@@ -5,6 +5,7 @@ export interface LiskovApplicationLogLine {
   message?: string;
   event?: string;
   jobId?: string;
+  runtimeInstanceId?: string;
   receivedAtMs?: number;
   origin?: string | { kind?: string };
   [key: string]: unknown;
@@ -17,8 +18,13 @@ export interface LiskovApplicationLogsResponse {
   reason?: string;
   logs: LiskovApplicationLogLine[];
   summary: Record<string, unknown>;
+  nextCursor?: string | null;
+  latestCursor?: string;
+  order?: string;
   [key: string]: unknown;
 }
+
+export const APPLICATION_LOGS_HEADER = "TIMESTAMP LEVEL ORIGIN JOB_ID INSTANCE MESSAGE";
 
 export function isLiskovApplicationLogsResponse(value: unknown): value is LiskovApplicationLogsResponse {
   const body = record(value);
@@ -26,6 +32,9 @@ export function isLiskovApplicationLogsResponse(value: unknown): value is Liskov
     || typeof body.available !== "boolean" || !Array.isArray(body.logs)
     || !record(body.summary)) return false;
   if (body.available === false && typeof body.reason !== "string") return false;
+  if (body.nextCursor !== undefined && body.nextCursor !== null && typeof body.nextCursor !== "string") return false;
+  if (body.latestCursor !== undefined && typeof body.latestCursor !== "string") return false;
+  if (body.order !== undefined && typeof body.order !== "string") return false;
   return body.logs.every((line) => record(line) !== undefined);
 }
 
@@ -34,19 +43,33 @@ export function formatApplicationLogs(body: LiskovApplicationLogsResponse, appli
   if (!body.available) {
     return `Application logging is unavailable for ${safeApplicationRef}: ${terminalSafe(body.reason ?? "unavailable")}.`;
   }
-  const rows = body.logs.map((line) => {
-    const timestamp = formatTimestamp(line);
-    const level = normalizedLevel(line.level);
-    const origin = productOrigin(line.origin);
-    const jobId = terminalSafe(stringValue(line.jobId) ?? "—");
-    const message = terminalSafe(stringValue(line.message) ?? stringValue(line.event) ?? "");
-    return `${timestamp} ${level} ${origin} ${jobId} ${message}`;
-  });
-  return [
+  const lines = [
     `Application logs for ${safeApplicationRef}: ${body.logs.length} record${body.logs.length === 1 ? "" : "s"}.`,
-    "TIMESTAMP LEVEL ORIGIN JOB_ID MESSAGE",
-    ...rows
-  ].join("\n");
+    APPLICATION_LOGS_HEADER,
+    ...body.logs.map((line) => formatApplicationLogLine(line))
+  ];
+  const footer = formatOriginCountsFooter(body.summary);
+  if (footer !== undefined) lines.push(footer);
+  return lines.join("\n");
+}
+
+export function formatApplicationLogLine(line: LiskovApplicationLogLine): string {
+  const timestamp = formatTimestamp(line);
+  const level = normalizedLevel(line.level);
+  const origin = productOrigin(line.origin);
+  const jobId = terminalSafe(stringValue(line.jobId) ?? "—");
+  const instance = terminalSafe(stringValue(line.runtimeInstanceId) ?? "-");
+  const message = terminalSafe(stringValue(line.message) ?? stringValue(line.event) ?? "");
+  return `${timestamp} ${level} ${origin} ${jobId} ${instance} ${message}`;
+}
+
+export function eventGlobMatcher(glob: string): (event: string) => boolean {
+  const pattern = glob
+    .split("*")
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"))
+    .join("[\\s\\S]*");
+  const regex = new RegExp(`^${pattern}$`, "u");
+  return (event) => regex.test(event);
 }
 
 export function terminalSafe(value: string): string {
@@ -60,6 +83,15 @@ export function terminalSafe(value: string): string {
     }
   }
   return output;
+}
+
+function formatOriginCountsFooter(summary: Record<string, unknown>): string | undefined {
+  const counts = record(summary.originCounts);
+  if (!counts) return undefined;
+  const entries = Object.entries(counts).filter((entry): entry is [string, number] =>
+    typeof entry[1] === "number" && Number.isFinite(entry[1]));
+  if (entries.length === 0) return undefined;
+  return `Origins: ${entries.map(([origin, count]) => `${terminalSafe(origin)} ${count}`).join(", ")}.`;
 }
 
 function formatTimestamp(line: LiskovApplicationLogLine): string {

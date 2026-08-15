@@ -42,7 +42,7 @@ COMMANDS
   plans APPLICATION_ID
   action-plan APP_REF
   action-plan retry APP_REF --decision-id ID --reason TEXT --yes
-  logs APP_REF [--limit N] [--deployment ID] [--job ID] [--origin all|customer|runtime-ssh] [--json]
+  logs APP_REF [--limit N] [--deployment ID] [--job ID] [--origin all|customer|runtime-ssh|runtime_ssh] [--event GLOB] [--follow] [--from-start] [--ndjson] [--json]
   devtools view-key APP_REF DEPLOYMENT_ID
   runtime-image workflow APP_ID --manifest PATH [--output PATH]
   deployment import APP_REF --sequence N --origin ADDRESS --yes

@@ -38,8 +38,12 @@ import {
 } from "./organization-context.js";
 import { validateApplicationManifestV4 } from "./application-policy.js";
 import {
+  APPLICATION_LOGS_HEADER,
+  eventGlobMatcher,
+  formatApplicationLogLine,
   formatApplicationLogs,
   isLiskovApplicationLogsResponse,
+  type LiskovApplicationLogLine,
   type LiskovApplicationLogsResponse
 } from "./application-logs.js";
 import {
@@ -62,6 +66,7 @@ export interface SlipwayCliOptions {
   environmentHandoffBuilder?: (input: SlipwayEnvironmentHandoffBuildInput) => Promise<SlipwayEncryptedEnvironmentHandoff>;
   openBrowser?: (url: string) => boolean | Promise<boolean>;
   sleepMs?: (ms: number) => Promise<void>;
+  followContinue?: () => boolean;
   stdout?: (line: string) => void;
   stderr?: (line: string) => void;
   nowMs?: () => number;
@@ -319,7 +324,11 @@ export interface SlipwayApplicationLogsInput {
   limit?: number;
   deploymentId?: string;
   jobId?: string;
-  origin?: "all" | "customer" | "runtime-ssh";
+  origin?: "all" | "customer" | "runtime-ssh" | "runtime_ssh";
+  follow?: boolean;
+  fromStart?: boolean;
+  event?: string;
+  ndjson?: boolean;
   slipwayUrl?: string;
   config?: string;
   json?: boolean;
@@ -2196,6 +2205,9 @@ export async function runSlipwayApplicationActivity(input: SlipwayApplicationAct
   return 0;
 }
 
+const APPLICATION_LOGS_POLL_INTERVAL_MS = 2_000;
+const APPLICATION_LOGS_MAX_CONSECUTIVE_FAILURES = 30;
+
 export async function runSlipwayApplicationLogs(input: SlipwayApplicationLogsInput, options: SlipwayCliOptions = {}): Promise<number> {
   const inputError = applicationLogsInputError(input);
   if (inputError) {
@@ -2208,22 +2220,52 @@ export async function runSlipwayApplicationLogs(input: SlipwayApplicationLogsInp
     return 1;
   }
 
-  const query = new URLSearchParams();
-  if (input.limit !== undefined) query.set("limit", String(input.limit));
-  if (input.deploymentId !== undefined) query.set("deploymentId", input.deploymentId.trim());
-  if (input.jobId !== undefined) query.set("jobId", input.jobId.trim());
-  if (input.origin !== undefined) query.set("origin", input.origin === "runtime-ssh" ? "runtime_ssh" : input.origin);
-  const queryString = query.toString();
-  const request = await authenticatedSlipwayRequest<LiskovApplicationLogsResponse>({
-    config: input.config,
-    slipwayUrl: input.slipwayUrl,
-    json: input.json,
-    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/logs${queryString ? `?${queryString}` : ""}`,
-    requestErrorCode: "SLIPWAY_APPLICATION_LOGS_FAILED",
-    notFoundMessage: "No Liskov CLI session is stored locally.",
-    fetchFailedMessage: "could not read Liskov Application logs",
-    redactFetchError: true
-  }, options);
+  const streaming = input.follow === true || input.fromStart === true;
+  const eventMatches = input.event === undefined ? undefined : eventGlobMatcher(input.event);
+  const visibleLogs = (logs: LiskovApplicationLogLine[]): LiskovApplicationLogLine[] =>
+    eventMatches === undefined ? logs : logs.filter((line) => typeof line.event === "string" && eventMatches(line.event));
+
+  const requestPage = async (
+    page: { order: "asc" | "desc"; cursor?: string } | undefined,
+    requestOptions: SlipwayCliOptions
+  ) => {
+    const query = new URLSearchParams();
+    if (input.limit !== undefined) query.set("limit", String(input.limit));
+    if (input.deploymentId !== undefined) query.set("deploymentId", input.deploymentId.trim());
+    if (input.jobId !== undefined) query.set("jobId", input.jobId.trim());
+    if (input.origin !== undefined) {
+      query.set("origin", input.origin === "runtime-ssh" || input.origin === "runtime_ssh" ? "runtime_ssh" : input.origin);
+    }
+    if (page !== undefined) {
+      query.set("order", page.order);
+      if (page.cursor !== undefined) query.set("cursor", page.cursor);
+    }
+    const queryString = query.toString();
+    return authenticatedSlipwayRequest<LiskovApplicationLogsResponse>({
+      config: input.config,
+      slipwayUrl: input.slipwayUrl,
+      json: input.json,
+      path: `/api/applications/${encodeURIComponent(input.applicationRef)}/logs${queryString ? `?${queryString}` : ""}`,
+      requestErrorCode: "SLIPWAY_APPLICATION_LOGS_FAILED",
+      notFoundMessage: "No Liskov CLI session is stored locally.",
+      fetchFailedMessage: "could not read Liskov Application logs",
+      redactFetchError: true
+    }, requestOptions);
+  };
+  // authenticatedSlipwayRequest writes only on failure; in ndjson mode divert
+  // those failure lines to stderr so stdout stays records-only.
+  const firstRequestOptions: SlipwayCliOptions = input.ndjson
+    ? { ...options, stdout: (line) => emitError(options, line) }
+    : options;
+  const writeLogsError = (structured: Record<string, unknown>, human: string): void => {
+    if (input.ndjson) emitError(options, human);
+    else writeStructuredOrHuman(options, input.json, structured, human);
+  };
+
+  const request = await requestPage(
+    streaming ? { order: input.fromStart === true ? "asc" : "desc" } : undefined,
+    firstRequestOptions
+  );
   if (!request.ok) return request.exitCode;
 
   const body = request.body;
@@ -2235,7 +2277,7 @@ export async function runSlipwayApplicationLogs(input: SlipwayApplicationLogsInp
         : body === undefined || request.response.ok
           ? "SLIPWAY_APPLICATION_LOGS_RESPONSE_INVALID"
           : "SLIPWAY_APPLICATION_LOGS_FAILED";
-    writeStructuredOrHuman(options, input.json, {
+    writeLogsError({
       ok: false,
       error,
       status: request.response.status,
@@ -2246,7 +2288,102 @@ export async function runSlipwayApplicationLogs(input: SlipwayApplicationLogsInp
     return 1;
   }
 
-  writeStructuredOrHuman(options, input.json, body, formatApplicationLogs(body, input.applicationRef));
+  if (!streaming) {
+    if (input.ndjson) {
+      if (!body.available) {
+        emitError(options, formatApplicationLogs(body, input.applicationRef));
+        return 0;
+      }
+      for (const line of visibleLogs(body.logs)) emit(options, JSON.stringify(line));
+      return 0;
+    }
+    const rendered = body.available && eventMatches !== undefined ? { ...body, logs: visibleLogs(body.logs) } : body;
+    writeStructuredOrHuman(options, input.json, body, formatApplicationLogs(rendered, input.applicationRef));
+    return 0;
+  }
+
+  // Streaming modes never run with --json (excluded before network I/O).
+  if (!body.available) {
+    const unavailable = formatApplicationLogs(body, input.applicationRef);
+    if (input.ndjson) emitError(options, unavailable);
+    else emit(options, unavailable);
+    return 0;
+  }
+  if (typeof body.latestCursor !== "string" || typeof body.order !== "string") {
+    writeLogsError({
+      ok: false,
+      error: "SLIPWAY_APPLICATION_LOGS_PAGINATION_UNSUPPORTED",
+      applicationRef: input.applicationRef,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, `Error (SLIPWAY_APPLICATION_LOGS_PAGINATION_UNSUPPORTED): the Liskov service does not support log pagination yet. Retry without --follow/--from-start.`);
+    return 1;
+  }
+
+  const printRecords = (records: LiskovApplicationLogLine[]): void => {
+    for (const line of visibleLogs(records)) {
+      emit(options, input.ndjson ? JSON.stringify(line) : formatApplicationLogLine(line));
+    }
+  };
+  const sleep = options.sleepMs ?? defaultSleep;
+  const followContinue = options.followContinue ?? (() => true);
+  const quietOptions: SlipwayCliOptions = { ...options, stdout: () => {} };
+  const pollPage = async (cursor: string): Promise<LiskovApplicationLogsResponse | undefined> => {
+    const page = await requestPage({ order: "asc", cursor }, quietOptions);
+    if (!page.ok || !page.response.ok || !isLiskovApplicationLogsResponse(page.body)) return undefined;
+    return page.body;
+  };
+  let consecutiveFailures = 0;
+  const streamFailureExhausted = (): boolean => {
+    consecutiveFailures += 1;
+    if (consecutiveFailures >= APPLICATION_LOGS_MAX_CONSECUTIVE_FAILURES) {
+      writeLogsError({
+        ok: false,
+        error: "SLIPWAY_APPLICATION_LOGS_FAILED",
+        applicationRef: input.applicationRef,
+        consecutiveFailures
+      }, `Error (SLIPWAY_APPLICATION_LOGS_FAILED): could not read Liskov Application logs after ${consecutiveFailures} consecutive attempts.`);
+      return true;
+    }
+    emitError(options, `Warning: could not read Liskov Application logs (attempt ${consecutiveFailures} of ${APPLICATION_LOGS_MAX_CONSECUTIVE_FAILURES}); retrying.`);
+    return false;
+  };
+
+  if (!input.ndjson) emit(options, APPLICATION_LOGS_HEADER);
+  let cursor = body.latestCursor;
+  if (input.fromStart === true) {
+    printRecords(body.logs);
+    let next = body.nextCursor ?? null;
+    while (next !== null) {
+      const page = await pollPage(next);
+      if (page === undefined) {
+        if (streamFailureExhausted()) return 1;
+        await sleep(APPLICATION_LOGS_POLL_INTERVAL_MS);
+        continue;
+      }
+      consecutiveFailures = 0;
+      cursor = next;
+      printRecords(page.logs);
+      next = typeof page.nextCursor === "string" ? page.nextCursor : null;
+    }
+  } else {
+    printRecords([...body.logs].reverse());
+  }
+
+  if (input.follow !== true) return 0;
+
+  consecutiveFailures = 0;
+  while (followContinue()) {
+    await sleep(APPLICATION_LOGS_POLL_INTERVAL_MS);
+    const page = await pollPage(cursor);
+    if (page === undefined) {
+      if (streamFailureExhausted()) return 1;
+      continue;
+    }
+    consecutiveFailures = 0;
+    printRecords(page.logs);
+    if (typeof page.nextCursor === "string") cursor = page.nextCursor;
+  }
   return 0;
 }
 
@@ -4200,8 +4337,15 @@ function applicationLogsInputError(input: SlipwayApplicationLogsInput): string |
   }
   if (input.deploymentId !== undefined && input.deploymentId.trim() === "") return "--deployment must not be empty.";
   if (input.jobId !== undefined && input.jobId.trim() === "") return "--job must not be empty.";
-  if (input.origin !== undefined && !["all", "customer", "runtime-ssh"].includes(input.origin)) {
-    return "--origin must be all, customer, or runtime-ssh.";
+  if (input.origin !== undefined && !["all", "customer", "runtime-ssh", "runtime_ssh"].includes(input.origin)) {
+    return "--origin must be all, customer, runtime-ssh, or runtime_ssh.";
+  }
+  if (input.event !== undefined && input.event.trim() === "") return "--event must not be empty.";
+  if (input.json) {
+    if (input.follow) return "--json cannot be combined with --follow.";
+    if (input.fromStart) return "--json cannot be combined with --from-start.";
+    if (input.ndjson) return "--json cannot be combined with --ndjson.";
+    if (input.event !== undefined) return "--json cannot be combined with --event.";
   }
   return undefined;
 }

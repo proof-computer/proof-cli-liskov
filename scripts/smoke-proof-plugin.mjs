@@ -43,6 +43,11 @@ try {
   assertIncludes(applicationLogsHelp.stdout, "Read recent Liskov Application logs");
   assertIncludes(applicationLogsHelp.stdout, "--origin");
   assertIncludes(applicationLogsHelp.stdout, "runtime-ssh");
+  assertIncludes(applicationLogsHelp.stdout, "runtime_ssh");
+  assertIncludes(applicationLogsHelp.stdout, "--follow");
+  assertIncludes(applicationLogsHelp.stdout, "--from-start");
+  assertIncludes(applicationLogsHelp.stdout, "--ndjson");
+  assertIncludes(applicationLogsHelp.stdout, "--event");
   assertIncludes(applicationLogsHelp.stdout, "--organization <selector>");
   assertIncludes(applicationLogsHelp.stdout, "LISKOV_ORGANIZATION");
 

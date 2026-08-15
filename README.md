@@ -19,6 +19,9 @@ proof liskov application status proof-docs
 proof liskov application plans proof-docs --json
 proof liskov application logs proof-docs --limit 100
 proof liskov application logs proof-docs --deployment dep-123 --job job-123 --origin runtime-ssh --json
+proof liskov application logs proof-docs --follow
+proof liskov application logs proof-docs --from-start --ndjson
+proof liskov application logs proof-docs --follow --event 'runtime.access.*'
 proof liskov application publish proof-docs --artifact-version av-... --dry-run
 proof liskov application publish proof-docs --artifact-version av-... --yes
 proof liskov application publish proof-docs --paused --reason "failure-matrix initialization" --yes
@@ -93,6 +96,22 @@ capability; `application logs` is read-only and its `--json` output is the core
 `/logs` response. Human output escapes terminal control characters in log
 messages. A successful degraded response exits zero and reports its stable
 availability reason.
+
+`application logs` can also stream and paginate through the service's cursor
+mode. `--follow` prints one newest-first page as oldest-first context, then
+polls forward from the service's `latestCursor` every two seconds until
+interrupted; transient poll failures warn on stderr and the command exits
+non-zero only after 30 consecutive failures. `--from-start` drains the full
+retained history oldest-first by following `nextCursor` until an empty page,
+and combined with `--follow` it keeps streaming from the drain's last cursor
+without duplicates. `--ndjson` emits one raw log record JSON object per line
+with no header or footer, and `--event GLOB` filters records client-side by
+their `event` field (`*` matches any run of characters; records without an
+event are dropped). `--origin runtime_ssh` is accepted as an alias for
+`runtime-ssh`. `--json` remains the verbatim one-shot response and cannot be
+combined with `--follow`, `--from-start`, `--ndjson`, or `--event`. Against a
+service that does not yet support cursor pagination, `--follow`/`--from-start`
+fail with `SLIPWAY_APPLICATION_LOGS_PAGINATION_UNSUPPORTED`.
 
 Application deletion is a logical Liskov tombstone. Without `--yes`, the CLI
 uses the read-only deletion-preview endpoint and sends no mutation body. With
