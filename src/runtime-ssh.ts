@@ -371,12 +371,16 @@ export async function runRuntimeSshConnection(
   const connection = response.body?.connection;
   if (!response.response.ok || response.body?.ok !== true || !connection) {
     const hint = response.body?.error === "runtime_ssh_attachment_ambiguous"
-      ? " Specify --deployment or --job to select one ready attachment."
+      ? ambiguousAttachmentHint(response.body)
       : "";
     return apiFailure(input.json, options, response.response.status, response.body?.error, hint, response.body);
   }
   if (!validConnection(connection)) {
     return localFailure(input.json, options, "RUNTIME_SSH_CONNECTION_INVALID", "Liskov returned an invalid Runtime SSH connection descriptor.");
+  }
+  const selected = requestedIdentityMatches(input, connection);
+  if (!selected.ok) {
+    return localFailure(input.json, options, selected.error, selected.message);
   }
 
   return connection.provider === "tailscale"
@@ -443,7 +447,7 @@ async function runManagedConnection(
   }
   const selectedFingerprint = sshFingerprint(selectedKey.publicKey);
   if (!connection.authorizedKeyFingerprints.includes(selectedFingerprint)) {
-    return localFailure(input.json, options, "RUNTIME_SSH_IDENTITY_NOT_AUTHORIZED", `The selected identity fingerprint ${selectedFingerprint} is not authorized by this runtime policy. Access comes from the policy, not the operator-key registry: add this key to the application policy's ingress.ssh.provider.authorizedKeys and deploy.`);
+    return localFailure(input.json, options, "RUNTIME_SSH_IDENTITY_NOT_AUTHORIZED", `The selected identity fingerprint ${selectedFingerprint} is not in this attachment's authorized set. V4 still lists keys in the deployed policy; V5 registers them with \`proof liskov runtime-ssh operator-key add\` so the next attachment snapshot includes them.`);
   }
 
   const alias = `liskov-runtime-ssh-${connection.attachmentId}`;
@@ -874,6 +878,7 @@ function formatOperatorKey(key: RuntimeSshOperatorKey): string {
 
 function validConnection(connection: ConnectionResponse["connection"]): connection is RuntimeSshConnection {
   if (!connection) return false;
+  // provider: "liskov" is the connection-request word for both V4 managed and V5 access.ssh.
   if (connection.provider === "tailscale") {
     const hostname = connection.hostname;
     return connection.user === "root"
@@ -1086,6 +1091,45 @@ function installSignalCleanup(directory: string): () => void {
   return () => {
     for (const [signal, handler] of handlers) process.off(signal, handler);
   };
+}
+
+function requestedIdentityMatches(
+  input: RuntimeSshConnectionInput,
+  connection: RuntimeSshConnection
+): { ok: true } | { ok: false; error: string; message: string } {
+  if (input.jobId) {
+    const jobIds = connection.provider === "liskov"
+      ? [connection.jobId, connection.liskovJobId]
+      : [connection.jobId];
+    if (!jobIds.includes(input.jobId)) {
+      return {
+        ok: false,
+        error: "RUNTIME_SSH_JOB_MISMATCH",
+        message: `Requested job ${input.jobId} does not match the returned Runtime SSH attachment (${jobIds.join(" / ")}).`
+      };
+    }
+  }
+  if (input.deploymentId) {
+    const deploymentIds = connection.provider === "liskov"
+      ? [connection.deploymentId, connection.liskovDeploymentId]
+      : [connection.deploymentId];
+    if (!deploymentIds.includes(input.deploymentId)) {
+      return {
+        ok: false,
+        error: "RUNTIME_SSH_DEPLOYMENT_MISMATCH",
+        message: `Requested deployment ${input.deploymentId} does not match the returned Runtime SSH attachment (${deploymentIds.join(" / ")}).`
+      };
+    }
+  }
+  return { ok: true };
+}
+
+function ambiguousAttachmentHint(body: ConnectionResponse | undefined): string {
+  const hint = " Specify --deployment or --job to select one ready attachment.";
+  const candidates = body?.candidates;
+  if (!Array.isArray(candidates) || candidates.length === 0) return hint;
+  const listed = candidates.map((candidate) => `${candidate.deploymentId}/${candidate.jobId}`).join(", ");
+  return `${hint} Candidates: ${listed}.`;
 }
 
 function validDescriptorId(value: unknown): value is string {

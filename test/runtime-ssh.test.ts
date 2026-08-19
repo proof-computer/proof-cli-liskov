@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { lstat, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import LiskovSsh from "../src/commands/liskov/ssh.js";
 import {
   runRuntimeSshConnection,
   runRuntimeSshIntegrationCreate,
@@ -246,6 +247,68 @@ function managedConnection(identityKey: string, hostKey: string) {
   } as const;
 }
 
+const v5TrustClaim = "Liskov-supplied runtime-contact and Dropbear binaries were digest verified; the customer runtime image is not attested";
+
+// V5 access.ssh attachment on the frozen connection-request wire: provider stays
+// "liskov". Fingerprints are org-registry snapshots (1–8), not inline policy keys.
+function v5ManagedConnection(identityKey: string, hostKey: string, overrides: Record<string, unknown> = {}) {
+  const registryCompanion = ed25519PublicKey(13);
+  return {
+    provider: "liskov",
+    attachmentId: "att_v5_aabbccddeeff0011",
+    applicationId: "v5-app",
+    applicationUid: "app_v5",
+    liskovDeploymentId: "ldep_1",
+    deploymentId: "provider_dep_1",
+    liskovJobId: "ljob_1",
+    jobId: "provider_job_1",
+    user: "root",
+    port: 22,
+    authorizedKeyFingerprints: [fingerprint(identityKey), fingerprint(registryCompanion)],
+    host: {
+      publicKey: hostKey,
+      fingerprint: fingerprint(hostKey),
+      signedEvidence: "header.claims.signature"
+    },
+    trust: {
+      claim: v5TrustClaim,
+      runtimeContactSha256: "1".repeat(64),
+      dropbearVersion: "2026.94",
+      dropbearSha256: "2".repeat(64),
+      dropbearkeySha256: "3".repeat(64)
+    },
+    ...overrides
+  };
+}
+
+function v5Ticket(bearerToken: string, expiresAtMs = Date.now() + 60_000) {
+  return {
+    gatewayUrl: "wss://gateway.example/",
+    tunnelId: "tun_v5_aabbccddeeff0011",
+    protocol: "liskov-access.v1",
+    bearerToken,
+    expiresAtMs,
+    limits: {
+      maxFrameBytes: 65_536,
+      maxBytesPerDirection: 1_073_741_824,
+      maxDurationMs: 7_200_000
+    }
+  };
+}
+
+async function leftoverTicketDirs(sessionFile: string): Promise<string[]> {
+  const names = await readdir(path.dirname(sessionFile));
+  return names.filter((name) => name.startsWith(".runtime-ssh-ticket-"));
+}
+
+async function prepareV5Identity(sessionFile: string): Promise<{ identity: string; identityKey: string; hostKey: string }> {
+  const identity = path.join(path.dirname(sessionFile), "customer-identity");
+  const identityKey = ed25519PublicKey(7);
+  const hostKey = ed25519PublicKey(9);
+  await writeFile(`${identity}.pub`, `${identityKey} customer-comment\n`, { mode: 0o644 });
+  return { identity, identityKey, hostKey };
+}
+
 test("managed access pins host trust, mints one ticket, launches strict OpenSSH, and erases the ticket", async () => {
   await withSession(async (sessionFile) => {
     const identity = path.join(path.dirname(sessionFile), "customer-identity");
@@ -381,6 +444,442 @@ test("managed access fails closed on a substituted pinned host key before ticket
     assert.equal(code, 1);
     assert.equal(requests, 1);
     assert.match(errors.join("\n"), /RUNTIME_SSH_HOST_KEY_MISMATCH/u);
+  });
+});
+
+test("proof liskov ssh still exposes the exact-job flag surface", () => {
+  for (const flag of ["job", "deployment", "identity", "accept-host-key", "print-command", "json"]) {
+    assert.ok(LiskovSsh.flags[flag], flag);
+  }
+});
+
+test("V5 managed ssh posts the exact job selector and consumes that attachment", async () => {
+  const ticketSecret = "ticket.header.signature-that-must-not-be-printed";
+  for (const selector of [
+    { deploymentId: "ldep_1", jobId: "ljob_1" },
+    { deploymentId: "provider_dep_1", jobId: "provider_job_1" }
+  ]) {
+    await withSession(async (sessionFile) => {
+      const { identity, identityKey, hostKey } = await prepareV5Identity(sessionFile);
+      const connection = v5ManagedConnection(identityKey, hostKey);
+      const output: string[] = [];
+      const calls: Array<{ executable: string; args: readonly string[]; mode: string }> = [];
+      let connectionBody: unknown;
+      const ticketUrls: string[] = [];
+      let observedTicketFile = "";
+      const code = await runRuntimeSshConnection({
+        acceptHostKey: true,
+        applicationRef: "app",
+        cliBin: "proof",
+        config: sessionFile,
+        deploymentId: selector.deploymentId,
+        identity,
+        jobId: selector.jobId
+      }, {
+        fetchImpl: async (url, init) => {
+          if (String(url).endsWith("/connection-requests")) {
+            connectionBody = JSON.parse(String(init?.body));
+            return Response.json({ ok: true, connection });
+          }
+          ticketUrls.push(String(url));
+          assert.match(String(url), /\/runtime-ssh\/attachments\/att_v5_aabbccddeeff0011\/tickets$/u);
+          return Response.json({ ok: true, ticket: v5Ticket(ticketSecret) });
+        },
+        runProcess: async (executable, args, mode) => {
+          calls.push({ executable, args, mode });
+          assert.equal(executable, "ssh");
+          assert.equal(mode, "inherit");
+          assert.ok(args.includes("StrictHostKeyChecking=yes"));
+          assert.ok(args.includes("HostKeyAlias=liskov-runtime-ssh-att_v5_aabbccddeeff0011"));
+          const proxy = args.find((arg) => arg.startsWith("ProxyCommand="));
+          assert.ok(proxy);
+          assert.doesNotMatch(proxy, new RegExp(ticketSecret));
+          const tokenPath = proxy.match(/'--token-file' '([^']+)'/u)?.[1];
+          assert.ok(tokenPath);
+          observedTicketFile = tokenPath;
+          assert.equal(await readFile(tokenPath, "utf8"), ticketSecret);
+          assert.equal((await lstat(tokenPath)).mode & 0o777, 0o600);
+          return { exitCode: 23, stdout: "", stderr: "" };
+        },
+        stdout: (line) => output.push(line),
+        stderr: (line) => output.push(line)
+      });
+      assert.equal(code, 23);
+      assert.deepEqual(connectionBody, { deploymentId: selector.deploymentId, jobId: selector.jobId });
+      assert.equal(ticketUrls.length, 1);
+      assert.equal(calls.length, 1);
+      await assert.rejects(lstat(observedTicketFile), { code: "ENOENT" });
+      assert.deepEqual(await leftoverTicketDirs(sessionFile), []);
+      assert.doesNotMatch(output.join("\n"), new RegExp(ticketSecret));
+      assert.doesNotMatch(output.join("\n"), new RegExp(token));
+    });
+  }
+});
+
+test("V5 managed ssh refuses a returned job that does not match --job and never mints", async () => {
+  await withSession(async (sessionFile) => {
+    const { identity, identityKey, hostKey } = await prepareV5Identity(sessionFile);
+    let ticketPosts = 0;
+    let spawned = 0;
+    const errors: string[] = [];
+    const code = await runRuntimeSshConnection({
+      acceptHostKey: true,
+      applicationRef: "app",
+      config: sessionFile,
+      identity,
+      jobId: "ljob_1"
+    }, {
+      fetchImpl: async (url) => {
+        if (String(url).endsWith("/connection-requests")) {
+          return Response.json({
+            ok: true,
+            connection: v5ManagedConnection(identityKey, hostKey, {
+              liskovJobId: "ljob_other",
+              jobId: "provider_job_other"
+            })
+          });
+        }
+        ticketPosts += 1;
+        throw new Error("ticket mint must not run for a job mismatch");
+      },
+      runProcess: async () => {
+        spawned += 1;
+        throw new Error("no subprocess expected");
+      },
+      stderr: (line) => errors.push(line)
+    });
+    assert.equal(code, 1);
+    assert.equal(ticketPosts, 0);
+    assert.equal(spawned, 0);
+    assert.deepEqual(await leftoverTicketDirs(sessionFile), []);
+    assert.match(errors.join("\n"), /RUNTIME_SSH_JOB_MISMATCH/u);
+  });
+});
+
+test("V5 managed ssh refuses a returned deployment that does not match --deployment and never mints", async () => {
+  await withSession(async (sessionFile) => {
+    const { identity, identityKey, hostKey } = await prepareV5Identity(sessionFile);
+    let ticketPosts = 0;
+    let spawned = 0;
+    const errors: string[] = [];
+    const code = await runRuntimeSshConnection({
+      acceptHostKey: true,
+      applicationRef: "app",
+      config: sessionFile,
+      deploymentId: "ldep_1",
+      identity,
+      jobId: "ljob_1"
+    }, {
+      fetchImpl: async (url) => {
+        if (String(url).endsWith("/connection-requests")) {
+          return Response.json({
+            ok: true,
+            connection: v5ManagedConnection(identityKey, hostKey, {
+              liskovDeploymentId: "ldep_other",
+              deploymentId: "provider_dep_other"
+            })
+          });
+        }
+        ticketPosts += 1;
+        throw new Error("ticket mint must not run for a deployment mismatch");
+      },
+      runProcess: async () => {
+        spawned += 1;
+        throw new Error("no subprocess expected");
+      },
+      stderr: (line) => errors.push(line)
+    });
+    assert.equal(code, 1);
+    assert.equal(ticketPosts, 0);
+    assert.equal(spawned, 0);
+    assert.deepEqual(await leftoverTicketDirs(sessionFile), []);
+    assert.match(errors.join("\n"), /RUNTIME_SSH_DEPLOYMENT_MISMATCH/u);
+  });
+});
+
+test("V5 managed ssh refuses ambiguous attachments and names candidate job ids", async () => {
+  const candidates = [
+    { attachmentId: "att_a", deploymentId: "ldep_a", jobId: "job_a" },
+    { attachmentId: "att_b", deploymentId: "ldep_b", jobId: "job_b" }
+  ];
+  const ambiguousBody = {
+    ok: false,
+    error: "runtime_ssh_attachment_ambiguous",
+    candidates
+  };
+
+  await withSession(async (sessionFile) => {
+    const { identity } = await prepareV5Identity(sessionFile);
+    let ticketPosts = 0;
+    let spawned = 0;
+    const errors: string[] = [];
+    const code = await runRuntimeSshConnection({
+      applicationRef: "app",
+      config: sessionFile,
+      identity
+    }, {
+      fetchImpl: async (url) => {
+        if (String(url).endsWith("/connection-requests")) {
+          return Response.json(ambiguousBody, { status: 409 });
+        }
+        ticketPosts += 1;
+        throw new Error("ticket mint must not run for an ambiguous attachment");
+      },
+      runProcess: async () => {
+        spawned += 1;
+        throw new Error("no subprocess expected");
+      },
+      stderr: (line) => errors.push(line)
+    });
+    assert.equal(code, 1);
+    assert.equal(ticketPosts, 0);
+    assert.equal(spawned, 0);
+    const human = errors.join("\n");
+    assert.match(human, /runtime_ssh_attachment_ambiguous/u);
+    assert.match(human, /job_a/u);
+    assert.match(human, /job_b/u);
+    assert.doesNotMatch(human, new RegExp(token));
+  });
+
+  await withSession(async (sessionFile) => {
+    const output: string[] = [];
+    let ticketPosts = 0;
+    let spawned = 0;
+    const code = await runRuntimeSshConnection({
+      applicationRef: "app",
+      config: sessionFile,
+      json: true
+    }, {
+      fetchImpl: async (url) => {
+        if (String(url).endsWith("/connection-requests")) {
+          return Response.json(ambiguousBody, { status: 409 });
+        }
+        ticketPosts += 1;
+        throw new Error("ticket mint must not run for an ambiguous attachment");
+      },
+      runProcess: async () => {
+        spawned += 1;
+        throw new Error("no subprocess expected");
+      },
+      stdout: (line) => output.push(line),
+      stderr: (line) => output.push(line)
+    });
+    assert.equal(code, 1);
+    assert.equal(ticketPosts, 0);
+    assert.equal(spawned, 0);
+    const parsed = JSON.parse(output.join("\n")) as { candidates?: unknown; error?: string };
+    assert.equal(parsed.error, "runtime_ssh_attachment_ambiguous");
+    assert.deepEqual(parsed.candidates, candidates);
+    assert.doesNotMatch(output.join("\n"), new RegExp(token));
+  });
+});
+
+test("V5 managed ssh first-use without a pin refuses and does not mint", async () => {
+  await withSession(async (sessionFile) => {
+    const { identity, identityKey, hostKey } = await prepareV5Identity(sessionFile);
+    let requests = 0;
+    let spawned = 0;
+    const errors: string[] = [];
+    const code = await runRuntimeSshConnection({
+      applicationRef: "app",
+      config: sessionFile,
+      identity,
+      json: true
+    }, {
+      fetchImpl: async (url) => {
+        requests += 1;
+        if (String(url).includes("/tickets")) throw new Error("ticket mint must not run without a host pin");
+        return Response.json({ ok: true, connection: v5ManagedConnection(identityKey, hostKey) });
+      },
+      runProcess: async () => {
+        spawned += 1;
+        throw new Error("no subprocess expected");
+      },
+      stderr: (line) => errors.push(line)
+    });
+    assert.equal(code, 1);
+    assert.equal(requests, 1);
+    assert.equal(spawned, 0);
+    assert.match(errors.join("\n"), /RUNTIME_SSH_HOST_KEY_NOT_ACCEPTED/u);
+    assert.deepEqual(await leftoverTicketDirs(sessionFile), []);
+    await assert.rejects(lstat(path.join(path.dirname(sessionFile), "runtime-ssh-known-hosts")), { code: "ENOENT" });
+  });
+
+  await withSession(async (sessionFile) => {
+    const { identity, identityKey, hostKey } = await prepareV5Identity(sessionFile);
+    let requests = 0;
+    let spawned = 0;
+    const errors: string[] = [];
+    const code = await runRuntimeSshConnection({
+      applicationRef: "app",
+      config: sessionFile,
+      identity
+    }, {
+      confirmHostKey: async () => false,
+      fetchImpl: async (url) => {
+        requests += 1;
+        if (String(url).includes("/tickets")) throw new Error("ticket mint must not run when host confirmation is declined");
+        return Response.json({ ok: true, connection: v5ManagedConnection(identityKey, hostKey) });
+      },
+      runProcess: async () => {
+        spawned += 1;
+        throw new Error("no subprocess expected");
+      },
+      stderr: (line) => errors.push(line)
+    });
+    assert.equal(code, 1);
+    assert.equal(requests, 1);
+    assert.equal(spawned, 0);
+    assert.match(errors.join("\n"), /RUNTIME_SSH_HOST_KEY_NOT_ACCEPTED/u);
+  });
+});
+
+test("V5 managed ssh refuses an expired ticket without spawning ssh or leaving a token file", async () => {
+  await withSession(async (sessionFile) => {
+    const { identity, identityKey, hostKey } = await prepareV5Identity(sessionFile);
+    const expiredSecret = "expired-bearer-that-must-not-be-printed";
+    const output: string[] = [];
+    let spawned = 0;
+    const code = await runRuntimeSshConnection({
+      acceptHostKey: true,
+      applicationRef: "app",
+      config: sessionFile,
+      identity,
+      json: true
+    }, {
+      fetchImpl: async (url) => {
+        if (String(url).endsWith("/connection-requests")) {
+          return Response.json({ ok: true, connection: v5ManagedConnection(identityKey, hostKey) });
+        }
+        return Response.json({ ok: true, ticket: v5Ticket(expiredSecret, Date.now() - 1) });
+      },
+      runProcess: async () => {
+        spawned += 1;
+        throw new Error("no subprocess expected");
+      },
+      stdout: (line) => output.push(line),
+      stderr: (line) => output.push(line)
+    });
+    assert.equal(code, 1);
+    assert.equal(spawned, 0);
+    assert.deepEqual(await leftoverTicketDirs(sessionFile), []);
+    assert.doesNotMatch(output.join("\n"), new RegExp(expiredSecret));
+    assert.doesNotMatch(output.join("\n"), /bearerToken/u);
+  });
+});
+
+test("V5 managed ssh mint 409 never spawns ssh or leaks the ticket", async () => {
+  const mintSecret = "mint-fail-bearer-that-must-not-be-printed";
+  for (const error of ["runtime_ssh_host_fingerprint_mismatch", "runtime_ssh_attachment_not_ready"]) {
+    for (const json of [false, true]) {
+      await withSession(async (sessionFile) => {
+        const { identity, identityKey, hostKey } = await prepareV5Identity(sessionFile);
+        const output: string[] = [];
+        let spawned = 0;
+        const code = await runRuntimeSshConnection({
+          acceptHostKey: true,
+          applicationRef: "app",
+          config: sessionFile,
+          identity,
+          json
+        }, {
+          fetchImpl: async (url) => {
+            if (String(url).endsWith("/connection-requests")) {
+              return Response.json({ ok: true, connection: v5ManagedConnection(identityKey, hostKey) });
+            }
+            return Response.json({
+              ok: false,
+              error,
+              ticket: v5Ticket(mintSecret)
+            }, { status: 409 });
+          },
+          runProcess: async () => {
+            spawned += 1;
+            throw new Error("no subprocess expected");
+          },
+          stdout: (line) => output.push(line),
+          stderr: (line) => output.push(line)
+        });
+        assert.equal(code, 1);
+        assert.equal(spawned, 0);
+        assert.deepEqual(await leftoverTicketDirs(sessionFile), []);
+        const text = output.join("\n");
+        assert.match(text, new RegExp(error, "u"));
+        assert.doesNotMatch(text, new RegExp(mintSecret));
+        assert.doesNotMatch(text, /bearerToken/u);
+      });
+    }
+  }
+});
+
+test("V5 managed ssh rejects provider liskov_managed as an invented connection-request word", async () => {
+  await withSession(async (sessionFile) => {
+    const { identity, identityKey, hostKey } = await prepareV5Identity(sessionFile);
+    let ticketPosts = 0;
+    let spawned = 0;
+    const errors: string[] = [];
+    const code = await runRuntimeSshConnection({
+      acceptHostKey: true,
+      applicationRef: "app",
+      config: sessionFile,
+      identity
+    }, {
+      fetchImpl: async (url) => {
+        if (String(url).endsWith("/connection-requests")) {
+          return Response.json({
+            ok: true,
+            connection: v5ManagedConnection(identityKey, hostKey, { provider: "liskov_managed" })
+          });
+        }
+        ticketPosts += 1;
+        throw new Error("ticket mint must not run for an invented provider word");
+      },
+      runProcess: async () => {
+        spawned += 1;
+        throw new Error("no subprocess expected");
+      },
+      stderr: (line) => errors.push(line)
+    });
+    assert.equal(code, 1);
+    assert.equal(ticketPosts, 0);
+    assert.equal(spawned, 0);
+    assert.match(errors.join("\n"), /RUNTIME_SSH_CONNECTION_INVALID/u);
+  });
+});
+
+test("V5 managed ssh unauthorized identity names the attachment set, not only ingress.ssh", async () => {
+  await withSession(async (sessionFile) => {
+    const { identity, hostKey } = await prepareV5Identity(sessionFile);
+    const errors: string[] = [];
+    let ticketPosts = 0;
+    const code = await runRuntimeSshConnection({
+      acceptHostKey: true,
+      applicationRef: "app",
+      config: sessionFile,
+      identity
+    }, {
+      fetchImpl: async (url) => {
+        if (String(url).endsWith("/connection-requests")) {
+          return Response.json({
+            ok: true,
+            connection: v5ManagedConnection(ed25519PublicKey(1), hostKey)
+          });
+        }
+        ticketPosts += 1;
+        throw new Error("ticket mint must not run for an unauthorized identity");
+      },
+      runProcess: async () => {
+        throw new Error("no subprocess expected");
+      },
+      stderr: (line) => errors.push(line)
+    });
+    assert.equal(code, 1);
+    assert.equal(ticketPosts, 0);
+    const text = errors.join("\n");
+    assert.match(text, /RUNTIME_SSH_IDENTITY_NOT_AUTHORIZED/u);
+    assert.match(text, /not in this attachment's authorized set/u);
+    assert.match(text, /proof liskov runtime-ssh operator-key add/u);
+    assert.doesNotMatch(text, /add this key to the application policy's ingress\.ssh\.provider\.authorizedKeys/u);
   });
 });
 
