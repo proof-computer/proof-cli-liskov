@@ -683,7 +683,6 @@ export interface PublicSlipwaySession {
 }
 
 export type PublicSlipwayIdentity =
-  | { kind: "wallet"; address?: string }
   | { kind: "github_test"; githubUserId?: string; login?: string; repositories?: readonly string[] }
   | { kind: "github_app"; githubUserId?: string; login?: string; avatarUrl?: string; repositories?: readonly string[]; installations?: readonly unknown[] }
   | { kind?: string; [key: string]: unknown };
@@ -5763,10 +5762,6 @@ function formatSessionIdentity(session: PublicSlipwaySession): string {
   if (identity?.kind === "github_app" || identity?.kind === "github_test") {
     const login = typeof identity.login === "string" ? identity.login : undefined;
     return login ? `@${login}` : identity.kind;
-  }
-  if (identity?.kind === "wallet") {
-    const address = typeof identity.address === "string" ? identity.address : undefined;
-    return address ?? session.address ?? "wallet";
   }
   return session.address ?? session.sessionId ?? "unknown";
 }
