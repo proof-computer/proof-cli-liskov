@@ -1,5 +1,5 @@
 import { Flags, type Interfaces } from "@oclif/core";
-import { OrganizationScopedCommand } from "../../../organization-context.js";
+import { liskovUrlFlag, OrganizationScopedCommand } from "../../../organization-context.js";
 
 import { runSlipwayApplicationList } from "../../../session.js";
 
@@ -9,14 +9,14 @@ export default class SlipwayApplicationList extends OrganizationScopedCommand {
     "<%= config.bin %> liskov application list",
     "<%= config.bin %> liskov application list --deleted",
     "<%= config.bin %> liskov application list --json",
-    "<%= config.bin %> liskov application list --slipway-url https://slipway.proof.computer"
+    "<%= config.bin %> liskov application list --liskov-url http://127.0.0.1:8787"
   ];
   static flags: Interfaces.FlagInput = {
     config: Flags.string({ description: "Path to the local Liskov session file." }),
     deleted: Flags.boolean({ description: "List tombstoned Applications only." }),
     help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
-    "slipway-url": Flags.string({ description: "Liskov service URL." })
+    "liskov-url": liskovUrlFlag()
   };
   static summary = "List readable Liskov Applications.";
 
@@ -26,7 +26,7 @@ export default class SlipwayApplicationList extends OrganizationScopedCommand {
       config: flags.config as string | undefined,
       deleted: flags.deleted as boolean | undefined,
       json: flags.json as boolean | undefined,
-      slipwayUrl: flags["slipway-url"] as string | undefined
+      slipwayUrl: flags["liskov-url"] as string | undefined
     }, {
       organization: flags.organization as string | undefined,
       stdout: (line) => this.log(line)
