@@ -127,7 +127,9 @@ export interface SlipwaySetEnvironmentAction {
 }
 
 export interface SlipwayLoginInput {
+  liskovUrl?: string;
   slipwayUrl?: string;
+  sessionToken?: string;
   config?: string;
   json?: boolean;
   noBrowser?: boolean;
@@ -1027,11 +1029,83 @@ interface SlipwayGithubPolicySpec {
   ref: string;
 }
 
+async function loginWithMintedSessionToken(input: {
+  sessionToken: string;
+  slipwayUrl: string;
+  sessionFile: string;
+  json?: boolean;
+  env: NodeJS.ProcessEnv;
+  fetchImpl: typeof fetch;
+  options: SlipwayCliOptions;
+}): Promise<number> {
+  const nowMs = input.options.nowMs ?? Date.now;
+  let response: Response;
+  try {
+    response = await input.fetchImpl(new URL("/api/session", input.slipwayUrl), {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${input.sessionToken}`
+      }
+    });
+  } catch (error) {
+    writeStructuredOrHuman(input.options, input.json, {
+      ok: false,
+      error: "SLIPWAY_CLI_LOGIN_CREATE_FAILED",
+      message: errorMessage(error),
+      slipwayUrl: input.slipwayUrl,
+      sessionFile: input.sessionFile
+    }, `Error (SLIPWAY_CLI_LOGIN_CREATE_FAILED): could not reach Liskov at ${input.slipwayUrl}.`);
+    return 1;
+  }
+  const body = await readJsonResponse<SlipwayApiSessionResponse>(response);
+  if (!response.ok || body?.ok !== true || body.session === undefined) {
+    writeStructuredOrHuman(input.options, input.json, {
+      ok: false,
+      error: "SLIPWAY_SESSION_UNAUTHORIZED",
+      status: response.status,
+      reason: body?.reason ?? body?.error,
+      slipwayUrl: input.slipwayUrl,
+      sessionFile: input.sessionFile
+    }, "Error (SLIPWAY_SESSION_UNAUTHORIZED): Liskov rejected the session token.");
+    return 1;
+  }
+  await saveSlipwaySession({
+    version: 1,
+    slipwayUrl: input.slipwayUrl,
+    sessionToken: input.sessionToken,
+    savedAtMs: nowMs(),
+    session: body.session
+  }, { config: input.sessionFile, env: input.env, nowMs });
+  writeStructuredOrHuman(input.options, input.json, {
+    ok: true,
+    status: "authorized",
+    slipwayUrl: input.slipwayUrl,
+    sessionFile: input.sessionFile,
+    session: body.session
+  }, `Logged in to ${input.slipwayUrl} as ${formatSessionIdentity(body.session)}.`);
+  return 0;
+}
+
 export async function runSlipwayLogin(input: SlipwayLoginInput, options: SlipwayCliOptions = {}): Promise<number> {
-  const slipwayUrl = normalizeBaseUrl(input.slipwayUrl ?? DEFAULT_SLIPWAY_URL);
   const env = options.env ?? process.env;
+  const slipwayUrl = normalizeBaseUrl(
+    input.liskovUrl ?? input.slipwayUrl ?? env.LISKOV_URL ?? DEFAULT_SLIPWAY_URL
+  );
   const sessionFile = resolveSlipwaySessionFile({ config: input.config, env });
   const fetchImpl = options.fetchImpl ?? fetch;
+  const mintedToken = input.sessionToken ?? env.LISKOV_SESSION_TOKEN;
+  if (mintedToken && mintedToken.length > 0) {
+    return loginWithMintedSessionToken({
+      sessionToken: mintedToken,
+      slipwayUrl,
+      sessionFile,
+      json: input.json,
+      env,
+      fetchImpl,
+      options
+    });
+  }
   const sessionToken = randomHex(32);
   const pendingSecret = randomHex(32);
   let response: Response;

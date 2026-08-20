@@ -4345,6 +4345,73 @@ describe("proof-cli Liskov runner", () => {
     await assert.rejects(() => stat(sessionFile), /ENOENT/u);
   });
 
+  it("stores a minted session token after GET /api/session succeeds and never prints the token", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const stdout = writer();
+    const stderr = writer();
+    const token = "minted-session-token-must-not-print";
+    const code = await runSlipwayLogin({
+      liskovUrl: "https://liskov.test",
+      config: sessionFile,
+      json: true,
+      sessionToken: token
+    }, {
+      fetchImpl: async (url, init) => {
+        assert.equal(String(url), "https://liskov.test/api/session");
+        assert.equal((init?.headers as Record<string, string>).authorization, `Bearer ${token}`);
+        return jsonResponse({
+          ok: true,
+          session: {
+            sessionId: "sess-local",
+            address: "github:1",
+            identity: { kind: "github_app", githubUserId: "1", login: "liskov-local" },
+            createdAtMs: 1,
+            expiresAtMs: 2
+          }
+        });
+      },
+      nowMs: () => 1_000,
+      stderr: stderr.write,
+      stdout: stdout.write
+    });
+    assert.equal(code, 0);
+    const saved = JSON.parse(await readFile(sessionFile, "utf8")) as {
+      slipwayUrl: string;
+      sessionToken: string;
+      session: { identity: { login: string } };
+    };
+    assert.equal(saved.slipwayUrl, "https://liskov.test");
+    assert.equal(saved.sessionToken, token);
+    assert.equal(saved.session.identity.login, "liskov-local");
+    assert.equal(stdout.text.includes(token), false);
+    assert.equal(stderr.text.includes(token), false);
+    const parsed = JSON.parse(stdout.text) as { ok: boolean; status: string };
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.status, "authorized");
+  });
+
+  it("does not write a session file when a minted token is rejected", async () => {
+    const sessionFile = path.join(await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-")), "session.json");
+    const stdout = writer();
+    const token = "rejected-session-token-must-not-print";
+    const code = await runSlipwayLogin({
+      liskovUrl: "https://liskov.test",
+      config: sessionFile,
+      json: true,
+      sessionToken: token
+    }, {
+      fetchImpl: async () => jsonResponse({ ok: false, error: "unauthorized" }, 401),
+      stdout: stdout.write
+    });
+    assert.equal(code, 1);
+    await assert.rejects(() => readFile(sessionFile), /ENOENT/u);
+    assert.equal(stdout.text.includes(token), false);
+    const parsed = JSON.parse(stdout.text) as { ok: boolean; error: string };
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.error, "SLIPWAY_SESSION_UNAUTHORIZED");
+  });
+
   it("logs in through pending CLI login without printing token material", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");

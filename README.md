@@ -5,6 +5,7 @@ Private oclif plugin for Liskov commands under the root `proof` CLI.
 ```sh
 proof liskov --help
 proof liskov login --no-browser
+proof liskov login --session-token TOKEN --liskov-url http://127.0.0.1:8787
 proof liskov organization list
 proof liskov organization use org-123
 proof liskov organization billing org-123
