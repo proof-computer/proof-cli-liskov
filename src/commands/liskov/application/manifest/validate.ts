@@ -5,11 +5,11 @@ import { Command, Flags, type Interfaces } from "@oclif/core";
 import {
   authoredDigest,
   releaseIntentDigest,
-  validateApplicationManifestV4
+  validateApplicationManifest
 } from "../../../../application-policy.js";
 
 export default class LiskovApplicationManifestValidate extends Command {
-  static description = "Strictly validate an authored Application manifest v4 file without publishing it.";
+  static description = "Strictly validate an authored Application manifest v4 or retained V5 file without publishing it.";
   static examples = [
     "<%= config.bin %> liskov application manifest validate --file .liskov/application-manifest.json",
     "<%= config.bin %> liskov application manifest validate --file manifest.json --json"
@@ -19,7 +19,7 @@ export default class LiskovApplicationManifestValidate extends Command {
     help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Emit machine-readable JSON." })
   };
-  static summary = "Validate an authored Application manifest v4.";
+  static summary = "Validate an authored Application manifest v4 or retained V5.";
 
   async run(): Promise<void> {
     const { flags } = await this.parse(LiskovApplicationManifestValidate);
@@ -32,19 +32,31 @@ export default class LiskovApplicationManifestValidate extends Command {
       else this.error(`Unable to read manifest: ${message}`, { exit: 1 });
       this.exit(1);
     }
-    const diagnostics = validateApplicationManifestV4(manifest);
+    const diagnostics = validateApplicationManifest(manifest);
+    const schemaVersion = manifest !== null && typeof manifest === "object" && !Array.isArray(manifest)
+      ? (manifest as Record<string, unknown>).schemaVersion
+      : undefined;
+    const retainedV5OrFuture = schemaVersion === 5
+      || (typeof schemaVersion === "number" && Number.isSafeInteger(schemaVersion) && schemaVersion > 5);
     const errors = diagnostics.filter((diagnostic) =>
-      diagnostic.code === "invalid_manifest" || diagnostic.code === "unknown_field");
+      diagnostic.code === "invalid_manifest"
+      || diagnostic.code === "unknown_field"
+      || (retainedV5OrFuture && diagnostic.code === "unsupported_policy_feature"));
     const capabilityDiagnostics = diagnostics.filter((diagnostic) =>
-      diagnostic.code === "unsupported_policy_feature" || diagnostic.code === "entitlement_exceeded");
+      diagnostic.code === "entitlement_exceeded"
+      || (!retainedV5OrFuture && diagnostic.code === "unsupported_policy_feature"));
     const deprecationDiagnostics = diagnostics.filter((diagnostic) =>
       diagnostic.code === "deprecated_manifest_field");
     const manifestValid = errors.length === 0;
     const result = {
       ok: manifestValid,
       manifestValid,
+      schemaVersion,
       ...(manifestValid
-        ? { authoredDigest: authoredDigest(manifest), releaseIntentDigest: releaseIntentDigest(manifest) }
+        ? {
+            authoredDigest: authoredDigest(manifest),
+            ...(schemaVersion === 4 ? { releaseIntentDigest: releaseIntentDigest(manifest) } : {})
+          }
         : {}),
       firstPublicReady: manifestValid && capabilityDiagnostics.length === 0,
       errors,
@@ -53,10 +65,13 @@ export default class LiskovApplicationManifestValidate extends Command {
     };
     if (flags.json) this.log(JSON.stringify(result));
     else if (manifestValid) {
-      this.log(`Application manifest v4 is valid.
-authoredDigest: ${result.authoredDigest}
-releaseIntentDigest: ${result.releaseIntentDigest}
-firstPublicReady: ${String(result.firstPublicReady)}`);
+      const digestLines = [
+        `Application manifest v${String(schemaVersion)} is valid.`,
+        `authoredDigest: ${result.authoredDigest}`,
+        ...("releaseIntentDigest" in result ? [`releaseIntentDigest: ${result.releaseIntentDigest}`] : []),
+        `firstPublicReady: ${String(result.firstPublicReady)}`
+      ];
+      this.log(digestLines.join("\n"));
       for (const diagnostic of capabilityDiagnostics) {
         this.log(`${diagnostic.code} ${diagnostic.pointer || "/"}: ${diagnostic.message}`);
       }

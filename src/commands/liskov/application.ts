@@ -35,6 +35,7 @@ COMMANDS
   publish APP_REF [--artifact-version ID] [--dry-run] [--paused --reason TEXT] [--yes]
   pause APP_REF [--owner OWNER] [--reason TEXT] [--yes]
   manifest validate --file PATH [--json]
+  policy explain APPLICATION_ID [--json]
   retire APP_REF [--reason TEXT] [--yes]
   retire cancel APP_REF [--reason TEXT] --yes
   resume APP_REF [--owner OWNER] [--reason TEXT] [--yes]
