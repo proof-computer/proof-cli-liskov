@@ -38,6 +38,12 @@ import {
 } from "./organization-context.js";
 import { validateApplicationManifestV4 } from "./application-policy.js";
 import {
+  formatPolicyExplanation,
+  formatStatusExplanation,
+  parsePolicyExplanation,
+  policyExplanationPath
+} from "./policy-explanation.js";
+import {
   APPLICATION_LOGS_HEADER,
   eventGlobMatcher,
   formatApplicationLogLine,
@@ -144,6 +150,13 @@ export interface SlipwayWhoamiInput {
 }
 
 export interface SlipwayApplicationStatusInput {
+  applicationId: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationPolicyExplainInput {
   applicationId: string;
   slipwayUrl?: string;
   config?: string;
@@ -1368,12 +1381,62 @@ export async function runSlipwayApplicationStatus(input: SlipwayApplicationStatu
     return 1;
   }
 
+  const explanationRequest = await authenticatedSlipwayRequest<unknown>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: policyExplanationPath(input.applicationId),
+    requestErrorCode: "SLIPWAY_APPLICATION_POLICY_EXPLAIN_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application policy explanation",
+    optional: true
+  }, options);
+  const attached = attachPolicyExplanation(body, explanationRequest);
+
   writeStructuredOrHuman(
     options,
     input.json,
-    body,
-    formatApplicationStatus(body, input.applicationId)
+    attached.body,
+    [formatApplicationStatus(body, input.applicationId), attached.human].filter(Boolean).join("\n")
   );
+  return 0;
+}
+
+export async function runSlipwayApplicationPolicyExplain(
+  input: SlipwayApplicationPolicyExplainInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  const request = await authenticatedSlipwayRequest<unknown>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: policyExplanationPath(input.applicationId),
+    requestErrorCode: "SLIPWAY_APPLICATION_POLICY_EXPLAIN_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application policy explanation"
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const parsed = parsePolicyExplanation(request.body);
+  if (!parsed.ok) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: parsed.error,
+      message: parsed.message,
+      applicationId: input.applicationId,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, `Error (${parsed.error}): ${parsed.message}`);
+    return 1;
+  }
+
+  writeStructuredOrHuman(options, input.json, {
+    ok: true,
+    schema: parsed.explanation.schema,
+    applicationId: input.applicationId,
+    explanation: parsed.explanation,
+    nextActions: parsed.nextActions
+  }, formatPolicyExplanation(parsed.explanation, parsed.nextActions));
   return 0;
 }
 
@@ -4328,6 +4391,7 @@ async function authenticatedSlipwayRequest<T>(
     notFoundMessage: string;
     fetchFailedMessage: string;
     redactFetchError?: boolean;
+    optional?: boolean;
   },
   options: SlipwayCliOptions
 ): Promise<
@@ -4381,6 +4445,15 @@ async function authenticatedSlipwayRequest<T>(
       headers
     });
   } catch (error) {
+    if (input.optional) {
+      return {
+        ok: true,
+        body: undefined,
+        response: new Response(null, { status: 599 }),
+        slipwayUrl,
+        sessionFile
+      };
+    }
     writeStructuredOrHuman(options, input.json, {
       ok: false,
       error: input.requestErrorCode,
@@ -4392,7 +4465,7 @@ async function authenticatedSlipwayRequest<T>(
   }
 
   const body = await readJsonResponse<T>(response);
-  if (!response.ok && writeOrganizationServerFailure(options, input.json, body)) {
+  if (!input.optional && !response.ok && writeOrganizationServerFailure(options, input.json, body)) {
     return { ok: false, exitCode: 1 };
   }
   return {
@@ -5350,6 +5423,44 @@ function withoutUndefinedDeep(value: unknown): unknown {
 
 function defaultSleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function attachPolicyExplanation(
+  body: SlipwayApplicationStatusResponse,
+  explanationRequest:
+    | {
+        ok: true;
+        body: unknown;
+        response: Response;
+        slipwayUrl: string;
+        sessionFile: string;
+      }
+    | { ok: false; exitCode: number }
+): { body: SlipwayApplicationStatusResponse; human: string } {
+  if (!explanationRequest.ok) {
+    return { body, human: "" };
+  }
+  const parsed = parsePolicyExplanation(explanationRequest.body);
+  if (!parsed.ok) {
+    return {
+      body: {
+        ...body,
+        explanationError: {
+          error: parsed.error,
+          message: parsed.message
+        }
+      },
+      human: `policy explanation: ${parsed.error}: ${parsed.message}`
+    };
+  }
+  return {
+    body: {
+      ...body,
+      explanation: parsed.explanation,
+      nextActions: parsed.nextActions
+    },
+    human: formatStatusExplanation(parsed.nextActions)
+  };
 }
 
 function formatApplicationStatus(body: SlipwayApplicationStatusResponse, fallbackApplicationId: string): string {

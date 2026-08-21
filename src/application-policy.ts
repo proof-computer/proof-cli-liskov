@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { validateApplicationManifestV5 } from "./application-policy-v5.js";
+
 export const APPLICATION_MANIFEST_SCHEMA = "proof.liskov.application-manifest";
 export const APPLICATION_MANIFEST_VERSION = 4;
 export const ATTESTED_RUNTIME_PROFILE = "proof.liskov.attested-runtime.v1";
@@ -718,4 +720,29 @@ export function validateApplicationManifestV4(value: unknown): PolicyValidationE
     }
   }
   return errors;
+}
+
+export function validateApplicationManifest(value: unknown): PolicyValidationError[] {
+  const root = object(value);
+  if (!root) {
+    return [{ code: "invalid_manifest", message: "must be an object", pointer: "" }];
+  }
+  if (root.schemaVersion === APPLICATION_MANIFEST_VERSION) {
+    return validateApplicationManifestV4(value);
+  }
+  if (root.schemaVersion === 5) {
+    return validateApplicationManifestV5(value);
+  }
+  if (typeof root.schemaVersion === "number" && Number.isSafeInteger(root.schemaVersion) && root.schemaVersion > 5) {
+    return [{
+      code: "unsupported_policy_feature",
+      message: `schemaVersion ${root.schemaVersion} is a future policy pair; this CLI does not interpret it`,
+      pointer: "/schemaVersion"
+    }];
+  }
+  return [{
+    code: "invalid_manifest",
+    message: "schemaVersion must be 4 or 5",
+    pointer: "/schemaVersion"
+  }];
 }
