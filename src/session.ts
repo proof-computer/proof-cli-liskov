@@ -259,6 +259,15 @@ export interface SlipwayApplicationSetRepositoryInput {
   json?: boolean;
 }
 
+export interface SlipwayApplicationCreateInput {
+  applicationId: string;
+  displayName?: string;
+  repository?: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationRenameInput {
   applicationRef: string;
   displayName: string;
@@ -893,6 +902,14 @@ interface SlipwayApplicationSetRepositoryResponse {
 
 interface SlipwayApplicationRenameRefs {
   displayName?: string | null;
+}
+
+interface SlipwayApplicationCreateResponse {
+  ok?: boolean;
+  application?: PublicSlipwayApplicationSummary;
+  error?: string;
+  reason?: string;
+  [key: string]: unknown;
 }
 
 interface SlipwayApplicationRenameResponse {
@@ -2047,6 +2064,55 @@ export async function runSlipwayApplicationSetRepository(input: SlipwayApplicati
     body,
     formatApplicationSetRepository(input.applicationRef, body)
   );
+  return 0;
+}
+
+export async function runSlipwayApplicationCreate(input: SlipwayApplicationCreateInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const applicationId = (input.applicationId ?? "").trim();
+  if (!applicationId) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_CREATE_INVALID",
+      message: "applicationId must not be empty"
+    }, "Error (SLIPWAY_APPLICATION_CREATE_INVALID): a non-empty application id is required.");
+    return 1;
+  }
+  const body: Record<string, unknown> = { applicationId };
+  const displayName = input.displayName?.trim();
+  if (displayName) body.displayName = displayName;
+  const repository = input.repository?.trim();
+  if (repository) body.repository = repository;
+  const request = await authenticatedSlipwayJsonRequest<SlipwayApplicationCreateResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: "/api/applications",
+    body,
+    requestErrorCode: "SLIPWAY_APPLICATION_CREATE_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not create Liskov Application"
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const responseBody = request.body;
+  if (responseBody?.ok !== true) {
+    const error = request.response.status === 401
+      ? "SLIPWAY_SESSION_UNAUTHORIZED"
+      : "SLIPWAY_APPLICATION_CREATE_FAILED";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      reason: responseBody?.reason ?? responseBody?.error,
+      applicationId,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, `Error (${error}): Liskov could not create Application ${applicationId}${responseBody?.reason ? `: ${responseBody.reason}` : "."}`);
+    return 1;
+  }
+
+  writeStructuredOrHuman(options, input.json, responseBody, formatApplicationCreate(responseBody));
   return 0;
 }
 
@@ -5854,6 +5920,18 @@ function formatApplicationSetRepository(applicationRef: string, body: SlipwayApp
   return [
     `Moved ${applicationRef} repository to ${to}${suffix}.`,
     "Remember to update and commit the repository's .liskov policy file so re-imports stay consistent."
+  ].join("\n");
+}
+
+function formatApplicationCreate(body: SlipwayApplicationCreateResponse): string {
+  const application = body.application ?? {};
+  const applicationId = stringValue((application as Record<string, unknown>).applicationId) ?? "(unknown)";
+  const applicationUid = stringValue((application as Record<string, unknown>).applicationUid) ?? "(unknown)";
+  const applicationName = stringValue((application as Record<string, unknown>).applicationName) ?? "(unknown)";
+  return [
+    `Created Liskov Application ${applicationId} (uid ${applicationUid}, name ${applicationName}) from identity alone.`,
+    "No policy exists yet: bind release authority with `application set-repository`/source binding,",
+    "then publish a policy version (V5: POST /api/applications/{id}/policy-versions)."
   ].join("\n");
 }
 

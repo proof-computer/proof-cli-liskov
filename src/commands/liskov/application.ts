@@ -28,6 +28,7 @@ USAGE
 
 COMMANDS
   backfill-identities [--yes]
+  create APP_ID [--display-name NAME] [--repository owner/repo]
   delete APP_REF [--owner OWNER] [--reason TEXT] [--force] [--yes]
   import --github owner/repo:path@ref [--server-fetch]
   import --file PATH

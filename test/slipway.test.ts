@@ -25,6 +25,7 @@ import {
   runSlipwayApplicationPlans,
   runSlipwayApplicationPublish,
   runSlipwayApplicationDevtoolsViewKey,
+  runSlipwayApplicationCreate,
   runSlipwayApplicationRename,
   runSlipwayApplicationRuntimeImageWorkflow,
   runSlipwayApplicationSetRepository,
@@ -1676,6 +1677,96 @@ describe("proof-cli Liskov runner", () => {
     const parsed = JSON.parse(out.text) as { ok: boolean; error: string };
     assert.equal(parsed.ok, false);
     assert.equal(parsed.error, "SLIPWAY_REPOSITORY_ACCESS_DENIED");
+  });
+
+  it("creates an Application from identity alone without printing the bearer token", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_create_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+    const out = writer();
+    const options = {
+      fetchImpl: async (url: URL | RequestInfo, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        requests.push({
+          url: String(url),
+          method: init?.method,
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body
+        });
+        return jsonResponse({
+          ok: true,
+          application: {
+            applicationUid: "app-2222222222222222",
+            applicationName: "shard-worker",
+            applicationId: "shard-worker",
+            displayName: body.displayName
+          }
+        });
+      },
+      stdout: out.write
+    };
+
+    const code = await runSlipwayApplicationCreate({
+      applicationId: "shard-worker",
+      displayName: "Shard Worker",
+      repository: "proof-computer/shard-worker",
+      config: sessionFile,
+      json: true
+    }, options);
+
+    assert.equal(code, 0);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: {
+        applicationId: "shard-worker",
+        displayName: "Shard Worker",
+        repository: "proof-computer/shard-worker"
+      }
+    }]);
+    assert.equal(out.text.includes(token), false);
+    const output = JSON.parse(out.text.trim()) as { ok: boolean; application: { applicationUid: string } };
+    assert.equal(output.ok, true);
+    assert.equal(output.application.applicationUid, "app-2222222222222222");
+  });
+
+  it("rejects an empty create application id before making any request", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "slipway_create_invalid_token_do_not_print",
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    let calls = 0;
+    const out = writer();
+    const code = await runSlipwayApplicationCreate({
+      applicationId: "   ",
+      config: sessionFile,
+      json: true
+    }, {
+      fetchImpl: async () => {
+        calls += 1;
+        return jsonResponse({ ok: true });
+      },
+      stdout: out.write
+    });
+    assert.equal(code, 1);
+    assert.equal(calls, 0);
+    const output = JSON.parse(out.text.trim()) as { ok: boolean; error: string };
+    assert.equal(output.ok, false);
+    assert.equal(output.error, "SLIPWAY_APPLICATION_CREATE_INVALID");
   });
 
   it("dry-runs and confirms an Application rename without printing the bearer token", async () => {
