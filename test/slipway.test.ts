@@ -3015,6 +3015,7 @@ describe("proof-cli Liskov runner", () => {
     }, options), 0);
     assert.equal(await runSlipwayCustodyExecutionDiagnose({ applicationRef: "alpha", executionId: "exec-1", network: "testnet", config: sessionFile, json: true }, options), 0);
     assert.equal(await runSlipwayCustodyExecutionRecover({ applicationRef: "alpha", executionId: "exec-1", reason: "operator reviewed", config: sessionFile, json: true, yes: true }, options), 0);
+    assert.equal(await runSlipwayCustodyExecutionRecover({ applicationRef: "alpha", executionId: "exec-1", reason: "expired registration; reclaim escrow", mode: "abandon", config: sessionFile, json: true, yes: true }, options), 0);
     assert.equal(await runSlipwayCustodyExecutionRetry({ applicationRef: "alpha", executionId: "exec-1", reason: "operator retry secret reason", config: sessionFile, json: true, yes: true }, options), 0);
     assert.equal(await runSlipwayApplicationActionPlanRetry({ applicationRef: "alpha", decisionId: "decision-1", reason: "cohort retry secret reason", config: sessionFile, json: true, yes: true }, options), 0);
     assert.equal(await runSlipwayCustodyMachineCatalog({ network: "testnet", config: sessionFile, json: true }, options), 0);
@@ -3066,6 +3067,11 @@ describe("proof-cli Liskov runner", () => {
       method: "POST",
       authorization: `Bearer ${token}`,
       body: { yesRecover: true, acknowledgement: "operator-reviewed", reason: "operator reviewed" }
+    }, {
+      url: "https://slipway.test/api/applications/alpha/live-custody/executions/exec-1/recover",
+      method: "POST",
+      authorization: `Bearer ${token}`,
+      body: { yesRecover: true, acknowledgement: "operator-reviewed", reason: "expired registration; reclaim escrow", mode: "abandon" }
     }, {
       url: "https://slipway.test/api/applications/alpha/live-custody/executions/exec-1/recover",
       method: "POST",

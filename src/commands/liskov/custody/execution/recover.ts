@@ -9,12 +9,18 @@ export default class SlipwayCustodyExecutionRecover extends OrganizationScopedCo
   };
   static description = "Mark a reviewed live custody execution failed and release recovery state.";
   static examples = [
-    "<%= config.bin %> liskov custody execution recover proof-docs --execution-id live-execution:abc --reason \"operator reviewed\" --yes --json"
+    "<%= config.bin %> liskov custody execution recover proof-docs --execution-id live-execution:abc --reason \"operator reviewed\" --yes --json",
+    "<%= config.bin %> liskov custody execution recover proof-docs --execution-id live-execution:abc --mode abandon --reason \"expired registration; reclaim escrow\" --yes"
   ];
   static flags: Interfaces.FlagInput = {
     config: Flags.string({ description: "Path to the local Liskov session file." }),
     "execution-id": Flags.string({ description: "Live custody execution id.", required: true }),
     help: Flags.help({ char: "h" }),
+    mode: Flags.string({
+      description:
+        "Recovery mode: review re-pins on the next reconcile (default); abandon also pauses the Application and admits the attempt to the guarded reclaim sweep; retry additionally resets the launch-recovery budget.",
+      options: ["review", "abandon", "retry"]
+    }),
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
     reason: Flags.string({ description: "Operator review reason.", required: true }),
     "slipway-url": Flags.string({ description: "Liskov service URL." }),
@@ -29,6 +35,7 @@ export default class SlipwayCustodyExecutionRecover extends OrganizationScopedCo
       config: flags.config as string | undefined,
       executionId: flags["execution-id"] as string,
       json: flags.json as boolean | undefined,
+      mode: flags.mode as "review" | "retry" | "abandon" | undefined,
       reason: flags.reason as string,
       slipwayUrl: flags["slipway-url"] as string | undefined,
       yes: flags.yes as boolean | undefined
