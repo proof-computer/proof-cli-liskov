@@ -62,6 +62,8 @@ export const DEFAULT_SLIPWAY_URL = "https://liskov.proof.computer";
 const DEFAULT_RUNTIME_IMAGE_WORKFLOW_OUTPUT = ".github/workflows/liskov-runtime-image.yml";
 const DEFAULT_RUNTIME_IMAGE_WORKFLOW_NAME = "Liskov Runtime Image Upload";
 const DEFAULT_RUNTIME_IMAGE_OIDC_AUDIENCE = "liskov-runtime-image-upload";
+// Long-poll hold requested per CLI login poll; the server caps waitMs at 20_000.
+const CLI_LOGIN_POLL_WAIT_MS = 20_000;
 const DEFAULT_RUNTIME_IMAGE_ACTIONS_REF =
   "proof-computer/liskov-github-actions/.github/workflows/runtime-image.yml@v1";
 
@@ -759,6 +761,7 @@ interface SlipwayCliLoginPollResponse {
   status?: string;
   cliLogin?: PublicSlipwayCliLogin;
   session?: PublicSlipwaySession;
+  waitedMs?: number;
   error?: string;
   reason?: string;
 }
@@ -1240,7 +1243,7 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
           accept: "application/json",
           "content-type": "application/json"
         },
-        body: JSON.stringify({ pendingSecret })
+        body: JSON.stringify({ pendingSecret, waitMs: CLI_LOGIN_POLL_WAIT_MS })
       });
     } catch (error) {
       writeStructuredOrHuman(options, input.json, {
@@ -1314,7 +1317,11 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
       return 1;
     }
 
-    await sleep(pollIntervalMs);
+    // A long-polling server already held this request for waitedMs; re-poll at once.
+    // Old servers omit waitedMs, and a server that answered without waiting reports 0:
+    // both keep the interval sleep.
+    const serverHeldRequest = typeof polled.waitedMs === "number" && polled.waitedMs > 0;
+    if (!serverHeldRequest) await sleep(pollIntervalMs);
   }
 
   writeStructuredOrHuman(options, input.json, {

@@ -4785,6 +4785,170 @@ describe("proof-cli Liskov runner", () => {
       true
     );
   });
+
+  it("long-polls without sleeping when the server held the request", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const stdout = writer();
+    const stderr = writer();
+    const pollBodies: Array<Record<string, unknown> | undefined> = [];
+    const code = await runSlipwayLogin({
+      slipwayUrl: "https://slipway.test",
+      config: sessionFile,
+      noBrowser: true,
+      json: true
+    }, {
+      fetchImpl: async (url, init) => {
+        const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined;
+        if (String(url) === "https://slipway.test/api/cli-login/pending") {
+          return jsonResponse({
+            ok: true,
+            cliLogin: {
+              pendingLoginId: "0123456789abcdef0123456789abcdef",
+              userCode: "ABCD-2345",
+              status: "pending",
+              expiresAtMs: 10_000,
+              pollIntervalMs: 100
+            },
+            verificationUri: "/cli-login.html?pendingLoginId=0123456789abcdef0123456789abcdef&userCode=ABCD-2345"
+          });
+        }
+        if (String(url) === "https://slipway.test/api/cli-login/0123456789abcdef0123456789abcdef/poll") {
+          pollBodies.push(body);
+          if (pollBodies.length === 1) {
+            return jsonResponse({
+              ok: true,
+              status: "pending",
+              cliLogin: {
+                pendingLoginId: "0123456789abcdef0123456789abcdef",
+                userCode: "ABCD-2345",
+                status: "pending"
+              },
+              waitedMs: 20_000
+            });
+          }
+          return jsonResponse({
+            ok: true,
+            status: "authorized",
+            cliLogin: {
+              pendingLoginId: "0123456789abcdef0123456789abcdef",
+              userCode: "ABCD-2345",
+              status: "authorized"
+            },
+            session: {
+              sessionId: "session-long-poll",
+              address: "github:12345",
+              identity: { kind: "github_app", githubUserId: "12345", login: "octo-agent" },
+              createdAtMs: 100,
+              expiresAtMs: 200
+            }
+          });
+        }
+        return jsonResponse({ ok: false, error: "unexpected_request" }, 404);
+      },
+      nowMs: () => 1_000,
+      sleepMs: async () => {
+        throw new Error("must not sleep");
+      },
+      stderr: stderr.write,
+      stdout: stdout.write
+    });
+    assert.equal(code, 0);
+    assert.equal(pollBodies.length, 2);
+    for (const body of pollBodies) {
+      assert.equal(typeof body?.pendingSecret, "string");
+      assert.equal(body?.waitMs, 20_000);
+    }
+    const saved = JSON.parse(await readFile(sessionFile, "utf8")) as { sessionToken: string };
+    assert.equal(stdout.text.includes(saved.sessionToken), false);
+    assert.equal(stderr.text.includes(saved.sessionToken), false);
+    const parsed = JSON.parse(stdout.text) as { ok: boolean; status: string; timings: { pollCount: number } };
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.status, "authorized");
+    assert.equal(parsed.timings.pollCount, 2);
+  });
+
+  it("keeps the interval sleep for servers without waitedMs", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const stdout = writer();
+    const stderr = writer();
+    const pollBodies: Array<Record<string, unknown> | undefined> = [];
+    const sleeps: number[] = [];
+    const code = await runSlipwayLogin({
+      slipwayUrl: "https://slipway.test",
+      config: sessionFile,
+      noBrowser: true,
+      json: true
+    }, {
+      fetchImpl: async (url, init) => {
+        const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined;
+        if (String(url) === "https://slipway.test/api/cli-login/pending") {
+          return jsonResponse({
+            ok: true,
+            cliLogin: {
+              pendingLoginId: "0123456789abcdef0123456789abcdef",
+              userCode: "ABCD-2345",
+              status: "pending",
+              expiresAtMs: 10_000,
+              pollIntervalMs: 100
+            },
+            verificationUri: "/cli-login.html?pendingLoginId=0123456789abcdef0123456789abcdef&userCode=ABCD-2345"
+          });
+        }
+        if (String(url) === "https://slipway.test/api/cli-login/0123456789abcdef0123456789abcdef/poll") {
+          pollBodies.push(body);
+          if (pollBodies.length === 1) {
+            // An old server: no waitedMs in the pending response.
+            return jsonResponse({
+              ok: true,
+              status: "pending",
+              cliLogin: {
+                pendingLoginId: "0123456789abcdef0123456789abcdef",
+                userCode: "ABCD-2345",
+                status: "pending"
+              }
+            });
+          }
+          return jsonResponse({
+            ok: true,
+            status: "authorized",
+            cliLogin: {
+              pendingLoginId: "0123456789abcdef0123456789abcdef",
+              userCode: "ABCD-2345",
+              status: "authorized"
+            },
+            session: {
+              sessionId: "session-old-server",
+              address: "github:12345",
+              identity: { kind: "github_app", githubUserId: "12345", login: "octo-agent" },
+              createdAtMs: 100,
+              expiresAtMs: 200
+            }
+          });
+        }
+        return jsonResponse({ ok: false, error: "unexpected_request" }, 404);
+      },
+      nowMs: () => 1_000,
+      sleepMs: async (ms) => {
+        sleeps.push(ms);
+      },
+      stderr: stderr.write,
+      stdout: stdout.write
+    });
+    assert.equal(code, 0);
+    assert.equal(pollBodies.length, 2);
+    for (const body of pollBodies) {
+      assert.equal(body?.waitMs, 20_000);
+    }
+    assert.deepEqual(sleeps, [100]);
+    const saved = JSON.parse(await readFile(sessionFile, "utf8")) as { sessionToken: string };
+    assert.equal(stdout.text.includes(saved.sessionToken), false);
+    assert.equal(stderr.text.includes(saved.sessionToken), false);
+    const parsed = JSON.parse(stdout.text) as { ok: boolean; timings: { pollCount: number } };
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.timings.pollCount, 2);
+  });
 });
 
 function writer(): { text: string; write: (line: string) => void } {
