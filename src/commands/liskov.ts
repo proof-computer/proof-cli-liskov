@@ -36,6 +36,7 @@ COMMANDS
   application import --github owner/repo:path@ref [--server-fetch]
   application list
   application manifest validate --file PATH [--json]
+  application policy publish APP_REF --file PATH --artifact-digest SHA256 --binding-revision N --revocation-epoch N --source-ref REF --source-commit SHA --workflow-identity ID --expected-pointer-version N --yes
   application publish APP_REF [--artifact-version ID] [--dry-run] [--paused --reason TEXT] [--yes]
   application pause APP_REF --yes
   application resume APP_REF --yes

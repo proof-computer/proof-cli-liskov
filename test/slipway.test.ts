@@ -23,6 +23,7 @@ import {
   runSlipwayApplicationLockboxGrantVerify,
   runSlipwayApplicationLockboxSetupPr,
   runSlipwayApplicationPlans,
+  runSlipwayApplicationPolicyPublish,
   runSlipwayApplicationPublish,
   runSlipwayApplicationDevtoolsViewKey,
   runSlipwayApplicationCreate,
@@ -2654,6 +2655,115 @@ describe("proof-cli Liskov runner", () => {
     }]);
   });
 
+  it("publishes a validated retained V5 source document through the registered writer with exact evidence", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-liskov-v5-publish-"));
+    const sessionFile = path.join(dir, "session.json");
+    const manifestPath = path.join(dir, "manifest.json");
+    const token = "registered_v5_publish_token_do_not_print";
+    const artifactDigest = `sha256:${"a".repeat(64)}`;
+    const document = retainedV5SourceManifest("alpha");
+    await writeFile(manifestPath, JSON.stringify(document), "utf8");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const requests: Array<{ url: string; authorization?: string; body: unknown }> = [];
+    const out = writer();
+    const code = await runSlipwayApplicationPolicyPublish({
+      applicationRef: "alpha",
+      artifactDigest,
+      bindingRevision: 1,
+      config: sessionFile,
+      expectedPointerVersion: 0,
+      file: manifestPath,
+      json: true,
+      revocationEpoch: 0,
+      sourceCommit: "b".repeat(40),
+      sourceRef: "refs/heads/main",
+      workflowIdentity: "proof-computer/alpha/.github/workflows/release.yml@refs/heads/main",
+      yes: true
+    }, {
+      fetchImpl: async (url, init) => {
+        requests.push({
+          url: String(url),
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body: JSON.parse(String(init?.body))
+        });
+        return jsonResponse({
+          ok: true,
+          policyVersion: {
+            schema: "proof.liskov.application-policy",
+            schemaVersion: 5,
+            policyVersionId: "alpha-v1",
+            activePointerVersion: 1,
+            handlerGeneration: 2
+          }
+        });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 0);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications/alpha/policy-versions",
+      authorization: `Bearer ${token}`,
+      body: {
+        document,
+        release: {
+          mode: "source",
+          artifactDigest,
+          build: {
+            bindingRevision: 1,
+            revocationEpoch: 0,
+            sourceRef: "refs/heads/main",
+            sourceCommit: "b".repeat(40),
+            workflowIdentity: "proof-computer/alpha/.github/workflows/release.yml@refs/heads/main",
+            artifactDigests: [artifactDigest]
+          }
+        },
+        expectedActivePointerVersion: 0
+      }
+    }]);
+    assert.equal(out.text.includes(token), false);
+    const output = JSON.parse(out.text) as { ok: boolean; policyVersion: { policyVersionId: string } };
+    assert.equal(output.ok, true);
+    assert.equal(output.policyVersion.policyVersionId, "alpha-v1");
+  });
+
+  it("refuses registered V5 publication without confirmation or with an invalid document before network I/O", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-liskov-v5-publish-refusal-"));
+    const invalidManifestPath = path.join(dir, "invalid.json");
+    await writeFile(invalidManifestPath, JSON.stringify({ schemaVersion: 4 }), "utf8");
+    const base = {
+      applicationRef: "alpha",
+      artifactDigest: `sha256:${"a".repeat(64)}`,
+      bindingRevision: 1,
+      expectedPointerVersion: 0,
+      file: invalidManifestPath,
+      json: true,
+      revocationEpoch: 0,
+      sourceCommit: "b".repeat(40),
+      sourceRef: "refs/heads/main",
+      workflowIdentity: "proof-computer/alpha/.github/workflows/release.yml@refs/heads/main"
+    };
+    const out = writer();
+    const options = {
+      fetchImpl: async () => {
+        throw new Error("network should not be called");
+      },
+      stdout: out.write
+    };
+
+    assert.equal(await runSlipwayApplicationPolicyPublish(base, options), 1);
+    assert.equal(await runSlipwayApplicationPolicyPublish({ ...base, yes: true }, options), 1);
+    const outputs = out.text.trim().split("\n").map((line) => JSON.parse(line) as { error: string });
+    assert.equal(outputs[0]?.error, "SLIPWAY_APPLICATION_POLICY_PUBLISH_CONFIRMATION_REQUIRED");
+    assert.equal(outputs[1]?.error, "SLIPWAY_APPLICATION_POLICY_PUBLISH_MANIFEST_INVALID");
+  });
+
   it("reconciles executor operations with exact guards, dry-run default, JSON-only stdout, and token redaction", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
@@ -5018,6 +5128,27 @@ function runtimeImageBuildManifest(
         }
       }
     }
+  };
+}
+
+function retainedV5SourceManifest(applicationId: string): Record<string, unknown> {
+  return {
+    schema: "proof.liskov.application-manifest",
+    schemaVersion: 5,
+    applicationId,
+    release: { mode: "source" },
+    runtime: {
+      kind: "javascript",
+      engine: "nodejs",
+      entrypoint: { file: "bundle.cjs" }
+    },
+    execution: { mode: "once" },
+    deployment: {
+      schedule: { duration: "10m" },
+      spend: { unit: "service_credit_micros", perJob: "50000" }
+    },
+    state: { mode: "off" },
+    observability: { logs: { enabled: true } }
   };
 }
 

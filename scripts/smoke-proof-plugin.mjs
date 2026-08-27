@@ -96,6 +96,12 @@ try {
   assertIncludes(applicationPublishHelp.stdout, "--reason");
   assertIncludes(applicationPublishHelp.stdout, "--yes");
 
+  const registeredPolicyPublishHelp = run(process.execPath, [proofDevBin, "liskov", "application", "policy", "publish", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(registeredPolicyPublishHelp.stdout, "--artifact-digest");
+  assertIncludes(registeredPolicyPublishHelp.stdout, "--expected-pointer-version");
+  assertIncludes(registeredPolicyPublishHelp.stdout, "--workflow-identity");
+  assertIncludes(registeredPolicyPublishHelp.stdout, "--yes");
+
   const applicationResumeHelp = run(process.execPath, [proofDevBin, "liskov", "application", "resume", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationResumeHelp.stdout, "Resume new Liskov work");
   assertIncludes(applicationResumeHelp.stdout, "--reason");
