@@ -37,6 +37,7 @@ import {
   OrganizationSelectorError
 } from "./organization-context.js";
 import { validateApplicationManifestV4 } from "./application-policy.js";
+import { validateApplicationManifestV5 } from "./application-policy-v5.js";
 import {
   formatPolicyExplanation,
   formatStatusExplanation,
@@ -180,6 +181,22 @@ export interface SlipwayApplicationStatusInput {
 
 export interface SlipwayApplicationPolicyExplainInput {
   applicationId: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationPolicyPublishInput {
+  applicationRef: string;
+  file: string;
+  artifactDigest: string;
+  bindingRevision: number;
+  revocationEpoch: number;
+  sourceRef: string;
+  sourceCommit: string;
+  workflowIdentity: string;
+  expectedPointerVersion: number;
+  yes?: boolean;
   slipwayUrl?: string;
   config?: string;
   json?: boolean;
@@ -2330,6 +2347,130 @@ export async function runSlipwayApplicationPublish(input: SlipwayApplicationPubl
         : `Published ${version ? `policy ${version}` : "active policy"} for ${input.applicationRef}.`;
     }
   }, options);
+}
+
+export async function runSlipwayApplicationPolicyPublish(
+  input: SlipwayApplicationPolicyPublishInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  if (!input.yes) {
+    return writeConfirmationRequired(
+      options,
+      input.json,
+      "SLIPWAY_APPLICATION_POLICY_PUBLISH_CONFIRMATION_REQUIRED",
+      "Registered V5 policy publication"
+    );
+  }
+
+  const invalidInput = registeredPolicyPublicationInputError(input);
+  if (invalidInput) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_POLICY_PUBLISH_INVALID",
+      message: invalidInput,
+      applicationRef: input.applicationRef
+    }, `Error (SLIPWAY_APPLICATION_POLICY_PUBLISH_INVALID): ${invalidInput}`);
+    return 1;
+  }
+
+  let document: unknown;
+  try {
+    document = JSON.parse(await readFile(input.file, "utf8")) as unknown;
+  } catch (error) {
+    const message = errorMessage(error);
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_POLICY_PUBLISH_FILE_INVALID",
+      message,
+      applicationRef: input.applicationRef,
+      file: input.file
+    }, `Error (SLIPWAY_APPLICATION_POLICY_PUBLISH_FILE_INVALID): could not read ${input.file}: ${message}`);
+    return 1;
+  }
+
+  const diagnostics = validateApplicationManifestV5(document);
+  const documentRoot = objectRecord(document);
+  if (documentRoot.applicationId !== input.applicationRef) {
+    diagnostics.push({
+      code: "invalid_manifest",
+      message: `applicationId must match the exact publication target ${input.applicationRef}`,
+      pointer: "/applicationId"
+    });
+  }
+  const release = objectRecord(documentRoot.release);
+  if (release.mode !== "source") {
+    diagnostics.push({
+      code: "unsupported_policy_feature",
+      message: "this command publishes source releases; release.mode must be source",
+      pointer: "/release/mode"
+    });
+  }
+  if (diagnostics.length > 0) {
+    const first = diagnostics[0]!;
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_POLICY_PUBLISH_MANIFEST_INVALID",
+      applicationRef: input.applicationRef,
+      file: input.file,
+      diagnostics
+    }, `Error (SLIPWAY_APPLICATION_POLICY_PUBLISH_MANIFEST_INVALID): ${first.code} ${first.pointer || "/"}: ${first.message}`);
+    return 1;
+  }
+
+  return runSlipwayJsonCommand({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/policy-versions`,
+    body: {
+      document,
+      release: {
+        mode: "source",
+        artifactDigest: input.artifactDigest,
+        build: {
+          bindingRevision: input.bindingRevision,
+          revocationEpoch: input.revocationEpoch,
+          sourceRef: input.sourceRef,
+          sourceCommit: input.sourceCommit,
+          workflowIdentity: input.workflowIdentity,
+          artifactDigests: [input.artifactDigest]
+        }
+      },
+      expectedActivePointerVersion: input.expectedPointerVersion
+    },
+    errorCode: "SLIPWAY_APPLICATION_POLICY_PUBLISH_FAILED",
+    fetchFailedMessage: "could not publish registered V5 policy",
+    human: (body) => {
+      const policy = objectRecord(objectRecord(body).policyVersion);
+      const version = stringValue(policy.policyVersionId) ?? "registered V5 policy";
+      const pointer = numberValue(policy.activePointerVersion);
+      const generation = numberValue(policy.handlerGeneration);
+      return `Published ${version} for ${input.applicationRef}${pointer === undefined ? "" : ` at pointer ${pointer}`}${generation === undefined ? "" : ` under handler generation ${generation}`}.`;
+    }
+  }, options);
+}
+
+function registeredPolicyPublicationInputError(input: SlipwayApplicationPolicyPublishInput): string | undefined {
+  if (!input.file.trim()) return "--file must not be empty.";
+  if (!/^sha256:[0-9a-f]{64}$/u.test(input.artifactDigest)) {
+    return "--artifact-digest must be sha256: followed by 64 lowercase hexadecimal characters.";
+  }
+  if (!Number.isSafeInteger(input.bindingRevision) || input.bindingRevision < 0) {
+    return "--binding-revision must be a non-negative safe integer.";
+  }
+  if (!Number.isSafeInteger(input.revocationEpoch) || input.revocationEpoch < 0) {
+    return "--revocation-epoch must be a non-negative safe integer.";
+  }
+  if (!input.sourceRef.trim()) return "--source-ref must not be empty.";
+  if (!/^[0-9a-f]{40}$/u.test(input.sourceCommit)) {
+    return "--source-commit must be a 40-character lowercase hexadecimal Git commit.";
+  }
+  if (!input.workflowIdentity.trim()) return "--workflow-identity must not be empty.";
+  if (!Number.isSafeInteger(input.expectedPointerVersion) || input.expectedPointerVersion < 0) {
+    return "--expected-pointer-version must be a non-negative safe integer.";
+  }
+  return undefined;
 }
 
 export async function runSlipwayApplicationPlans(input: SlipwayApplicationPlansInput, options: SlipwayCliOptions = {}): Promise<number> {

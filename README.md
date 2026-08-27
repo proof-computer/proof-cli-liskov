@@ -12,6 +12,7 @@ proof liskov organization billing org-123
 proof liskov organization service-credits org-123
 proof liskov organization billing transactions org-123 --limit 25 --before 1719230000000
 proof liskov application manifest validate --file .slipway/application-policy.json
+proof liskov application policy publish proof-docs --file .liskov/proof-docs-v5.json --artifact-digest sha256:... --binding-revision 1 --revocation-epoch 0 --source-ref refs/heads/main --source-commit 0123456789abcdef0123456789abcdef01234567 --workflow-identity proof-computer/proof-docs/.github/workflows/release.yml@refs/heads/main --expected-pointer-version 0 --yes
 proof liskov application import --github proof-computer/docs:.slipway/application-policy.json@main --server-fetch
 proof liskov application list
 proof liskov application list --organization org-123
@@ -154,6 +155,12 @@ returns both `authoredDigest` and `releaseIntentDigest`. Build-release
 publication selects an exact `--artifact-version`; `--dry-run` calls the
 read-only publication preflight. Actual publication observes preflight first
 and submits its `authoredDigest` as the race fence.
+
+Registered V5 publication is a distinct source-evidence path:
+`application policy publish` validates the retained schema-5 document locally,
+requires the exact attested artifact/build facts and observed active-pointer
+version, then submits them to the server-owned `policy-versions` writer. It
+never creates a V4 draft, and no request is sent without `--yes`.
 
 `application publish --paused --reason TEXT --yes` publishes and pauses in one
 server transaction, so the executor cannot observe an intermediate active

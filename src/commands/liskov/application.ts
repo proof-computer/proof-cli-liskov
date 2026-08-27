@@ -37,6 +37,7 @@ COMMANDS
   pause APP_REF [--owner OWNER] [--reason TEXT] [--yes]
   manifest validate --file PATH [--json]
   policy explain APPLICATION_ID [--json]
+  policy publish APP_REF --file PATH --artifact-digest SHA256 --binding-revision N --revocation-epoch N --source-ref REF --source-commit SHA --workflow-identity ID --expected-pointer-version N --yes
   retire APP_REF [--reason TEXT] [--yes]
   retire cancel APP_REF [--reason TEXT] --yes
   resume APP_REF [--owner OWNER] [--reason TEXT] [--yes]
