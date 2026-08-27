@@ -4643,6 +4643,148 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.error, "SLIPWAY_CLI_LOGIN_TIMEOUT");
     assert.equal(parsed.slipwayUrl, "https://slipway.test");
   });
+
+  it("reports deterministic login timings from the injected clock after a pending poll", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const stdout = writer();
+    const stderr = writer();
+    let pollCalls = 0;
+    // Counter clock: every nowMs() call advances by 2, starting from 1_000.
+    // With noBrowser the calls in runSlipwayLogin land as follows:
+    //   1  enteredAtMs          = 1002
+    //   2  pendingStartedAtMs   = 1004
+    //   3  after pending JSON   = 1006   -> pendingMs = 2
+    //   4  startedAtMs          = 1008   (timeout anchor; expiresAtMs 10_000 wins)
+    //   5  loop condition       = 1010
+    //   6  poll #1 start        = 1012   (firstPollStartedAtMs)
+    //   7  poll #1 end          = 1014   -> sample 2, status pending, sleep is a no-op
+    //   8  loop condition       = 1016
+    //   9  poll #2 start        = 1018
+    //  10  poll #2 end          = 1020   -> sample 2, authorized; wait = 1020 - 1012 = 8
+    //  11  savedAtMs argument   = 1022
+    //  12  saveSlipwaySession   = 1024   (its own nowMs call)
+    //  13  totalMs              = 1026 - 1002 = 24
+    const code = await runSlipwayLogin({
+      slipwayUrl: "https://slipway.test",
+      config: sessionFile,
+      noBrowser: true,
+      json: true
+    }, {
+      fetchImpl: async (url) => {
+        if (String(url) === "https://slipway.test/api/cli-login/pending") {
+          return jsonResponse({
+            ok: true,
+            cliLogin: {
+              pendingLoginId: "0123456789abcdef0123456789abcdef",
+              userCode: "ABCD-2345",
+              status: "pending",
+              expiresAtMs: 10_000,
+              pollIntervalMs: 100
+            },
+            verificationUri: "/cli-login.html?pendingLoginId=0123456789abcdef0123456789abcdef&userCode=ABCD-2345"
+          });
+        }
+        if (String(url) === "https://slipway.test/api/cli-login/0123456789abcdef0123456789abcdef/poll") {
+          pollCalls += 1;
+          if (pollCalls === 1) {
+            return jsonResponse({
+              ok: true,
+              status: "pending",
+              cliLogin: {
+                pendingLoginId: "0123456789abcdef0123456789abcdef",
+                userCode: "ABCD-2345",
+                status: "pending"
+              }
+            });
+          }
+          return jsonResponse({
+            ok: true,
+            status: "authorized",
+            cliLogin: {
+              pendingLoginId: "0123456789abcdef0123456789abcdef",
+              userCode: "ABCD-2345",
+              status: "authorized"
+            },
+            session: {
+              sessionId: "session-timed",
+              address: "github:12345",
+              identity: { kind: "github_app", githubUserId: "12345", login: "octo-agent" },
+              createdAtMs: 100,
+              expiresAtMs: 200
+            }
+          });
+        }
+        return jsonResponse({ ok: false, error: "unexpected_request" }, 404);
+      },
+      nowMs: (() => {
+        let now = 1_000;
+        return () => {
+          now += 2;
+          return now;
+        };
+      })(),
+      sleepMs: async () => {},
+      stderr: stderr.write,
+      stdout: stdout.write
+    });
+    assert.equal(code, 0);
+    assert.equal(pollCalls, 2);
+    const saved = JSON.parse(await readFile(sessionFile, "utf8")) as { sessionToken: string; savedAtMs: number };
+    assert.equal(saved.savedAtMs, 1_024);
+    assert.equal(stdout.text.includes(saved.sessionToken), false);
+    assert.equal(stderr.text.includes(saved.sessionToken), false);
+    // stdout is exactly one JSON line; the human timings summary goes to stderr in --json mode.
+    assert.equal(stdout.text.trim().split("\n").length, 1);
+    const parsed = JSON.parse(stdout.text) as {
+      ok: boolean;
+      status: string;
+      browserOpened: boolean;
+      timings: {
+        pendingMs: number;
+        browserOpenMs: number;
+        waitForAuthorizationMs: number;
+        pollCount: number;
+        pollRoundTripMs: { p50: number; max: number };
+        totalMs: number;
+      };
+    };
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.status, "authorized");
+    assert.equal(parsed.browserOpened, false);
+    assert.deepEqual(Object.keys(parsed.timings).sort(), [
+      "browserOpenMs",
+      "pendingMs",
+      "pollCount",
+      "pollRoundTripMs",
+      "totalMs",
+      "waitForAuthorizationMs"
+    ]);
+    for (const value of [
+      parsed.timings.pendingMs,
+      parsed.timings.browserOpenMs,
+      parsed.timings.waitForAuthorizationMs,
+      parsed.timings.pollCount,
+      parsed.timings.pollRoundTripMs.p50,
+      parsed.timings.pollRoundTripMs.max,
+      parsed.timings.totalMs
+    ]) {
+      assert.equal(typeof value, "number");
+    }
+    assert.deepEqual(parsed.timings, {
+      pendingMs: 2,
+      browserOpenMs: 0,
+      waitForAuthorizationMs: 8,
+      pollCount: 2,
+      pollRoundTripMs: { p50: 2, max: 2 },
+      totalMs: 24
+    });
+    assert.match(stderr.text, /Timings:/u);
+    assert.equal(
+      stderr.text.includes("Timings: pending 2 ms \u00b7 browser 0 ms \u00b7 wait 8 ms (2 polls, p50 2 ms, max 2 ms) \u00b7 total 24 ms"),
+      true
+    );
+  });
 });
 
 function writer(): { text: string; write: (line: string) => void } {

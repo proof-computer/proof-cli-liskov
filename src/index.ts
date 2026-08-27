@@ -111,6 +111,7 @@ export {
   type SlipwayEncryptedEnvironmentHandoff,
   type SlipwayEnvironmentHandoffBuildInput,
   type SlipwayLoginInput,
+  type SlipwayLoginTimings,
   type SlipwayLogoutInput,
   type SlipwayOrganizationBillingInput,
   type SlipwayOrganizationListInput,

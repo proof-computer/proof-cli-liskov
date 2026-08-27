@@ -143,6 +143,26 @@ export interface SlipwayLoginInput {
   timeoutMs?: number;
 }
 
+/**
+ * Wall-clock timings for one browser-confirmed `proof liskov login`, measured
+ * through the injected `SlipwayCliOptions.nowMs` seam so tests stay
+ * deterministic. Present only on the `authorized` success payload.
+ */
+export interface SlipwayLoginTimings {
+  /** `POST /api/cli-login/pending` round trip, including reading its JSON body. */
+  pendingMs: number;
+  /** Time spent opening the verification URL in a browser; `0` when `--no-browser`. */
+  browserOpenMs: number;
+  /** From just before the first poll request until the `authorized` poll response arrived. */
+  waitForAuthorizationMs: number;
+  /** Number of `POST /api/cli-login/{id}/poll` round trips, including the authorizing one. */
+  pollCount: number;
+  /** Poll round-trip distribution (fetch + JSON read), nearest-rank p50 and max; both `0` with no polls. */
+  pollRoundTripMs: { p50: number; max: number };
+  /** From function entry until just before the success payload was written. */
+  totalMs: number;
+}
+
 export interface SlipwayWhoamiInput {
   slipwayUrl?: string;
   config?: string;
@@ -1136,9 +1156,12 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
       options
     });
   }
+  const nowMs = options.nowMs ?? Date.now;
+  const enteredAtMs = nowMs();
   const sessionToken = randomHex(32);
   const pendingSecret = randomHex(32);
   let response: Response;
+  const pendingStartedAtMs = nowMs();
   try {
     response = await fetchImpl(new URL("/api/cli-login/pending", slipwayUrl), {
       method: "POST",
@@ -1164,6 +1187,7 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
   }
 
   const created = await readJsonResponse<SlipwayCliLoginResponse>(response);
+  const pendingMs = nowMs() - pendingStartedAtMs;
   const cliLogin = created?.cliLogin;
   const pendingLoginId = stringValue(cliLogin?.pendingLoginId);
   const userCode = stringValue(cliLogin?.userCode);
@@ -1183,7 +1207,13 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
     created.verificationUriComplete ?? created.verificationUri ?? `/cli-login.html?pendingLoginId=${encodeURIComponent(pendingLoginId)}&userCode=${encodeURIComponent(userCode)}`,
     slipwayUrl
   );
-  const browserOpened = input.noBrowser === true ? false : await openVerificationUrl(verificationUri, options);
+  let browserOpened = false;
+  let browserOpenMs = 0;
+  if (input.noBrowser !== true) {
+    const browserOpenStartedAtMs = nowMs();
+    browserOpened = await openVerificationUrl(verificationUri, options);
+    browserOpenMs = nowMs() - browserOpenStartedAtMs;
+  }
   emitLoginInstruction(options, {
     json: input.json,
     browserOpened,
@@ -1191,15 +1221,18 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
     userCode
   });
 
-  const nowMs = options.nowMs ?? Date.now;
   const startedAtMs = nowMs();
   const expiresAtMs = typeof cliLogin?.expiresAtMs === "number" ? cliLogin.expiresAtMs : startedAtMs + 10 * 60_000;
   const timeoutAtMs = input.timeoutMs === undefined ? expiresAtMs : Math.min(expiresAtMs, startedAtMs + Math.max(1, input.timeoutMs));
   const pollIntervalMs = Math.max(100, input.pollIntervalMs ?? cliLogin?.pollIntervalMs ?? 2_000);
   const sleep = options.sleepMs ?? defaultSleep;
+  const pollRoundTripSamplesMs: number[] = [];
+  let firstPollStartedAtMs = startedAtMs;
 
   while (nowMs() <= timeoutAtMs) {
     let pollResponse: Response;
+    const pollStartedAtMs = nowMs();
+    if (pollRoundTripSamplesMs.length === 0) firstPollStartedAtMs = pollStartedAtMs;
     try {
       pollResponse = await fetchImpl(new URL(`/api/cli-login/${encodeURIComponent(pendingLoginId)}/poll`, slipwayUrl), {
         method: "POST",
@@ -1221,6 +1254,8 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
     }
 
     const polled = await readJsonResponse<SlipwayCliLoginPollResponse>(pollResponse);
+    const pollEndedAtMs = nowMs();
+    pollRoundTripSamplesMs.push(pollEndedAtMs - pollStartedAtMs);
     if (!pollResponse.ok || polled?.ok !== true) {
       writeStructuredOrHuman(options, input.json, {
         ok: false,
@@ -1234,6 +1269,7 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
     }
 
     if (polled.status === "authorized" && polled.session) {
+      const waitForAuthorizationMs = pollEndedAtMs - firstPollStartedAtMs;
       await saveSlipwaySession({
         version: 1,
         slipwayUrl,
@@ -1241,14 +1277,28 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
         savedAtMs: nowMs(),
         session: polled.session
       }, { config: sessionFile, env, nowMs });
+      const sortedPollRoundTripsMs = [...pollRoundTripSamplesMs].sort((a, b) => a - b);
+      const timings: SlipwayLoginTimings = {
+        pendingMs,
+        browserOpenMs,
+        waitForAuthorizationMs,
+        pollCount: pollRoundTripSamplesMs.length,
+        pollRoundTripMs: {
+          p50: percentile(sortedPollRoundTripsMs, 50),
+          max: sortedPollRoundTripsMs.length === 0 ? 0 : sortedPollRoundTripsMs[sortedPollRoundTripsMs.length - 1]
+        },
+        totalMs: nowMs() - enteredAtMs
+      };
       writeStructuredOrHuman(options, input.json, {
         ok: true,
         status: "authorized",
         slipwayUrl,
         sessionFile,
         browserOpened,
-        session: polled.session
+        session: polled.session,
+        timings
       }, `Logged in to ${slipwayUrl} as ${formatSessionIdentity(polled.session)}.`);
+      emitLoginTimings(options, { json: input.json, timings });
       return 0;
     }
 
@@ -5288,6 +5338,23 @@ function emitLoginInstruction(
   else emit(options, lines);
 }
 
+function emitLoginTimings(options: SlipwayCliOptions, input: { json?: boolean; timings: SlipwayLoginTimings }): void {
+  const line = formatLoginTimings(input.timings);
+  // In --json mode stdout must stay exactly one JSON object; the summary goes to stderr.
+  if (input.json) emitError(options, line);
+  else emit(options, line);
+}
+
+function formatLoginTimings(timings: SlipwayLoginTimings): string {
+  const polls = `${timings.pollCount} ${timings.pollCount === 1 ? "poll" : "polls"}`;
+  return [
+    `Timings: pending ${formatDurationMs(timings.pendingMs)}`,
+    `browser ${formatDurationMs(timings.browserOpenMs)}`,
+    `wait ${formatDurationMs(timings.waitForAuthorizationMs)} (${polls}, p50 ${formatDurationMs(timings.pollRoundTripMs.p50)}, max ${formatDurationMs(timings.pollRoundTripMs.max)})`,
+    `total ${formatDurationMs(timings.totalMs)}`
+  ].join(" \u00b7 ");
+}
+
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
@@ -5489,6 +5556,22 @@ function withoutUndefinedDeep(value: unknown): unknown {
 
 function defaultSleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Nearest-rank percentile of an ascending-sorted sample; `0` for an empty sample. */
+function percentile(sortedAscending: number[], p: number): number {
+  if (sortedAscending.length === 0) return 0;
+  const fraction = Math.min(100, Math.max(0, p)) / 100;
+  const rank = Math.ceil(fraction * sortedAscending.length);
+  const index = Math.min(sortedAscending.length - 1, Math.max(0, rank - 1));
+  return sortedAscending[index];
+}
+
+/** `120 ms` below one second, otherwise one decimal in seconds (`4.2 s`). */
+function formatDurationMs(ms: number): string {
+  if (!Number.isFinite(ms)) return "n/a";
+  if (Math.abs(ms) < 1_000) return `${Math.round(ms)} ms`;
+  return `${(ms / 1_000).toFixed(1)} s`;
 }
 
 function attachPolicyExplanation(
