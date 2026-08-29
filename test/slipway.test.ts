@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm as rmdir, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
@@ -5260,3 +5260,93 @@ function encryptedHandoff(): Record<string, unknown> {
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
+
+describe("canonical application posture rendering", () => {
+  it("prints the server posture on status and list, and nothing without one", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "proof-posture-"));
+    const sessionFile = path.join(directory, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://liskov.test",
+      sessionToken: "session-token-that-must-not-be-printed",
+      savedAtMs: 1
+    }, { config: sessionFile });
+    try {
+      // A typed-spine application: the server posture is printed verbatim.
+      const withPosture = writer();
+      assert.equal(await runSlipwayApplicationStatus({ applicationId: "app_1", config: sessionFile }, {
+        fetchImpl: async (url) => String(url).includes("view=explanation")
+          ? new Response("{}", { status: 404 })
+          : jsonResponse({
+              ok: true,
+              application: { applicationId: "app_1", status: "active" },
+              applicationPosture: {
+                category: "inactive",
+                tone: "idle",
+                reason: "execution_complete",
+                label: "Run complete",
+                actionable: false,
+                evidence: "execution"
+              }
+            }),
+        stdout: withPosture.write
+      }), 0);
+      assert.match(withPosture.text, /app_1: active; Run complete \(execution evidence\)/u);
+
+      // An actionable posture says so.
+      const actionable = writer();
+      assert.equal(await runSlipwayApplicationStatus({ applicationId: "app_1", config: sessionFile }, {
+        fetchImpl: async (url) => String(url).includes("view=explanation")
+          ? new Response("{}", { status: 404 })
+          : jsonResponse({
+              ok: true,
+              application: { applicationId: "app_1", status: "active" },
+              applicationPosture: {
+                category: "needs_action",
+                tone: "danger",
+                reason: "execution_reconcile_required",
+                label: "Needs reconciliation",
+                actionable: true,
+                evidence: "execution"
+              }
+            }),
+        stdout: actionable.write
+      }), 0);
+      assert.match(actionable.text, /Needs reconciliation \(execution evidence, action required\)/u);
+
+      // An older server sends no posture: the line is exactly as it was.
+      const withoutPosture = writer();
+      assert.equal(await runSlipwayApplicationStatus({ applicationId: "app_1", config: sessionFile }, {
+        fetchImpl: async (url) => String(url).includes("view=explanation")
+          ? new Response("{}", { status: 404 })
+          : jsonResponse({ ok: true, application: { applicationId: "app_1", status: "active" } }),
+        stdout: withoutPosture.write
+      }), 0);
+      // The status line itself is exactly as it was; the explanation block
+      // below it is the pre-existing behaviour of this command.
+      assert.equal(withoutPosture.text.split("\n")[0], "app_1: active");
+
+      // The list prints it as one more detail, and omits it when absent.
+      const list = writer();
+      assert.equal(await runSlipwayApplicationList({ config: sessionFile }, {
+        fetchImpl: async () => jsonResponse({
+          ok: true,
+          count: 2,
+          applications: [
+            {
+              applicationId: "app_1",
+              status: "active",
+              applicationPosture: { category: "ready", tone: "ok", reason: "execution_running", label: "Running", actionable: false, evidence: "execution" }
+            },
+            { applicationId: "app_2", status: "active" }
+          ]
+        }),
+        stdout: list.write
+      }), 0);
+      assert.match(list.text, /- app_1: active \(posture Running\)/u);
+      assert.match(list.text, /- app_2: active$/mu);
+    } finally {
+      await rmdir(directory, { recursive: true });
+    }
+  });
+});
