@@ -821,6 +821,8 @@ interface PublicSlipwayApplicationSummary {
   activePolicyVersionId?: string;
   activePolicyDigest?: string;
   duplicateLegacyId?: boolean;
+  /** The server's canonical posture; absent on an older server. */
+  applicationPosture?: unknown;
 }
 
 interface PublicSlipwayApplicationRefCandidate {
@@ -5961,7 +5963,29 @@ function formatApplicationStatus(body: SlipwayApplicationStatusResponse, fallbac
   const repository = app?.source?.repository ? `; repo ${app.source.repository}` : "";
   const deleted = typeof app?.deletedAtMs === "number" ? `; deleted ${new Date(app.deletedAtMs).toISOString()}` : "";
   const signer = formatSelfCustodySigner(body.selfCustodySigner);
-  return `${applicationId}: ${status}${replicaSummary ? ` (${replicaSummary})` : ""}${policy}${repository}${deleted}${signer ? `; ${signer}` : ""}`;
+  const posture = formatApplicationPosture(body.applicationPosture);
+  return `${applicationId}: ${status}${replicaSummary ? ` (${replicaSummary})` : ""}${policy}${repository}${deleted}${signer ? `; ${signer}` : ""}${posture}`;
+}
+
+/**
+ * The server's canonical posture, verbatim. A row without one — an older
+ * server, or a read the server degraded — prints exactly as before; the CLI
+ * never derives a posture of its own.
+ */
+function applicationPostureDetail(value: unknown): string | undefined {
+  const posture = objectRecord(value);
+  const label = stringValue(posture.label);
+  if (!label) return undefined;
+  return `posture ${label}${posture.actionable === true ? " (action required)" : ""}`;
+}
+
+function formatApplicationPosture(value: unknown): string {
+  const posture = objectRecord(value);
+  const label = stringValue(posture.label);
+  if (!label) return "";
+  const evidence = stringValue(posture.evidence);
+  const actionable = posture.actionable === true ? ", action required" : "";
+  return `; ${label}${evidence ? ` (${evidence} evidence${actionable})` : actionable ? ` (${actionable.slice(2)})` : ""}`;
 }
 
 function formatApplicationDeploymentStatus(body: SlipwayGenericResponse, fallbackApplicationId: string): string {
@@ -6109,7 +6133,8 @@ function formatApplicationList(body: SlipwayApplicationListResponse): string {
       application.organizationId ? `org ${application.organizationId}` : undefined,
       application.applicationUid && application.applicationUid !== primary ? `uid ${application.applicationUid}` : undefined,
       application.duplicateLegacyId ? "duplicate legacy id" : undefined,
-      typeof application.deletedAtMs === "number" ? `deleted ${new Date(application.deletedAtMs).toISOString()}` : undefined
+      typeof application.deletedAtMs === "number" ? `deleted ${new Date(application.deletedAtMs).toISOString()}` : undefined,
+      applicationPostureDetail(application.applicationPosture)
     ].filter((item): item is string => item !== undefined);
     lines.push(`- ${applicationId}: ${status}${details.length > 0 ? ` (${details.join(", ")})` : ""}`);
   }
