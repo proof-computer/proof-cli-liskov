@@ -12,6 +12,8 @@ proof liskov organization billing org-123
 proof liskov organization service-credits org-123
 proof liskov organization billing transactions org-123 --limit 25 --before 1719230000000
 proof liskov application manifest validate --file .slipway/application-policy.json
+proof liskov application execution show proof-docs
+proof liskov application execution show proof-docs --watch --timeout-seconds 900
 proof liskov application policy publish proof-docs --file .liskov/proof-docs-v5.json --artifact-digest sha256:... --binding-revision 1 --revocation-epoch 0 --source-ref refs/heads/main --source-commit 0123456789abcdef0123456789abcdef01234567 --workflow-identity proof-computer/proof-docs/.github/workflows/release.yml@refs/heads/main --expected-pointer-version 0 --yes
 proof liskov application import --github proof-computer/docs:.slipway/application-policy.json@main --server-fetch
 proof liskov application list
@@ -161,6 +163,20 @@ Registered V5 publication is a distinct source-evidence path:
 requires the exact attested artifact/build facts and observed active-pointer
 version, then submits them to the server-owned `policy-versions` writer. It
 never creates a V4 draft, and no request is sent without `--yes`.
+
+`application execution show` reads the same canonical explanation envelope as
+`application policy explain` and renders its `execution` and `spendCloseout`
+sections as the typed-spine run: the selected occurrence and attempt, the stage
+rail, the deploy and custody-settlement effects with their persisted receipts
+and job id, the reserve/settlement lineage, the first persisted blocker with the
+server's next action, and the decision trace. `--json` prints the verbatim
+server envelope. `--watch` re-reads it every `--poll-ms` (default 2000, minimum
+500) for up to `--timeout-seconds` (default 900, maximum 1800) and prints one
+line per semantic change (`--json` emits one NDJSON record per change with the
+`changedPaths`); it exits 0 when the occurrence completes, 1 on a failed
+terminal, a persisted blocker (unless `--until-terminal`) or the timeout, 2 on
+invalid flags, and 130 on Ctrl-C after a final snapshot. A fact the server did
+not report renders as "not reported"; the CLI never infers execution state.
 
 `application publish --paused --reason TEXT --yes` publishes and pauses in one
 server transaction, so the executor cannot observe an intermediate active

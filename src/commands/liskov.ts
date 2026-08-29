@@ -41,6 +41,7 @@ COMMANDS
   application pause APP_REF --yes
   application resume APP_REF --yes
   application status APPLICATION_ID
+  application execution show APPLICATION_ID [--json] [--watch] [--poll-ms N] [--timeout-seconds N] [--until-terminal]
   application plans APPLICATION_ID
   application action-plan APP_REF
   application action-plan retry APP_REF --decision-id ID --reason TEXT --yes

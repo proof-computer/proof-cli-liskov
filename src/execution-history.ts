@@ -32,6 +32,11 @@ export function formatExecutionHistory(
   const lines = [
     `Live custody executions for ${applicationRef}: returned ${body.count}, total ${body.total}, next offset ${next}.`
   ];
+  if (body.count === 0 && body.total === 0) {
+    lines.push(
+      "No live-custody attempts are recorded. An application that runs through typed V5 execution reports its run under `proof liskov application execution show <ref>`."
+    );
+  }
   for (const rawAttempt of body.attempts) {
     const attempt = safeAttempt(rawAttempt);
     const identifiers = [

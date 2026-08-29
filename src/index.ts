@@ -25,6 +25,7 @@ export {
   runSlipwayApplicationLockboxGrantVerify,
   runSlipwayApplicationLockboxSetupPr,
   runSlipwayApplicationPlans,
+  runSlipwayApplicationExecutionShow,
   runSlipwayApplicationPolicyExplain,
   runSlipwayApplicationPolicyPublish,
   runSlipwayApplicationPublish,
