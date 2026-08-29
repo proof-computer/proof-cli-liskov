@@ -10,6 +10,8 @@ const requiredArtifacts = [
   "dist/commands/liskov.js",
   "dist/commands/liskov/application.js",
   "dist/commands/liskov/application/logs.js",
+  "dist/commands/liskov/application/execution.js",
+  "dist/commands/liskov/application/execution/show.js",
   "dist/commands/liskov/application/deployment.js",
   "dist/commands/liskov/application/deployment/import.js",
   "dist/commands/liskov/application/delete.js",

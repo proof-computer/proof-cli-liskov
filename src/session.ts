@@ -45,6 +45,15 @@ import {
   policyExplanationPath
 } from "./policy-explanation.js";
 import {
+  executionChanges,
+  executionDigest,
+  executionStableBlocker,
+  executionTerminal,
+  formatExecutionChange,
+  formatExecutionExplanation,
+  formatExecutionStatusLine
+} from "./execution-explanation.js";
+import {
   APPLICATION_LOGS_HEADER,
   eventGlobMatcher,
   formatApplicationLogLine,
@@ -1529,6 +1538,180 @@ export async function runSlipwayApplicationPolicyExplain(
     nextActions: parsed.nextActions
   }, formatPolicyExplanation(parsed.explanation, parsed.nextActions));
   return 0;
+}
+
+export interface SlipwayApplicationExecutionShowInput {
+  applicationId: string;
+  config?: string;
+  slipwayUrl?: string;
+  json?: boolean;
+  watch?: boolean;
+  pollMs?: number;
+  timeoutSeconds?: number;
+  untilTerminal?: boolean;
+}
+
+const APPLICATION_EXECUTION_WATCH_MIN_POLL_MS = 500;
+const APPLICATION_EXECUTION_WATCH_DEFAULT_POLL_MS = 2_000;
+const APPLICATION_EXECUTION_WATCH_DEFAULT_TIMEOUT_SECONDS = 900;
+const APPLICATION_EXECUTION_WATCH_MAX_TIMEOUT_SECONDS = 1_800;
+const APPLICATION_EXECUTION_WATCH_MAX_CONSECUTIVE_FAILURES = 30;
+
+/**
+ * `proof liskov application execution show`: the typed-spine execution and
+ * spend/closeout truth from the one canonical explanation envelope. `--watch`
+ * re-reads it and reports one record per semantic change; exit 0 on a
+ * completed occurrence, 1 on a failed terminal, a persisted blocker (unless
+ * `--until-terminal`) or the timeout, 2 on invalid flags, 130 on Ctrl-C.
+ */
+export async function runSlipwayApplicationExecutionShow(
+  input: SlipwayApplicationExecutionShowInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  const pollMs = input.pollMs ?? APPLICATION_EXECUTION_WATCH_DEFAULT_POLL_MS;
+  const timeoutSeconds = input.timeoutSeconds ?? APPLICATION_EXECUTION_WATCH_DEFAULT_TIMEOUT_SECONDS;
+  if (input.watch === true) {
+    const invalid = !Number.isSafeInteger(pollMs) || pollMs < APPLICATION_EXECUTION_WATCH_MIN_POLL_MS
+      ? `--poll-ms must be an integer of at least ${APPLICATION_EXECUTION_WATCH_MIN_POLL_MS}`
+      : !Number.isSafeInteger(timeoutSeconds) || timeoutSeconds < 1
+          || timeoutSeconds > APPLICATION_EXECUTION_WATCH_MAX_TIMEOUT_SECONDS
+        ? `--timeout-seconds must be an integer between 1 and ${APPLICATION_EXECUTION_WATCH_MAX_TIMEOUT_SECONDS}`
+        : undefined;
+    if (invalid) {
+      writeStructuredOrHuman(options, input.json, {
+        ok: false,
+        error: "SLIPWAY_APPLICATION_EXECUTION_INPUT_INVALID",
+        message: invalid,
+        applicationId: input.applicationId
+      }, `Error (SLIPWAY_APPLICATION_EXECUTION_INPUT_INVALID): ${invalid}`);
+      return 2;
+    }
+  }
+
+  const read = (quiet: boolean) => authenticatedSlipwayRequest<unknown>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: policyExplanationPath(input.applicationId),
+    requestErrorCode: "SLIPWAY_APPLICATION_EXECUTION_SHOW_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application execution explanation",
+    optional: quiet
+  }, options);
+
+  const first = await read(false);
+  if (!first.ok) return first.exitCode;
+  const parsed = parsePolicyExplanation(first.body);
+  if (!parsed.ok) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: parsed.error,
+      message: parsed.message,
+      applicationId: input.applicationId,
+      slipwayUrl: first.slipwayUrl,
+      sessionFile: first.sessionFile
+    }, `Error (${parsed.error}): ${parsed.message}`);
+    return 1;
+  }
+  if (input.watch !== true) {
+    // `--json` is the verbatim server envelope, as every read command prints it.
+    writeStructuredOrHuman(options, input.json, first.body, formatExecutionExplanation(parsed.explanation));
+    return 0;
+  }
+
+  const nowMs = options.nowMs ?? (() => Date.now());
+  const sleep = options.sleepMs ?? defaultSleep;
+  const followContinue = options.followContinue ?? (() => true);
+  const deadlineMs = nowMs() + timeoutSeconds * 1000;
+  let current = parsed.explanation;
+  let currentBody: unknown = first.body;
+  let digest = executionDigest(current);
+  let sequence = 0;
+  let consecutiveFailures = 0;
+  let interrupted = false;
+  const onInterrupt = (): void => {
+    interrupted = true;
+  };
+  const listenForInterrupt = options.followContinue === undefined;
+  if (listenForInterrupt) process.once("SIGINT", onInterrupt);
+
+  const emitRecord = (changedPaths: ReturnType<typeof executionChanges>, previousDigest: string | null, final?: string): void => {
+    const observedAtMs = nowMs();
+    if (input.json) {
+      emit(options, JSON.stringify({
+        schema: current.schema,
+        sequence,
+        observedAtMs,
+        previousDigest,
+        digest,
+        changedPaths,
+        ...(final ? { final } : {}),
+        explanation: currentBody
+      }));
+      return;
+    }
+    if (sequence === 0 && !final) {
+      emit(options, formatExecutionExplanation(current));
+      emit(options, `watching every ${pollMs} ms for up to ${timeoutSeconds} s; one line per change.`);
+      return;
+    }
+    for (const change of changedPaths) emit(options, formatExecutionChange(observedAtMs, change));
+    if (final) {
+      emit(options, `${final}:`);
+      emit(options, formatExecutionExplanation(current));
+    }
+  };
+  const settle = (): number | undefined => {
+    const terminal = executionTerminal(current);
+    if (terminal.terminal) return terminal.success ? 0 : 1;
+    if (input.untilTerminal !== true && executionStableBlocker(current) !== null) return 1;
+    return undefined;
+  };
+  const finish = (code: number): number => {
+    if (listenForInterrupt) process.removeListener("SIGINT", onInterrupt);
+    return code;
+  };
+
+  emitRecord([], null);
+  const settled = settle();
+  if (settled !== undefined) return finish(settled);
+
+  while (followContinue()) {
+    if (interrupted) {
+      emitRecord([], digest, "interrupted");
+      return finish(130);
+    }
+    if (nowMs() >= deadlineMs) {
+      emitRecord([], digest, "timeout");
+      return finish(1);
+    }
+    await sleep(pollMs);
+    const page = await read(true);
+    const next = page.ok && page.response.ok ? parsePolicyExplanation(page.body) : undefined;
+    if (!next || !next.ok) {
+      consecutiveFailures += 1;
+      if (consecutiveFailures >= APPLICATION_EXECUTION_WATCH_MAX_CONSECUTIVE_FAILURES) {
+        emitError(options, `Error (SLIPWAY_APPLICATION_EXECUTION_SHOW_FAILED): ${consecutiveFailures} consecutive read failures while watching.`);
+        emitRecord([], digest, "unreadable");
+        return finish(1);
+      }
+      emitError(options, `Warning: could not read Liskov Application execution explanation (attempt ${consecutiveFailures} of ${APPLICATION_EXECUTION_WATCH_MAX_CONSECUTIVE_FAILURES}); retrying.`);
+      continue;
+    }
+    consecutiveFailures = 0;
+    const nextDigest = executionDigest(next.explanation);
+    if (nextDigest === digest) continue;
+    const changes = executionChanges(current, next.explanation);
+    const previousDigest = digest;
+    current = next.explanation;
+    currentBody = page.ok ? page.body : currentBody;
+    digest = nextDigest;
+    sequence += 1;
+    emitRecord(changes, previousDigest);
+    const outcome = settle();
+    if (outcome !== undefined) return finish(outcome);
+  }
+  return finish(0);
 }
 
 export async function runSlipwayApplicationList(input: SlipwayApplicationListInput, options: SlipwayCliOptions = {}): Promise<number> {
@@ -5756,7 +5939,9 @@ function attachPolicyExplanation(
       explanation: parsed.explanation,
       nextActions: parsed.nextActions
     },
-    human: formatStatusExplanation(parsed.nextActions)
+    human: [formatExecutionStatusLine(parsed.explanation), formatStatusExplanation(parsed.nextActions)]
+      .filter((line): line is string => typeof line === "string" && line.length > 0)
+      .join("\n")
   };
 }
 

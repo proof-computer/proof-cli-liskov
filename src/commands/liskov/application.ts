@@ -42,6 +42,7 @@ COMMANDS
   retire cancel APP_REF [--reason TEXT] --yes
   resume APP_REF [--owner OWNER] [--reason TEXT] [--yes]
   status APPLICATION_ID
+  execution show APPLICATION_ID [--json] [--watch] [--poll-ms N] [--timeout-seconds N] [--until-terminal]
   plans APPLICATION_ID
   action-plan APP_REF
   action-plan retry APP_REF --decision-id ID --reason TEXT --yes
