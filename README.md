@@ -52,6 +52,7 @@ proof liskov runtime-ssh operator-key add org-123 --name patrick-mbp --identity 
 proof liskov runtime-ssh operator-key remove org-123 key_123
 proof liskov ssh proof-docs --print-command
 proof liskov ssh proof-docs --deployment dep-123 --job job-123
+proof liskov ssh proof-docs --job 155468
 proof liskov custody account ensure proof-docs --chain acurast --yes
 proof liskov custody preflight proof-docs --json
 proof liskov custody execution run-one proof-docs --plan-item-id PLAN_ITEM_ID_FROM_ONE_ITEM --idempotency-key OPAQUE_KEY_FROM_SAME_ITEM --expect-kind acurast.deploy --expect-policy-digest POLICY_DIGEST_FROM_SAME_ITEM --yes-spend --yes

@@ -9,7 +9,8 @@ export default class LiskovSsh extends OrganizationScopedCommand {
   static examples = [
     "<%= config.bin %> liskov ssh my-app",
     "<%= config.bin %> liskov ssh my-app --deployment deploy_123 --print-command",
-    "<%= config.bin %> liskov ssh my-app --job job_123"
+    "<%= config.bin %> liskov ssh my-app --job job_123",
+    "<%= config.bin %> liskov ssh my-app --job 155468"
   ];
   static flags: Interfaces.FlagInput = {
     "accept-host-key": Flags.boolean({ description: "Accept and pin a first-use managed runtime host key without prompting." }),
@@ -17,7 +18,7 @@ export default class LiskovSsh extends OrganizationScopedCommand {
     deployment: Flags.string({ description: "Select an exact deployment id." }),
     help: Flags.help({ char: "h" }),
     identity: Flags.string({ description: "Customer-owned Ed25519 private key for managed Runtime SSH." }),
-    job: Flags.string({ description: "Select an exact job id." }),
+    job: Flags.string({ description: "Select an exact job id, or a provider job sequence (a V5 job\u2019s number)." }),
     json: Flags.boolean({ description: "Emit machine-readable JSON (most useful with --print-command)." }),
     "print-command": Flags.boolean({ description: "Resolve and verify the connection without opening SSH." }),
     "slipway-url": Flags.string({ description: "Liskov service URL." })

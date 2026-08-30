@@ -134,6 +134,68 @@ test("Runtime SSH connection requests propagate the request organization without
   });
 });
 
+test("a numeric --job selects the V5 job by its provider sequence on both spines", async () => {
+  await withSession(async (sessionFile) => {
+    // BKLG-20260830-mobh: a V5 job has no Liskov deployment row; the number
+    // an execution surface shows is the provider job sequence, which the
+    // attachment's provider deployment column carries on both spines. A
+    // structured job id must still pass through untouched.
+    let posted: Record<string, unknown> = {};
+    const code = await runRuntimeSshConnection({
+      applicationRef: "app",
+      config: sessionFile,
+      jobId: "155468",
+      printCommand: true,
+      json: true
+    }, {
+      fetchImpl: async (_url, init) => {
+        posted = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return Response.json({
+          ok: true,
+          connection: {
+            provider: "tailscale",
+            attachmentId: "att_v5",
+            deploymentId: "155468",
+            jobId: "155468",
+            expectedTailnet: "example.com",
+            hostname: "runtime.example.com",
+            user: "root",
+            port: 22,
+            command: ["tailscale", "ssh", "root@runtime.example.com"]
+          }
+        });
+      },
+      runProcess: async () => ({
+        exitCode: 0,
+        stdout: JSON.stringify({ CurrentTailnet: { Name: "example.com" } }),
+        stderr: ""
+      }),
+      stdout: () => {}
+    });
+    assert.equal(code, 0);
+    assert.equal(posted.deploymentId, "155468");
+    assert.equal(posted.jobId, "155468");
+
+    let structured: Record<string, unknown> = {};
+    await runRuntimeSshConnection({
+      applicationRef: "app",
+      config: sessionFile,
+      jobId: "job_123",
+      printCommand: true,
+      json: true
+    }, {
+      fetchImpl: async (_url, init) => {
+        structured = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return Response.json({ ok: false, error: "runtime_ssh_attachment_not_found" });
+      },
+      stdout: () => {},
+      stderr: () => {}
+    });
+    assert.equal(structured.deploymentId, undefined);
+    assert.equal(structured.jobId, "job_123");
+  });
+});
+
 test("tailnet mismatch is actionable and never switches accounts", async () => {
   await withSession(async (sessionFile) => {
     const calls: Array<{ executable: string; args: readonly string[]; mode: string }> = [];

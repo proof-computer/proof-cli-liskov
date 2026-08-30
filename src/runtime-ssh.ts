@@ -362,10 +362,17 @@ export async function runRuntimeSshConnection(
   input: RuntimeSshConnectionInput,
   options: RuntimeSshCliOptions = {}
 ): Promise<number> {
+  // A bare numeric --job is a provider job sequence — the id a V5 execution
+  // surface shows (a V5 job has no Liskov deployment row at all), and the
+  // number V4 stores as both its provider deployment id and its sequence. The
+  // attachment's provider deployment column carries exactly that number on
+  // both spines, so a sequence selects the job by also offering it as the
+  // deployment id; a structured --job value is passed through untouched.
+  const jobSequence = input.jobId && /^[0-9]+$/.test(input.jobId) ? input.jobId : undefined;
   const response = await runtimeSshRequest<ConnectionResponse>(input, options, {
     method: "POST",
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/runtime-ssh/connection-requests`,
-    body: { deploymentId: input.deploymentId, jobId: input.jobId }
+    body: { deploymentId: input.deploymentId ?? jobSequence, jobId: input.jobId }
   });
   if (!response.ok) return response.exitCode;
   const connection = response.body?.connection;
