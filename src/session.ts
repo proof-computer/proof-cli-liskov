@@ -68,7 +68,8 @@ import {
   type LaunchEligibilityRead
 } from "./launch-eligibility.js";
 
-export const DEFAULT_SLIPWAY_URL = "https://liskov.proof.computer";
+export const DEFAULT_SLIPWAY_URL = "https://console.liskov.proof.computer";
+const LEGACY_LISKOV_URL = "https://liskov.proof.computer";
 const DEFAULT_RUNTIME_IMAGE_WORKFLOW_OUTPUT = ".github/workflows/liskov-runtime-image.yml";
 const DEFAULT_RUNTIME_IMAGE_WORKFLOW_NAME = "Liskov Runtime Image Upload";
 const DEFAULT_RUNTIME_IMAGE_OIDC_AUDIENCE = "liskov-runtime-image-upload";
@@ -1133,10 +1134,14 @@ async function loginWithMintedSessionToken(input: {
     writeStructuredOrHuman(input.options, input.json, {
       ok: false,
       error: "SLIPWAY_CLI_LOGIN_CREATE_FAILED",
-      message: errorMessage(error),
+      message: withLiskovEndpointMigrationHint(errorMessage(error), input.slipwayUrl),
       slipwayUrl: input.slipwayUrl,
+      ...liskovEndpointMigrationDetails(input.slipwayUrl),
       sessionFile: input.sessionFile
-    }, `Error (SLIPWAY_CLI_LOGIN_CREATE_FAILED): could not reach Liskov at ${input.slipwayUrl}.`);
+    }, withLiskovEndpointMigrationHint(
+      `Error (SLIPWAY_CLI_LOGIN_CREATE_FAILED): could not reach Liskov at ${input.slipwayUrl}.`,
+      input.slipwayUrl
+    ));
     return 1;
   }
   const body = await readJsonResponse<SlipwayApiSessionResponse>(response);
@@ -1210,10 +1215,14 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
     writeStructuredOrHuman(options, input.json, {
       ok: false,
       error: "SLIPWAY_CLI_LOGIN_CREATE_FAILED",
-      message: errorMessage(error),
+      message: withLiskovEndpointMigrationHint(errorMessage(error), slipwayUrl),
       slipwayUrl,
+      ...liskovEndpointMigrationDetails(slipwayUrl),
       sessionFile
-    }, `Error (SLIPWAY_CLI_LOGIN_CREATE_FAILED): could not create a Liskov CLI login request at ${slipwayUrl}.`);
+    }, withLiskovEndpointMigrationHint(
+      `Error (SLIPWAY_CLI_LOGIN_CREATE_FAILED): could not create a Liskov CLI login request at ${slipwayUrl}.`,
+      slipwayUrl
+    ));
     return 1;
   }
 
@@ -1277,10 +1286,14 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
       writeStructuredOrHuman(options, input.json, {
         ok: false,
         error: "SLIPWAY_CLI_LOGIN_POLL_FAILED",
-        message: errorMessage(error),
+        message: withLiskovEndpointMigrationHint(errorMessage(error), slipwayUrl),
         slipwayUrl,
+        ...liskovEndpointMigrationDetails(slipwayUrl),
         sessionFile
-      }, `Error (SLIPWAY_CLI_LOGIN_POLL_FAILED): could not poll Liskov CLI login status at ${slipwayUrl}.`);
+      }, withLiskovEndpointMigrationHint(
+        `Error (SLIPWAY_CLI_LOGIN_POLL_FAILED): could not poll Liskov CLI login status at ${slipwayUrl}.`,
+        slipwayUrl
+      ));
       return 1;
     }
 
@@ -1400,10 +1413,14 @@ export async function runSlipwayWhoami(input: SlipwayWhoamiInput, options: Slipw
     writeStructuredOrHuman(options, input.json, {
       ok: false,
       error: "SLIPWAY_SESSION_READ_FAILED",
-      message: errorMessage(error),
+      message: withLiskovEndpointMigrationHint(errorMessage(error), slipwayUrl),
       slipwayUrl,
+      ...liskovEndpointMigrationDetails(slipwayUrl),
       sessionFile
-    }, `Error (SLIPWAY_SESSION_READ_FAILED): could not read Liskov session from ${slipwayUrl}.`);
+    }, withLiskovEndpointMigrationHint(
+      `Error (SLIPWAY_SESSION_READ_FAILED): could not read Liskov session from ${slipwayUrl}.`,
+      slipwayUrl
+    ));
     return 1;
   }
 
@@ -4907,10 +4924,17 @@ async function authenticatedSlipwayRequest<T>(
     writeStructuredOrHuman(options, input.json, {
       ok: false,
       error: input.requestErrorCode,
-      message: input.redactFetchError ? "Request failed." : errorMessage(error),
+      message: withLiskovEndpointMigrationHint(
+        input.redactFetchError ? "Request failed." : errorMessage(error),
+        slipwayUrl
+      ),
       slipwayUrl,
+      ...liskovEndpointMigrationDetails(slipwayUrl),
       sessionFile
-    }, `Error (${input.requestErrorCode}): ${input.fetchFailedMessage} at ${slipwayUrl}.`);
+    }, withLiskovEndpointMigrationHint(
+      `Error (${input.requestErrorCode}): ${input.fetchFailedMessage} at ${slipwayUrl}.`,
+      slipwayUrl
+    ));
     return { ok: false, exitCode: 1 };
   }
 
@@ -5021,11 +5045,18 @@ async function authenticatedSlipwayJsonRequest<T>(
     writeStructuredOrHuman(options, input.json, {
       ok: false,
       error: input.requestErrorCode,
-      message: input.redactFetchError ? "request_failed" : errorMessage(error),
+      message: withLiskovEndpointMigrationHint(
+        input.redactFetchError ? "request_failed" : errorMessage(error),
+        slipwayUrl
+      ),
       slipwayUrl,
+      ...liskovEndpointMigrationDetails(slipwayUrl),
       sessionFile,
       ...input.requestFailureDetails
-    }, `Error (${input.requestErrorCode}): ${input.fetchFailedMessage} at ${slipwayUrl}.`);
+    }, withLiskovEndpointMigrationHint(
+      `Error (${input.requestErrorCode}): ${input.fetchFailedMessage} at ${slipwayUrl}.`,
+      slipwayUrl
+    ));
     return { ok: false, exitCode: 1 };
   }
 
@@ -5603,6 +5634,28 @@ function normalizeBaseUrl(value: string): string {
   url.hash = "";
   url.search = "";
   return url.toString().replace(/\/+$/u, "");
+}
+
+/** Add a migration action only when the exact retired-apex endpoint failed. */
+export function withLiskovEndpointMigrationHint(message: string, value: string | URL): string {
+  let endpoint: string;
+  try {
+    endpoint = normalizeBaseUrl(String(value));
+  } catch {
+    return message;
+  }
+  if (endpoint !== LEGACY_LISKOV_URL) return message;
+  return `${message} The legacy Liskov endpoint ${LEGACY_LISKOV_URL} is being withdrawn; use ${DEFAULT_SLIPWAY_URL} or pass --liskov-url to select another endpoint.`;
+}
+
+function liskovEndpointMigrationDetails(value: string | URL): { suggestedLiskovUrl?: string } {
+  try {
+    return normalizeBaseUrl(String(value)) === LEGACY_LISKOV_URL
+      ? { suggestedLiskovUrl: DEFAULT_SLIPWAY_URL }
+      : {};
+  } catch {
+    return {};
+  }
 }
 
 function signerControlPlaneUrl(slipwayUrl: string): string {

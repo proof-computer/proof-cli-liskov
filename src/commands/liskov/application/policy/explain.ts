@@ -11,7 +11,7 @@ export default class LiskovApplicationPolicyExplain extends OrganizationScopedCo
   static examples = [
     "<%= config.bin %> liskov application policy explain proof-docs",
     "<%= config.bin %> liskov application policy explain proof-docs --json",
-    "<%= config.bin %> liskov application policy explain proof-docs --slipway-url https://liskov.proof.computer"
+    "<%= config.bin %> liskov application policy explain proof-docs --slipway-url https://console.liskov.proof.computer"
   ];
   static flags: Interfaces.FlagInput = {
     config: Flags.string({ description: "Path to the local Liskov session file." }),

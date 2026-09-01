@@ -10,7 +10,7 @@ export default class SlipwayApplicationRuntimeImageWorkflow extends Command {
   static examples = [
     "<%= config.bin %> liskov application runtime-image workflow proof-docs --manifest .liskov/proof-docs.json",
     "<%= config.bin %> liskov application runtime-image workflow proof-docs --manifest .liskov/proof-docs.json --output .github/workflows/liskov-runtime-image.yml --yes",
-    "<%= config.bin %> liskov application runtime-image workflow proof-docs --manifest .liskov/proof-docs.json --liskov-url https://liskov.proof.computer --json"
+    "<%= config.bin %> liskov application runtime-image workflow proof-docs --manifest .liskov/proof-docs.json --liskov-url https://console.liskov.proof.computer --json"
   ];
   static flags: Interfaces.FlagInput = {
     help: Flags.help({ char: "h" }),
