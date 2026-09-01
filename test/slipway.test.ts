@@ -2699,7 +2699,13 @@ describe("proof-cli Liskov runner", () => {
             schemaVersion: 5,
             policyVersionId: "alpha-v1",
             activePointerVersion: 1,
-            handlerGeneration: 2
+            handlerGeneration: 2,
+            policyDiagnostics: [{
+              severity: "warning",
+              code: "successor_overlap_default_applied",
+              message: "existing jobs use the retained default",
+              pointer: "/deployment/lifecycle/update/existingJobs"
+            }]
           }
         });
       },
@@ -2728,9 +2734,51 @@ describe("proof-cli Liskov runner", () => {
       }
     }]);
     assert.equal(out.text.includes(token), false);
-    const output = JSON.parse(out.text) as { ok: boolean; policyVersion: { policyVersionId: string } };
+    const output = JSON.parse(out.text) as {
+      ok: boolean;
+      policyVersion: {
+        policyVersionId: string;
+        policyDiagnostics: Array<{
+          severity: string;
+          code: string;
+          message: string;
+          pointer: string;
+        }>;
+      };
+    };
     assert.equal(output.ok, true);
     assert.equal(output.policyVersion.policyVersionId, "alpha-v1");
+    assert.equal(output.policyVersion.policyDiagnostics[0]?.severity, "warning");
+
+    const humanOut = writer();
+    assert.equal(await runSlipwayApplicationPolicyPublish({
+      applicationRef: "alpha",
+      artifactDigest,
+      bindingRevision: 1,
+      config: sessionFile,
+      expectedPointerVersion: 0,
+      file: manifestPath,
+      revocationEpoch: 0,
+      sourceCommit: "b".repeat(40),
+      sourceRef: "refs/heads/main",
+      workflowIdentity: "proof-computer/alpha/.github/workflows/release.yml@refs/heads/main",
+      yes: true
+    }, {
+      fetchImpl: async () => jsonResponse({
+        ok: true,
+        policyVersion: {
+          policyVersionId: "alpha-v1",
+          activePointerVersion: 1,
+          handlerGeneration: 2,
+          policyDiagnostics: output.policyVersion.policyDiagnostics
+        }
+      }),
+      stdout: humanOut.write
+    }), 0);
+    assert.equal(humanOut.text, [
+      "Published alpha-v1 for alpha at pointer 1 under handler generation 2.",
+      "WARNING successor_overlap_default_applied /deployment/lifecycle/update/existingJobs: existing jobs use the retained default\n"
+    ].join("\n"));
   });
 
   it("refuses registered V5 publication without confirmation or with an invalid document before network I/O", async () => {
