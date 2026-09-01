@@ -163,7 +163,10 @@ Registered V5 publication is a distinct source-evidence path:
 `application policy publish` validates the retained schema-5 document locally,
 requires the exact attested artifact/build facts and observed active-pointer
 version, then submits them to the server-owned `policy-versions` writer. It
-never creates a V4 draft, and no request is sent without `--yes`.
+never creates a V4 draft, and no request is sent without `--yes`. On success,
+human output renders the server-authored immutable policy diagnostics with
+their severity, stable code, pointer, and message; `--json` preserves the same
+`policyVersion.policyDiagnostics` records unchanged.
 
 `application execution show` reads the same canonical explanation envelope as
 `application policy explain` and renders its `execution` and `spendCloseout`

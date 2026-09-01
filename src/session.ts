@@ -2631,7 +2631,8 @@ export async function runSlipwayApplicationPolicyPublish(
       const version = stringValue(policy.policyVersionId) ?? "registered V5 policy";
       const pointer = numberValue(policy.activePointerVersion);
       const generation = numberValue(policy.handlerGeneration);
-      return `Published ${version} for ${input.applicationRef}${pointer === undefined ? "" : ` at pointer ${pointer}`}${generation === undefined ? "" : ` under handler generation ${generation}`}.`;
+      const summary = `Published ${version} for ${input.applicationRef}${pointer === undefined ? "" : ` at pointer ${pointer}`}${generation === undefined ? "" : ` under handler generation ${generation}`}.`;
+      return [summary, ...formatPolicyDiagnosticLines(policy.policyDiagnostics)].join("\n");
     }
   }, options);
 }
@@ -5706,6 +5707,17 @@ function numberValue(value: unknown): number | undefined {
 
 function arrayValue(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
+}
+
+function formatPolicyDiagnosticLines(value: unknown): string[] {
+  return arrayValue(value).map((entry) => {
+    const diagnostic = objectRecord(entry);
+    const severity = stringValue(diagnostic.severity) ?? stringValue(diagnostic.level) ?? "info";
+    const code = stringValue(diagnostic.code) ?? "policy_diagnostic";
+    const pointer = stringValue(diagnostic.pointer) ?? "/";
+    const message = stringValue(diagnostic.message);
+    return `${severity.toUpperCase()} ${code} ${pointer}${message ? `: ${message}` : ""}`;
+  });
 }
 
 function objectRecord(value: unknown): Record<string, unknown> {
