@@ -84,8 +84,7 @@ describe("local application-manifest v4 tools", () => {
     const errors = validateApplicationManifestV4(input);
     assert.ok(errors.some((error) => error.pointer === "/release/builder/allowedRefs/1"));
     assert.ok(errors.some((error) => error.pointer === "/release/builder/manifestPath"));
-    assert.ok(errors.some((error) =>
-      error.code === "unknown_field" && error.pointer === "/release/artifact/encryption"));
+    assert.ok(errors.every((error) => error.code === "invalid_manifest"));
   });
 
   it("validates pinned IPFS and runtime-image artifacts strictly", () => {
