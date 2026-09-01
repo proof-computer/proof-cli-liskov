@@ -20,13 +20,13 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
         with:
           version: 10.33.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
@@ -48,11 +48,9 @@ jobs:
         run: npm publish --dry-run --access public
       - name: Publish
         if: ${{ (github.event_name == 'push' || inputs.publish) && steps.published.outputs.published != 'true' }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_ACCESS_TOKEN }}
         run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "Missing NPM_ACCESS_TOKEN repository secret" >&2
-            exit 1
-          fi
-          npm publish --provenance --access public
+          # npm exchanges the GitHub OIDC token for a short-lived publish
+          # credential. npmjs must trust proof-computer/proof-cli-liskov and
+          # this exact npm-publish.yml workflow; no long-lived write token is
+          # exposed to the job.
+          npm publish --access public
