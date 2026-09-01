@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 
 import RuntimeImageWorkflowCommand from "../src/commands/liskov/application/runtime-image/workflow.js";
 import {
+  DEFAULT_SLIPWAY_URL,
   runSlipwayAdminDeploySpendResolve,
   runSlipwayAdminExecutorOperationReconcile,
   runSlipwayApplicationBackfillIdentities,
@@ -56,6 +57,99 @@ import {
 } from "../src/index.js";
 
 describe("proof-cli Liskov runner", () => {
+  it("defaults new logins to the permanent console and explains legacy endpoint failures", async () => {
+    assert.equal(DEFAULT_SLIPWAY_URL, "https://console.liskov.proof.computer");
+
+    const defaultSession = path.join(
+      await mkdtemp(path.join(tmpdir(), "proof-liskov-default-host-")),
+      "session.json"
+    );
+    const defaultOut = writer();
+    const defaultCode = await runSlipwayLogin({
+      config: defaultSession,
+      json: true,
+      sessionToken: "default-host-token"
+    }, {
+      fetchImpl: async (url) => {
+        assert.equal(String(url), "https://console.liskov.proof.computer/api/session");
+        return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+      },
+      stdout: defaultOut.write
+    });
+    assert.equal(defaultCode, 1);
+
+    const legacyUrl = "https://liskov.proof.computer";
+    const legacyJson = writer();
+    const legacyCode = await runSlipwayLogin({
+      config: path.join(await mkdtemp(path.join(tmpdir(), "proof-liskov-legacy-host-")), "session.json"),
+      json: true,
+      liskovUrl: legacyUrl,
+      sessionToken: "legacy-host-token"
+    }, {
+      fetchImpl: async () => {
+        throw new Error("getaddrinfo ENOTFOUND liskov.proof.computer");
+      },
+      stdout: legacyJson.write
+    });
+    assert.equal(legacyCode, 1);
+    const parsed = JSON.parse(legacyJson.text) as {
+      message: string;
+      slipwayUrl: string;
+      suggestedLiskovUrl: string;
+    };
+    assert.equal(parsed.slipwayUrl, legacyUrl);
+    assert.equal(parsed.suggestedLiskovUrl, DEFAULT_SLIPWAY_URL);
+    assert.match(parsed.message, /console\.liskov\.proof\.computer/u);
+
+    const legacyHuman = writer();
+    const humanCode = await runSlipwayLogin({
+      config: path.join(await mkdtemp(path.join(tmpdir(), "proof-liskov-legacy-human-")), "session.json"),
+      liskovUrl: legacyUrl,
+      sessionToken: "legacy-human-token"
+    }, {
+      fetchImpl: async () => {
+        throw new Error("connection refused");
+      },
+      stdout: legacyHuman.write
+    });
+    assert.equal(humanCode, 1);
+    assert.match(legacyHuman.text, /legacy Liskov endpoint https:\/\/liskov\.proof\.computer/u);
+    assert.match(legacyHuman.text, /use https:\/\/console\.liskov\.proof\.computer/u);
+    assert.equal(legacyHuman.text.includes("legacy-human-token"), false);
+  });
+
+  it("explains a network failure from a saved legacy endpoint", async () => {
+    const sessionFile = path.join(
+      await mkdtemp(path.join(tmpdir(), "proof-liskov-legacy-session-")),
+      "session.json"
+    );
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://liskov.proof.computer",
+      sessionToken: "saved-legacy-token",
+      savedAtMs: 1
+    }, { config: sessionFile });
+    const out = writer();
+    const code = await runSlipwayApplicationStatus({
+      applicationId: "proof-docs",
+      config: sessionFile,
+      json: true
+    }, {
+      fetchImpl: async () => {
+        throw new Error("network offline");
+      },
+      stdout: out.write
+    });
+    assert.equal(code, 1);
+    const parsed = JSON.parse(out.text) as {
+      message: string;
+      suggestedLiskovUrl: string;
+    };
+    assert.equal(parsed.suggestedLiskovUrl, DEFAULT_SLIPWAY_URL);
+    assert.match(parsed.message, /console\.liskov\.proof\.computer/u);
+    assert.equal(out.text.includes("saved-legacy-token"), false);
+  });
+
   it("writes a manifest-bound @v1 runtime-image workflow without inline upload logic", async () => {
     const { dir, manifestPath } = await runtimeImageWorkflowFixture("proof-docs");
     const output = path.join(dir, ".github", "workflows", "liskov-runtime-image.yml");

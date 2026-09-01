@@ -8,7 +8,7 @@ export default class SlipwayLogin extends Command {
   static examples = [
     "<%= config.bin %> liskov login",
     "<%= config.bin %> liskov login --no-browser",
-    "<%= config.bin %> liskov login --liskov-url https://liskov.proof.computer --json",
+    "<%= config.bin %> liskov login --liskov-url https://console.liskov.proof.computer --json",
     "<%= config.bin %> liskov login --session-token TOKEN --liskov-url http://127.0.0.1:8787"
   ];
   static flags: Interfaces.FlagInput = {

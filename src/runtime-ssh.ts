@@ -12,7 +12,12 @@ import {
   organizationSelector,
   OrganizationSelectorError
 } from "./organization-context.js";
-import { DEFAULT_SLIPWAY_URL, resolveSlipwaySessionFile, type SlipwaySessionFile } from "./session.js";
+import {
+  DEFAULT_SLIPWAY_URL,
+  resolveSlipwaySessionFile,
+  withLiskovEndpointMigrationHint,
+  type SlipwaySessionFile
+} from "./session.js";
 
 export interface RuntimeSshCliOptions {
   env?: NodeJS.ProcessEnv;
@@ -593,7 +598,15 @@ async function runtimeSshRequest<T>(
   try {
     response = await (options.fetchImpl ?? fetch)(new URL(request.path, context.baseUrl), init);
   } catch (error) {
-    return { ok: false, exitCode: localFailure(input.json, options, "RUNTIME_SSH_REQUEST_FAILED", `Could not contact Liskov: ${errorMessage(error)}`) };
+    return {
+      ok: false,
+      exitCode: localFailure(
+        input.json,
+        options,
+        "RUNTIME_SSH_REQUEST_FAILED",
+        withLiskovEndpointMigrationHint(`Could not contact Liskov: ${errorMessage(error)}`, context.baseUrl)
+      )
+    };
   }
   const text = await response.text();
   let body: T | undefined;
@@ -626,7 +639,15 @@ async function resolveRuntimeSshOrganization(
   } catch (error) {
     return {
       ok: false,
-      exitCode: localFailure(input.json, options, "RUNTIME_SSH_REQUEST_FAILED", `Could not resolve the Liskov organization: ${errorMessage(error)}`)
+      exitCode: localFailure(
+        input.json,
+        options,
+        "RUNTIME_SSH_REQUEST_FAILED",
+        withLiskovEndpointMigrationHint(
+          `Could not resolve the Liskov organization: ${errorMessage(error)}`,
+          context.baseUrl
+        )
+      )
     };
   }
   const body = await readRuntimeSshJson(response);
