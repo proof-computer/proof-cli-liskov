@@ -36,8 +36,12 @@ import {
   organizationSelector,
   OrganizationSelectorError
 } from "./organization-context.js";
-import { validateApplicationManifestV4 } from "./application-policy.js";
-import { validateApplicationManifestV5 } from "./application-policy-v5.js";
+import {
+  evaluateApplicationManifestText,
+  isRegisteredSourcePublicationPair,
+  validateApplicationManifestV4,
+  type PolicyContractEvaluation
+} from "./application-policy.js";
 import {
   formatPolicyExplanation,
   formatStatusExplanation,
@@ -2560,7 +2564,7 @@ export async function runSlipwayApplicationPolicyPublish(
       options,
       input.json,
       "SLIPWAY_APPLICATION_POLICY_PUBLISH_CONFIRMATION_REQUIRED",
-      "Registered V5 policy publication"
+      "Registered policy publication"
     );
   }
 
@@ -2576,8 +2580,11 @@ export async function runSlipwayApplicationPolicyPublish(
   }
 
   let document: unknown;
+  let contractResult: PolicyContractEvaluation;
   try {
-    document = JSON.parse(await readFile(input.file, "utf8")) as unknown;
+    const source = await readFile(input.file, "utf8");
+    contractResult = evaluateApplicationManifestText(source, "json");
+    document = contractResult.document;
   } catch (error) {
     const message = errorMessage(error);
     writeStructuredOrHuman(options, input.json, {
@@ -2590,7 +2597,20 @@ export async function runSlipwayApplicationPolicyPublish(
     return 1;
   }
 
-  const diagnostics = validateApplicationManifestV5(document);
+  const diagnostics = [
+    ...contractResult.errors,
+    ...contractResult.capabilityDiagnostics,
+    ...contractResult.deprecationDiagnostics
+  ];
+  if (!isRegisteredSourcePublicationPair(contractResult)) {
+    diagnostics.push({
+      code: contractResult.disposition === "unknown_opaque" ? "unknown_policy_schema" : "invalid_manifest",
+      message: contractResult.disposition === "unknown_opaque"
+        ? "this CLI has no registered publication contract for the exact schema pair"
+        : "the document does not declare a locally supported registered publication pair",
+      pointer: "/schema"
+    });
+  }
   const documentRoot = objectRecord(document);
   if (documentRoot.applicationId !== input.applicationRef) {
     diagnostics.push({

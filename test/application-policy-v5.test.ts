@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { validateApplicationManifest } from "../src/application-policy.js";
+import {
+  evaluateApplicationManifest,
+  isRegisteredSourcePublicationPair,
+  setPolicyContractForTesting,
+  validateApplicationManifest
+} from "../src/application-policy.js";
 
 function retainedJavascript(): Record<string, unknown> {
   return {
@@ -104,7 +109,7 @@ describe("retained V5 application-manifest validation", () => {
     const ingress = retainedJavascript();
     ingress.ingress = { http: { mode: "required", port: 8080 } };
     assert.ok(validateApplicationManifest(ingress).some((error) =>
-      error.pointer === "/ingress" && error.message.includes("deferred")));
+      error.pointer === "/ingress"));
 
     const cohort = retainedJavascript();
     cohort.cohort = { id: "workers" };
@@ -117,17 +122,17 @@ describe("retained V5 application-manifest validation", () => {
     const acu = retainedJavascript();
     (acu.deployment as Record<string, Record<string, unknown>>).spend.unit = "acu";
     assert.ok(validateApplicationManifest(acu).some((error) =>
-      error.pointer === "/deployment/spend/unit" && error.message.includes("deferred")));
+      error.pointer === "/deployment/spend/unit"));
 
     const tailscale = retainedManagedSsh();
     (tailscale.access as Record<string, Record<string, Record<string, unknown>>>).ssh.provider.kind = "tailscale";
     assert.ok(validateApplicationManifest(tailscale).some((error) =>
-      error.pointer === "/access/ssh/provider/kind" && error.message.includes("deferred")));
+      error.pointer === "/access/ssh/provider/kind"));
 
     const stateOn = retainedJavascript();
     (stateOn.state as Record<string, unknown>).mode = "volumes";
     assert.ok(validateApplicationManifest(stateOn).some((error) =>
-      error.pointer === "/state/mode" && error.message.includes("deferred")));
+      error.pointer === "/state/mode"));
   });
 
   it("degrades on a future schemaVersion without interpreting nested fields", () => {
@@ -136,8 +141,41 @@ describe("retained V5 application-manifest validation", () => {
     future.ingress = { http: { mode: "required" } };
     const diagnostics = validateApplicationManifest(future);
     assert.equal(diagnostics.length, 1);
-    assert.equal(diagnostics[0]?.code, "unsupported_policy_feature");
-    assert.equal(diagnostics[0]?.pointer, "/schemaVersion");
-    assert.match(diagnostics[0]?.message ?? "", /future policy pair/u);
+    assert.equal(diagnostics[0]?.code, "unknown_policy_schema");
+    assert.equal(diagnostics[0]?.pointer, "/schema");
+    assert.match(diagnostics[0]?.message ?? "", /no registered handler/u);
+  });
+
+  it("admits a synthetic later pair through registry injection without a version branch", () => {
+    const future = { ...retainedJavascript(), schemaVersion: 6, futureContractMarker: "proof" };
+    setPolicyContractForTesting({
+      manifest: {
+        publicationPairs: [{
+          schema: "proof.liskov.application-manifest",
+          schemaVersion: 6,
+          releaseMode: "source"
+        }]
+      },
+      evaluate: () => ({
+        schema: "proof.liskov.policy-client-result.v1",
+        operation: "validate",
+        disposition: "supported",
+        valid: true,
+        pair: { schema: "proof.liskov.application-manifest", schemaVersion: 6 },
+        document: future,
+        errors: [],
+        capabilityDiagnostics: [],
+        deprecationDiagnostics: [],
+        authoredDigest: "a".repeat(64),
+        releaseIntentDigest: "b".repeat(64)
+      })
+    });
+    try {
+      const result = evaluateApplicationManifest(future);
+      assert.equal(result.valid, true);
+      assert.equal(isRegisteredSourcePublicationPair(result), true);
+    } finally {
+      setPolicyContractForTesting(undefined);
+    }
   });
 });

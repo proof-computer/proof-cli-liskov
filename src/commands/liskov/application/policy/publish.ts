@@ -7,7 +7,7 @@ export default class LiskovApplicationPolicyPublish extends OrganizationScopedCo
   static args = {
     app_ref: Args.string({ description: "Exact Liskov Application id; must match document.applicationId.", required: true })
   };
-  static description = "Publish one retained V5 source document through the registered policy-version writer.";
+  static description = "Publish one locally supported source document through the registered policy-version writer.";
   static examples = [
     "<%= config.bin %> liskov application policy publish proof-docs --file .liskov/proof-docs-v5.json --artifact-digest sha256:... --binding-revision 1 --revocation-epoch 0 --source-ref refs/heads/main --source-commit 0123456789abcdef0123456789abcdef01234567 --workflow-identity proof-computer/proof-docs/.github/workflows/release.yml@refs/heads/main --expected-pointer-version 0 --yes",
     "<%= config.bin %> liskov application policy publish proof-docs --file manifest.json --artifact-digest sha256:... --binding-revision 1 --revocation-epoch 0 --source-ref refs/heads/main --source-commit 0123456789abcdef0123456789abcdef01234567 --workflow-identity proof-computer/proof-docs/.github/workflows/release.yml@refs/heads/main --expected-pointer-version 0 --yes --json"
@@ -17,7 +17,7 @@ export default class LiskovApplicationPolicyPublish extends OrganizationScopedCo
     "binding-revision": Flags.integer({ description: "Source-binding revision carried by the attested build.", min: 0, required: true }),
     config: Flags.string({ description: "Path to the local Liskov session file." }),
     "expected-pointer-version": Flags.integer({ description: "Active pointer version observed before publication.", min: 0, required: true }),
-    file: Flags.string({ char: "f", description: "Retained V5 Application manifest JSON file.", required: true }),
+    file: Flags.string({ char: "f", description: "Supported Application manifest JSON file.", required: true }),
     help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
     "revocation-epoch": Flags.integer({ description: "Source-binding revocation epoch carried by the attested build.", min: 0, required: true }),
@@ -25,9 +25,9 @@ export default class LiskovApplicationPolicyPublish extends OrganizationScopedCo
     "source-commit": Flags.string({ description: "Exact 40-character source commit attested by the build.", required: true }),
     "source-ref": Flags.string({ description: "Exact source ref attested by the build.", required: true }),
     "workflow-identity": Flags.string({ description: "Exact GitHub workflow identity attested by the build.", required: true }),
-    yes: Flags.boolean({ char: "y", description: "Confirm the registered V5 publication mutation.", required: true })
+    yes: Flags.boolean({ char: "y", description: "Confirm the registered policy publication mutation.", required: true })
   };
-  static summary = "Publish a retained V5 source policy version.";
+  static summary = "Publish a registered source policy version.";
 
   async run(): Promise<void> {
     const { args, flags } = await this.parse(LiskovApplicationPolicyPublish);

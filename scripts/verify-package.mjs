@@ -51,6 +51,9 @@ const requiredArtifacts = [
   "dist/index.js",
   "dist/organization-context.js",
   "dist/session.js",
+  "dist/policy-client-bundle/policy-client-bundle.json",
+  "dist/policy-client-bundle/policy-client-contract.wasm.gz",
+  "dist/policy-client-bundle/policy-client.cjs",
   "oclif.manifest.json",
   "README.md"
 ];

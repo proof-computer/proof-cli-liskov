@@ -1,0 +1,48 @@
+{
+  "schema": "proof.liskov.policy-client-bundle.v1",
+  "abiVersion": 1,
+  "artifact": {
+    "file": "policy-client-contract.wasm.gz",
+    "sha256": "sha256:10fb535cb808210650f976d111c7535056aa99e93e9a46fefde2b757e0259f53",
+    "uncompressedSha256": "sha256:a2c33cc17f5e629c4302fa0e79dae84efd675b28cef01554245cadeb4cb0cb8a"
+  },
+  "adapter": {
+    "file": "policy-client.cjs",
+    "sha256": "sha256:e5fd667fad2731d370c5a99514d9a741cc9886ae07dc0ab85c84d9eac5b1f896"
+  },
+  "types": {
+    "file": "policy-client.d.ts",
+    "sha256": "sha256:c5b98941abd57ad3e86f5e476f33f6ca0575dc890d6282e090ee0f5140139a73"
+  },
+  "conformance": {
+    "file": "policy-client-conformance.json",
+    "sha256": "sha256:0619fdb545d491ef4667a51d277d29cba582e4748f8f1da5a5020b3099c76a33"
+  },
+  "supportedPairs": [
+    {
+      "schema": "proof.liskov.application-manifest",
+      "schemaVersion": 4
+    },
+    {
+      "schema": "proof.liskov.application-policy",
+      "schemaVersion": 4
+    },
+    {
+      "schema": "proof.liskov.application-manifest",
+      "schemaVersion": 5
+    },
+    {
+      "schema": "proof.liskov.application-policy",
+      "schemaVersion": 5
+    }
+  ],
+  "publicationPairs": [
+    {
+      "schema": "proof.liskov.application-manifest",
+      "schemaVersion": 5,
+      "releaseMode": "source"
+    }
+  ],
+  "sourceDigest": "sha256:b6ee5c3f702b93f4fb8d476ae23463ae811d6fbcac24511cd11b1012116d1780",
+  "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)"
+}

@@ -11,7 +11,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "node scripts/clean-build.mjs && tsc -p tsconfig.json && oclif manifest",
+    "build": "node scripts/clean-build.mjs && tsc -p tsconfig.json && node scripts/copy-policy-client-bundle.mjs && oclif manifest",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
     "prepare": "pnpm run build && node scripts/verify-package.mjs",
