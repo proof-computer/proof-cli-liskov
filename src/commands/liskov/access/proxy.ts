@@ -14,6 +14,14 @@ export function accessProxyAdvice(code: string): string {
       return ": the runtime has not connected to the access gateway for this job. Check the attachment is ready; if its access sidecar has failed, that is terminal for this run and the job must be relaunched.";
     case "access_proxy_rejected_connector_unavailable":
       return ": the runtime's connection to the access gateway is not ready yet. Retry in a few seconds.";
+    // Worth its own sentence for a reason found the day this landed: the
+    // gateway rejected every operator ticket for sixteen days (2026-08-18 to
+    // 2026-09-03) because the control plane had added a claim its
+    // `deny_unknown_fields` claim type did not know, and the only thing an
+    // operator saw was the bare token. A refusal that means "the two sides
+    // disagree about the ticket" must not read like "your key is wrong".
+    case "access_proxy_rejected_credential_rejected":
+      return ": the access gateway refused the one-time ticket. The ticket is minted seconds before use, so this is a gateway or control-plane fault rather than anything wrong with your key — retry once, then report the attachmentId and the time.";
     default:
       return "";
   }

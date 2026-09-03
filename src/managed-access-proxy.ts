@@ -12,6 +12,7 @@ const SAFE_CLOSE_CATEGORIES = new Set([
   "connector_closed",
   "connector_not_registered",
   "connector_unavailable",
+  "credential_rejected",
   "frame_too_large",
   "gateway_closed",
   "heartbeat_timeout",

@@ -152,6 +152,10 @@ test("proxy names which refusal the gateway sent, and echoes nothing it does not
     ["session_already_open", "access_proxy_rejected_session_already_open"],
     ["connector_not_registered", "access_proxy_rejected_connector_not_registered"],
     ["connector_unavailable", "access_proxy_rejected_connector_unavailable"],
+    // The live failure mode between 2026-08-18 and 2026-09-03: a gateway that
+    // could not deserialize the control plane's ticket claims answered 401
+    // credential_rejected, and every operator saw only the bare token.
+    ["credential_rejected", "access_proxy_rejected_credential_rejected"],
     // Not in the allowlist: the operator gets the bare token, never the
     // upstream's own words.
     ["secret bearer material", "access_proxy_rejected"]
