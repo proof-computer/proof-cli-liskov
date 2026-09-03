@@ -12,6 +12,9 @@ import {
   runRuntimeSshOperatorKeyAdd,
   runRuntimeSshOperatorKeyList,
   runRuntimeSshOperatorKeyRemove,
+  runRuntimeSshWithdrawnKeyAdd,
+  runRuntimeSshWithdrawnKeyList,
+  runRuntimeSshWithdrawnKeyRemove,
   type RuntimeSshProcessRunner
 } from "../src/runtime-ssh.js";
 
@@ -1093,8 +1096,11 @@ test("operator-key add registers the public half of --identity and never prints 
     const sent = JSON.parse(requestBody);
     assert.equal(sent.publicKey, publicKey);
     assert.equal(sent.name, "patrick-mbp");
-    // Registering is not granting; the human path has to say so.
-    assert.match(output.join("\n"), /does not grant access/u);
+    // Registering authorizes the NEXT attachment, not an existing one. The
+    // old assertion pinned "does not grant access", which was V4's rule and
+    // wrong for V5, where this registry is the grant source
+    // (BKLG-20260805-awz6).
+    assert.match(output.join("\n"), /authorizes new attachments, not existing ones/u);
     assert.doesNotMatch(output.join("\n"), new RegExp(token));
   });
 });
@@ -1187,14 +1193,19 @@ test("operator-key list renders one tab-separated row per key, and an empty stat
         : Response.json({ ok: true, keys: [] })
     });
     assert.equal(emptyCode, 0);
-    assert.match(empty.join("\n"), /list it in an application policy/u);
+    assert.match(empty.join("\n"), /A V5 application authorizes this registry/u);
   });
 });
 
-test("operator-key remove surfaces the server's non-revocation note on both output paths", async () => {
+// This test used to be named "surfaces the server's non-revocation note" and
+// asserted the words "does not revoke". BKLG-20260805-awz6 made the removal a
+// real revocation, so the assertion had to invert with the behaviour: what has
+// to travel now is what the server actually did, and the one thing it still
+// does not do.
+test("operator-key remove reports the withdrawal it performed on both output paths", async () => {
   await withSession(async (sessionFile) => {
     const publicKey = ed25519PublicKey(17);
-    const note = "Removal does not revoke access on deployed policies; update each policy's authorizedKeys and redeploy to do that.";
+    const note = "Access for this key is withdrawn: no new connection request or ticket will be granted for it, and its unused tickets are revoked. A session already open drains, bounded by the gateway's two-hour maximum session duration.";
     const removal = async (json: boolean, sink: string[]) => runRuntimeSshOperatorKeyRemove(
       { organizationId: "organization-one", keyId: "key_1", json, config: sessionFile },
       {
@@ -1204,20 +1215,154 @@ test("operator-key remove surfaces the server's non-revocation note on both outp
           if (String(url).endsWith("/api/organizations")) return Response.json(organizationListBody);
           assert.equal(init?.method, "DELETE");
           assert.equal(String(url), "https://liskov.test/api/organizations/org_1/runtime-ssh/operator-keys/key_1");
-          return Response.json({ ok: true, removed: operatorKeyRow(publicKey), note });
+          return Response.json({
+            ok: true,
+            removed: operatorKeyRow(publicKey),
+            withdrawal: withdrawnKeyRow(),
+            revokedTicketCount: 2,
+            note
+          });
         }
       }
     );
 
     const human: string[] = [];
     assert.equal(await removal(false, human), 0);
-    assert.match(human.join("\n"), /removed from the registry/u);
-    assert.match(human.join("\n"), /does not revoke/u);
+    assert.match(human.join("\n"), /removed and its access withdrawn/u);
+    // The effect, not a claim about it.
+    assert.match(human.join("\n"), /Unused tickets revoked: 2\./u);
+    // And the boundary that remains: an open session is not cut.
+    assert.match(human.join("\n"), /already open drains/u);
+    assert.doesNotMatch(human.join("\n"), /does not revoke/u);
 
     const machine: string[] = [];
     assert.equal(await removal(true, machine), 0);
     assert.equal(JSON.parse(machine.join("\n")).note, note);
+    assert.equal(JSON.parse(machine.join("\n")).revokedTicketCount, 2);
     assert.doesNotMatch(machine.join("\n"), new RegExp(token));
+  });
+});
+
+function withdrawnKeyRow(): Record<string, unknown> {
+  return {
+    withdrawalId: "rsw_1",
+    fingerprint: "SHA256:SQfC+vTbLURn9cTkVxIS8fGQ3FKNAJWeB0o139+gV4M",
+    sourceKeyId: "key_1",
+    sourceKeyName: "patrick-mbp",
+    withdrawnBy: "principal-1",
+    reason: "left the team",
+    withdrawnAtMs: 1000
+  };
+}
+
+test("withdrawn-key add withdraws a fingerprint that has no registry row", async () => {
+  await withSession(async (sessionFile) => {
+    let requestBody = "";
+    const output: string[] = [];
+    const code = await runRuntimeSshWithdrawnKeyAdd({
+      organizationId: "organization-one",
+      fingerprint: "SHA256:SQfC+vTbLURn9cTkVxIS8fGQ3FKNAJWeB0o139+gV4M",
+      reason: "left the team",
+      config: sessionFile
+    }, {
+      stdout: (line) => output.push(line),
+      stderr: (line) => output.push(line),
+      fetchImpl: async (url, init) => {
+        if (String(url).endsWith("/api/organizations")) return Response.json(organizationListBody);
+        assert.equal(init?.method, "POST");
+        assert.equal(String(url), "https://liskov.test/api/organizations/org_1/runtime-ssh/withdrawn-keys");
+        requestBody = String(init?.body);
+        return Response.json({ ok: true, withdrawal: withdrawnKeyRow(), revokedTicketCount: 1, newlyWithdrawn: true }, { status: 201 });
+      }
+    });
+    assert.equal(code, 0);
+    assert.equal(JSON.parse(requestBody).fingerprint, "SHA256:SQfC+vTbLURn9cTkVxIS8fGQ3FKNAJWeB0o139+gV4M");
+    assert.equal(JSON.parse(requestBody).reason, "left the team");
+    assert.match(output.join("\n"), /Access withdrawn/u);
+    assert.match(output.join("\n"), /Unused tickets revoked: 1\./u);
+  });
+});
+
+test("withdrawn-key add reports an already-withdrawn key without failing", async () => {
+  await withSession(async (sessionFile) => {
+    const output: string[] = [];
+    // An offboarding script retried after a timeout must not have to tell
+    // "I did it" from "it was already done".
+    const code = await runRuntimeSshWithdrawnKeyAdd({
+      organizationId: "organization-one",
+      fingerprint: "SHA256:SQfC+vTbLURn9cTkVxIS8fGQ3FKNAJWeB0o139+gV4M",
+      config: sessionFile
+    }, {
+      stdout: (line) => output.push(line),
+      stderr: (line) => output.push(line),
+      fetchImpl: async (url) => {
+        if (String(url).endsWith("/api/organizations")) return Response.json(organizationListBody);
+        return Response.json({ ok: true, withdrawal: withdrawnKeyRow(), revokedTicketCount: 0, newlyWithdrawn: false });
+      }
+    });
+    assert.equal(code, 0);
+    assert.match(output.join("\n"), /Already withdrawn/u);
+  });
+});
+
+test("withdrawn-key add refuses locally when it is given nothing to withdraw", async () => {
+  await withSession(async (sessionFile) => {
+    const output: string[] = [];
+    const code = await runRuntimeSshWithdrawnKeyAdd({ organizationId: "organization-one", config: sessionFile }, {
+      stdout: (line) => output.push(line),
+      stderr: (line) => output.push(line),
+      fetchImpl: async () => { throw new Error("no request expected"); }
+    });
+    assert.equal(code, 1);
+    assert.match(output.join("\n"), /RUNTIME_SSH_WITHDRAWAL_TARGET_REQUIRED/u);
+  });
+});
+
+test("withdrawn-key list renders one row per withdrawal, and an empty state that says access is intact", async () => {
+  await withSession(async (sessionFile) => {
+    const listing = async (withdrawnKeys: unknown[], sink: string[]) => runRuntimeSshWithdrawnKeyList(
+      { organizationId: "organization-one", config: sessionFile },
+      {
+        stdout: (line) => sink.push(line),
+        stderr: (line) => sink.push(line),
+        fetchImpl: async (url) => {
+          if (String(url).endsWith("/api/organizations")) return Response.json(organizationListBody);
+          assert.equal(String(url), "https://liskov.test/api/organizations/org_1/runtime-ssh/withdrawn-keys");
+          return Response.json({ ok: true, withdrawnKeys });
+        }
+      }
+    );
+
+    const rows: string[] = [];
+    assert.equal(await listing([withdrawnKeyRow()], rows), 0);
+    assert.match(rows.join("\n"), /rsw_1\tSHA256:/u);
+
+    const empty: string[] = [];
+    assert.equal(await listing([], empty), 0);
+    assert.match(empty.join("\n"), /can still open a session/u);
+  });
+});
+
+test("withdrawn-key remove lifts a withdrawal and says it is not a re-registration", async () => {
+  await withSession(async (sessionFile) => {
+    const output: string[] = [];
+    const code = await runRuntimeSshWithdrawnKeyRemove({
+      organizationId: "organization-one",
+      withdrawalId: "rsw_1",
+      config: sessionFile
+    }, {
+      stdout: (line) => output.push(line),
+      stderr: (line) => output.push(line),
+      fetchImpl: async (url, init) => {
+        if (String(url).endsWith("/api/organizations")) return Response.json(organizationListBody);
+        assert.equal(init?.method, "DELETE");
+        assert.equal(String(url), "https://liskov.test/api/organizations/org_1/runtime-ssh/withdrawn-keys/rsw_1");
+        return Response.json({ ok: true, reinstated: withdrawnKeyRow() });
+      }
+    });
+    assert.equal(code, 0);
+    assert.match(output.join("\n"), /Withdrawal lifted/u);
+    assert.match(output.join("\n"), /must still be registered/u);
   });
 });
 

@@ -8,13 +8,17 @@ export default class RuntimeSshOperatorKeyRemove extends OrganizationScopedComma
     organization_id: Args.string({ description: "Exact Liskov organization ID or slug.", required: false }),
     key_id: Args.string({ description: "Exact operator key ID from `operator-key list`.", required: false })
   };
-  static description = "Remove an operator key from the organization registry. This is inventory hygiene, not revocation: deployed policies keep the keys they already list, so update each policy's authorizedKeys and redeploy to actually withdraw access.";
+  // This description used to say the opposite -- that removal was "inventory
+  // hygiene, not revocation" and the caller had to edit the policy and
+  // redeploy. That was accurate, and it was the problem BKLG-20260805-awz6
+  // existed to fix: a `remove` verb that looked like offboarding and was not.
+  static description = "Remove an operator key from the organization registry and withdraw its access. New connection requests and tickets are refused for the key, and its unused tickets are revoked, without republishing any policy. A session already open drains.";
   static examples = [
     "<%= config.bin %> liskov runtime-ssh operator-key remove key_123",
     "<%= config.bin %> liskov runtime-ssh operator-key remove org_123 key_123"
   ];
   static flags: Interfaces.FlagInput = commonFlags();
-  static summary = "Remove a Runtime SSH operator key from the registry.";
+  static summary = "Remove a Runtime SSH operator key and withdraw its access.";
 
   async run(): Promise<void> {
     const { args, flags } = await this.parse(RuntimeSshOperatorKeyRemove);

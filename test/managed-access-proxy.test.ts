@@ -135,3 +135,88 @@ test("proxy reports only allowlisted gateway close categories", async () => {
     );
   }
 });
+
+// `BKLG-20260805-rykk`. The gateway refuses an operator *before* the WebSocket
+// upgrade, so `ws` reports `unexpected-response` rather than a close frame.
+// That path used to discard the status and body and report the bare token
+// `access_proxy_rejected`, which is why a second concurrent session was
+// indistinguishable from a runtime that never dialled in — and why it was
+// untested. The categories are read back through the same allowlist as close
+// frames, so an unrecognised one still degrades rather than echoing upstream.
+test("proxy names which refusal the gateway sent, and echoes nothing it does not recognise", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "liskov-access-reject-"));
+  const tokenFile = path.join(root, "operator.token");
+  await writeFile(tokenFile, "one-time-token\n", { mode: 0o600 });
+
+  for (const [body, expected] of [
+    ["session_already_open", "access_proxy_rejected_session_already_open"],
+    ["connector_not_registered", "access_proxy_rejected_connector_not_registered"],
+    ["connector_unavailable", "access_proxy_rejected_connector_unavailable"],
+    // Not in the allowlist: the operator gets the bare token, never the
+    // upstream's own words.
+    ["secret bearer material", "access_proxy_rejected"]
+  ]) {
+    const emitter = new EventEmitter();
+    const fake = Object.assign(emitter, {
+      protocol: "liskov-access.v1",
+      pause: () => undefined,
+      resume: () => undefined,
+      terminate: () => undefined,
+      send: () => undefined,
+      close: () => undefined
+    }) as unknown as WebSocket;
+    const proxy = runManagedAccessProxy(
+      { gateway: "wss://access.example", tokenFile, tunnelId: "tunnel_test" },
+      { stdin: new PassThrough(), stdout: new PassThrough() },
+      {
+        createSocket: () => {
+          queueMicrotask(() => {
+            const response = new PassThrough();
+            emitter.emit("unexpected-response", {}, response);
+            response.end(Buffer.from(body));
+          });
+          return fake;
+        }
+      }
+    );
+    await assert.rejects(proxy, (error: unknown) =>
+      error instanceof Error && error.message === expected
+    );
+  }
+});
+
+// A refusal body large enough to be a payload rather than a category is cut
+// off and reported as the bare token: the gateway is not a source of text this
+// CLI will relay to a terminal.
+test("proxy bounds the refusal body it will read", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "liskov-access-reject-bound-"));
+  const tokenFile = path.join(root, "operator.token");
+  await writeFile(tokenFile, "one-time-token\n", { mode: 0o600 });
+
+  const emitter = new EventEmitter();
+  const fake = Object.assign(emitter, {
+    protocol: "liskov-access.v1",
+    pause: () => undefined,
+    resume: () => undefined,
+    terminate: () => undefined,
+    send: () => undefined,
+    close: () => undefined
+  }) as unknown as WebSocket;
+  const proxy = runManagedAccessProxy(
+    { gateway: "wss://access.example", tokenFile, tunnelId: "tunnel_test" },
+    { stdin: new PassThrough(), stdout: new PassThrough() },
+    {
+      createSocket: () => {
+        queueMicrotask(() => {
+          const response = new PassThrough();
+          emitter.emit("unexpected-response", {}, response);
+          response.end(Buffer.alloc(4096, 0x61));
+        });
+        return fake;
+      }
+    }
+  );
+  await assert.rejects(proxy, (error: unknown) =>
+    error instanceof Error && error.message === "access_proxy_rejected"
+  );
+});

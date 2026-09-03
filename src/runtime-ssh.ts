@@ -66,6 +66,21 @@ export interface RuntimeSshOperatorKeyAddInput extends RuntimeSshOperatorKeyInpu
   publicKeyFile?: string;
 }
 
+/// Withdrawing names key material, not a registry row: a V4 application's keys
+/// live in its policy and may have no registry row at all, and that operator
+/// still has to be offboardable (BKLG-20260805-awz6).
+export interface RuntimeSshWithdrawnKeyAddInput extends RuntimeSshOperatorKeyInput {
+  /** `SHA256:...`, as shown by `operator-key list` or `ssh --print-command`. */
+  fingerprint?: string;
+  /** Private-key path whose public half names the key instead. */
+  identity?: string;
+  reason?: string;
+}
+
+export interface RuntimeSshWithdrawnKeyRemoveInput extends RuntimeSshOperatorKeyInput {
+  withdrawalId?: string;
+}
+
 export interface RuntimeSshConnectionInput extends RuntimeSshCommandInput {
   acceptHostKey?: boolean;
   applicationRef: string;
@@ -122,7 +137,33 @@ interface OperatorKeyResponse {
   key?: RuntimeSshOperatorKey;
   keys?: RuntimeSshOperatorKey[];
   removed?: RuntimeSshOperatorKey;
-  /** The server's standing reminder that a registry removal is not a revocation. */
+  withdrawal?: RuntimeSshWithdrawnKey;
+  /** Unused tickets the withdrawal revoked. */
+  revokedTicketCount?: number;
+  /** What the server actually did, and what it did not do to open sessions. */
+  note?: string;
+}
+
+/** One fingerprint denied for an organization (BKLG-20260805-awz6). */
+interface RuntimeSshWithdrawnKey {
+  withdrawalId: string;
+  fingerprint: string;
+  sourceKeyId?: string | null;
+  sourceKeyName?: string | null;
+  withdrawnBy: string;
+  reason?: string | null;
+  withdrawnAtMs: number;
+}
+
+interface WithdrawnKeyResponse {
+  ok?: boolean;
+  error?: string;
+  withdrawnKeys?: RuntimeSshWithdrawnKey[];
+  withdrawal?: RuntimeSshWithdrawnKey;
+  reinstated?: RuntimeSshWithdrawnKey;
+  removedRegistryKeyId?: string | null;
+  revokedTicketCount?: number;
+  newlyWithdrawn?: boolean;
   note?: string;
 }
 
@@ -304,7 +345,7 @@ export async function runRuntimeSshOperatorKeyList(
     return apiFailure(input.json, options, response.response.status, response.body?.error);
   }
   writeOutput(input.json, options, response.body, response.body.keys.length === 0
-    ? "No operator keys. Add an ssh-ed25519 public key, then list it in an application policy."
+    ? "No operator keys. Add an ssh-ed25519 public key. A V5 application authorizes this registry; a V4 application also lists the key in its policy."
     : response.body.keys.map(formatOperatorKey).join("\n"));
   return 0;
 }
@@ -329,9 +370,12 @@ export async function runRuntimeSshOperatorKeyAdd(
   if (!response.response.ok || response.body?.ok !== true || !response.body.key) {
     return apiFailure(input.json, options, response.response.status, response.body?.error);
   }
+  // The old trailer said only "list it in the policy's authorizedKeys", which
+  // is V4's rule and simply wrong for V5, where this registry IS the grant
+  // source and a new attachment snapshots it.
   writeOutput(input.json, options, response.body, [
     `Operator key added: ${formatOperatorKey(response.body.key)}`,
-    "Adding a key does not grant access. List it in the application policy's ingress.ssh.provider.authorizedKeys and deploy."
+    "This authorizes new attachments, not existing ones: a V5 application snapshots this registry when its next attachment is created, and a V4 application lists the key in its policy's ingress.ssh.provider.authorizedKeys and deploys."
   ].join("\n"));
   return 0;
 }
@@ -354,13 +398,131 @@ export async function runRuntimeSshOperatorKeyRemove(
   if (!response.response.ok || response.body?.ok !== true || !response.body.removed) {
     return apiFailure(input.json, options, response.response.status, response.body?.error);
   }
-  // The non-revocation note travels on both paths: under --json it is part of
-  // the body the server sent, and here it is printed explicitly. Removing a
-  // registry row does not revoke anything a policy already authorizes.
+  // Since BKLG-20260805-awz6 a removal withdraws the key's access as well, in
+  // the same transaction. The note travels on both paths — under --json it is
+  // part of the body the server sent, and here it is printed explicitly — and
+  // the fallback below is what a pre-awz6 control plane would leave unsaid, so
+  // it states the boundary rather than the old non-revocation disclaimer.
+  const revoked = typeof response.body.revokedTicketCount === "number"
+    ? response.body.revokedTicketCount
+    : undefined;
   writeOutput(input.json, options, response.body, [
-    `Operator key removed from the registry: ${formatOperatorKey(response.body.removed)}`,
+    `Operator key removed and its access withdrawn: ${formatOperatorKey(response.body.removed)}`,
+    revoked === undefined ? undefined : `Unused tickets revoked: ${revoked}.`,
     response.body.note
-      ?? "Removal does not revoke access on deployed policies; update each policy's authorizedKeys and redeploy to do that."
+      ?? "New connection requests and tickets are refused for this key. A session already open drains."
+  ].filter((line): line is string => line !== undefined).join("\n"));
+  return 0;
+}
+
+function formatWithdrawnKey(entry: RuntimeSshWithdrawnKey): string {
+  return [
+    entry.withdrawalId,
+    entry.fingerprint,
+    entry.sourceKeyName ?? "-",
+    entry.withdrawnBy,
+    String(entry.withdrawnAtMs)
+  ].join("\t");
+}
+
+export async function runRuntimeSshWithdrawnKeyList(
+  input: RuntimeSshOperatorKeyInput,
+  options: RuntimeSshCliOptions = {}
+): Promise<number> {
+  const organization = await resolveRuntimeSshOrganization(input, options);
+  if (!organization.ok) return organization.exitCode;
+  const response = await runtimeSshRequest<WithdrawnKeyResponse>(input, options, {
+    method: "GET",
+    path: withdrawnKeyCollectionPath(organization.organizationId),
+    organizationSelector: null
+  });
+  if (!response.ok) return response.exitCode;
+  if (!response.response.ok || response.body?.ok !== true || !Array.isArray(response.body.withdrawnKeys)) {
+    return apiFailure(input.json, options, response.response.status, response.body?.error);
+  }
+  writeOutput(input.json, options, response.body, response.body.withdrawnKeys.length === 0
+    ? "No withdrawn keys. Every authorized key in this organization can still open a session."
+    : response.body.withdrawnKeys.map(formatWithdrawnKey).join("\n"));
+  return 0;
+}
+
+/// Withdraw a fingerprint that has no registry row — how a **V4**
+/// application's policy-inline key is reached. For a key that IS in the
+/// registry, `operator-key remove` does both in one call.
+export async function runRuntimeSshWithdrawnKeyAdd(
+  input: RuntimeSshWithdrawnKeyAddInput,
+  options: RuntimeSshCliOptions = {}
+): Promise<number> {
+  const fingerprint = input.fingerprint?.trim();
+  const identity = input.identity?.trim();
+  if (!fingerprint && !identity) {
+    return localFailure(
+      input.json,
+      options,
+      "RUNTIME_SSH_WITHDRAWAL_TARGET_REQUIRED",
+      "Withdrawal needs --fingerprint or --identity naming the key to withdraw."
+    );
+  }
+  let publicKey: string | undefined;
+  if (!fingerprint && identity) {
+    const runner = options.runProcess ?? defaultProcessRunner;
+    const selected = await readIdentityPublicKey(identity, runner);
+    if (!selected.ok) return localFailure(input.json, options, selected.error, selected.message);
+    publicKey = selected.publicKey;
+  }
+  const organization = await resolveRuntimeSshOrganization(input, options);
+  if (!organization.ok) return organization.exitCode;
+  const response = await runtimeSshRequest<WithdrawnKeyResponse>(input, options, {
+    method: "POST",
+    path: withdrawnKeyCollectionPath(organization.organizationId),
+    organizationSelector: null,
+    body: fingerprint ? { fingerprint, reason: input.reason } : { publicKey, reason: input.reason }
+  });
+  if (!response.ok) return response.exitCode;
+  if (!response.response.ok || response.body?.ok !== true || !response.body.withdrawal) {
+    return apiFailure(input.json, options, response.response.status, response.body?.error);
+  }
+  const revoked = response.body.revokedTicketCount ?? 0;
+  writeOutput(input.json, options, response.body, [
+    response.body.newlyWithdrawn === false
+      ? `Already withdrawn: ${formatWithdrawnKey(response.body.withdrawal)}`
+      : `Access withdrawn: ${formatWithdrawnKey(response.body.withdrawal)}`,
+    `Unused tickets revoked: ${revoked}.`,
+    response.body.note
+      ?? "New connection requests and tickets are refused for this key. A session already open drains."
+  ].join("\n"));
+  return 0;
+}
+
+export async function runRuntimeSshWithdrawnKeyRemove(
+  input: RuntimeSshWithdrawnKeyRemoveInput,
+  options: RuntimeSshCliOptions = {}
+): Promise<number> {
+  const withdrawalId = input.withdrawalId?.trim();
+  if (!withdrawalId) {
+    return localFailure(
+      input.json,
+      options,
+      "RUNTIME_SSH_WITHDRAWAL_ID_REQUIRED",
+      "Reinstating needs the withdrawal id from `proof liskov runtime-ssh withdrawn-key list`."
+    );
+  }
+  const organization = await resolveRuntimeSshOrganization(input, options);
+  if (!organization.ok) return organization.exitCode;
+  const response = await runtimeSshRequest<WithdrawnKeyResponse>(input, options, {
+    method: "DELETE",
+    path: withdrawnKeyPath(organization.organizationId, withdrawalId),
+    organizationSelector: null,
+    body: {}
+  });
+  if (!response.ok) return response.exitCode;
+  if (!response.response.ok || response.body?.ok !== true || !response.body.reinstated) {
+    return apiFailure(input.json, options, response.response.status, response.body?.error);
+  }
+  writeOutput(input.json, options, response.body, [
+    `Withdrawal lifted: ${formatWithdrawnKey(response.body.reinstated)}`,
+    response.body.note
+      ?? "The key must still be registered (V5) or listed in the published policy (V4) for a new attachment to authorize it."
   ].join("\n"));
   return 0;
 }
@@ -1208,6 +1370,14 @@ function operatorKeyCollectionPath(organizationId: string): string {
 
 function operatorKeyPath(organizationId: string, keyId: string): string {
   return `${operatorKeyCollectionPath(organizationId)}/${encodeURIComponent(keyId)}`;
+}
+
+function withdrawnKeyCollectionPath(organizationId: string): string {
+  return `/api/organizations/${encodeURIComponent(organizationId)}/runtime-ssh/withdrawn-keys`;
+}
+
+function withdrawnKeyPath(organizationId: string, withdrawalId: string): string {
+  return `${withdrawnKeyCollectionPath(organizationId)}/${encodeURIComponent(withdrawalId)}`;
 }
 
 function integrationCollectionPath(organizationId: string): string {
