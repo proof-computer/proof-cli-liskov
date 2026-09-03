@@ -143,9 +143,11 @@ interface ManagedConnection {
   attachmentId: string;
   applicationId: string;
   applicationUid: string;
-  liskovDeploymentId: string;
+  /** Null for a V5 attachment: a V5 job has no Liskov deployment row (ADR-0097). */
+  liskovDeploymentId: string | null;
   deploymentId: string;
-  liskovJobId: string;
+  /** Null for a V5 attachment; `jobId` then carries the structured provider job id. */
+  liskovJobId: string | null;
   jobId: string;
   user: "root";
   port: 22;
@@ -371,13 +373,17 @@ export async function runRuntimeSshConnection(
   // surface shows (a V5 job has no Liskov deployment row at all), and the
   // number V4 stores as both its provider deployment id and its sequence. The
   // attachment's provider deployment column carries exactly that number on
-  // both spines, so a sequence selects the job by also offering it as the
-  // deployment id; a structured --job value is passed through untouched.
+  // both spines, so a sequence selects the job by offering it as the
+  // deployment id — and only as that. The server requires every offered
+  // identity to match, and a V5 attachment's provider job id is the
+  // structured Acurast JobId, which a sequence never equals (job 158691,
+  // 2026-09-03: 409 runtime_ssh_attachment_not_ready on a ready row). A
+  // structured --job value is passed through untouched.
   const jobSequence = input.jobId && /^[0-9]+$/.test(input.jobId) ? input.jobId : undefined;
   const response = await runtimeSshRequest<ConnectionResponse>(input, options, {
     method: "POST",
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/runtime-ssh/connection-requests`,
-    body: { deploymentId: input.deploymentId ?? jobSequence, jobId: input.jobId }
+    body: { deploymentId: input.deploymentId ?? jobSequence, jobId: jobSequence ? undefined : input.jobId }
   });
   if (!response.ok) return response.exitCode;
   const connection = response.body?.connection;
@@ -920,10 +926,17 @@ function validConnection(connection: ConnectionResponse["connection"]): connecti
   if (connection.provider !== "liskov") return false;
   const ids = [
     connection.attachmentId, connection.applicationId, connection.applicationUid,
-    connection.liskovDeploymentId, connection.deploymentId, connection.liskovJobId,
-    connection.jobId
+    connection.deploymentId, connection.jobId
   ];
-  if (connection.user !== "root" || connection.port !== 22 || !ids.every(validDescriptorId)) return false;
+  // The Liskov spine ids are null for a V5 attachment (no liskov_deployments /
+  // liskov_jobs row, ADR-0097); requiring them refused every V5 descriptor.
+  const spineIds = [connection.liskovDeploymentId, connection.liskovJobId];
+  if (
+    connection.user !== "root"
+    || connection.port !== 22
+    || !ids.every(validDescriptorId)
+    || !spineIds.every(validOptionalDescriptorId)
+  ) return false;
   let hostFingerprint: string;
   try {
     const normalizedHostKey = normalizeEd25519PublicKey(connection.host.publicKey);
@@ -1055,8 +1068,8 @@ function writeHostTrustNotice(
   const message = [
     "Managed Runtime SSH first-use host-key confirmation:",
     `  application: ${connection.applicationId} (${connection.applicationUid})`,
-    `  deployment: ${connection.liskovDeploymentId} / ${connection.deploymentId}`,
-    `  job: ${connection.liskovJobId} / ${connection.jobId}`,
+    `  deployment: ${connection.liskovDeploymentId ?? "-"} / ${connection.deploymentId}`,
+    `  job: ${connection.liskovJobId ?? "-"} / ${connection.jobId}`,
     `  host key: ${connection.host.fingerprint}`,
     `  identity: ${selectedFingerprint}`,
     `  trust: ${connection.trust.claim}`
@@ -1129,7 +1142,10 @@ function requestedIdentityMatches(
     const jobIds = connection.provider === "liskov"
       ? [connection.jobId, connection.liskovJobId]
       : [connection.jobId];
-    if (!jobIds.includes(input.jobId)) {
+    // A bare sequence was offered as the provider deployment id (see
+    // runRuntimeSshConnection), so that is where it matches.
+    const sequenceMatches = /^[0-9]+$/u.test(input.jobId) && connection.deploymentId === input.jobId;
+    if (!sequenceMatches && !jobIds.includes(input.jobId)) {
       return {
         ok: false,
         error: "RUNTIME_SSH_JOB_MISMATCH",
@@ -1162,6 +1178,10 @@ function ambiguousAttachmentHint(body: ConnectionResponse | undefined): string {
 
 function validDescriptorId(value: unknown): value is string {
   return typeof value === "string" && value.length >= 1 && value.length <= 512 && !/[\0-\x1f\x7f]/u.test(value);
+}
+
+function validOptionalDescriptorId(value: unknown): value is string | null {
+  return value === null || validDescriptorId(value);
 }
 
 function validSha256(value: unknown): value is string {

@@ -174,7 +174,10 @@ test("a numeric --job selects the V5 job by its provider sequence on both spines
     });
     assert.equal(code, 0);
     assert.equal(posted.deploymentId, "155468");
-    assert.equal(posted.jobId, "155468");
+    // The sequence is offered as the deployment id only: a V5 attachment's
+    // provider job id is the structured Acurast JobId, and the server refuses
+    // any offered identity that does not match.
+    assert.equal(posted.jobId, undefined);
 
     let structured: Record<string, unknown> = {};
     await runRuntimeSshConnection({
@@ -193,6 +196,79 @@ test("a numeric --job selects the V5 job by its provider sequence on both spines
     });
     assert.equal(structured.deploymentId, undefined);
     assert.equal(structured.jobId, "job_123");
+  });
+});
+
+test("a ready V5 attachment with null spine ids resolves by sequence and prints without a ticket", async () => {
+  await withSession(async (sessionFile) => {
+    // Production job 158691 (2026-09-03): liskovDeploymentId / liskovJobId are
+    // null (ADR-0097) and jobId is the structured Acurast JobId. The previous
+    // validator required every id to be a string and refused the descriptor.
+    const { identity, identityKey, hostKey } = await prepareV5Identity(sessionFile);
+    const providerJobId = '[{"name":"Acurast","values":[[[140,232,186,178]]]},158691]';
+    let posted: Record<string, unknown> = {};
+    let ticketPosts = 0;
+    const output: string[] = [];
+    const code = await runRuntimeSshConnection({
+      applicationRef: "app",
+      config: sessionFile,
+      identity,
+      jobId: "158691",
+      printCommand: true,
+      json: true
+    }, {
+      fetchImpl: async (url, init) => {
+        if (String(url).endsWith("/connection-requests")) {
+          posted = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+          return Response.json({
+            ok: true,
+            connection: v5ManagedConnection(identityKey, hostKey, {
+              liskovDeploymentId: null,
+              deploymentId: "158691",
+              liskovJobId: null,
+              jobId: providerJobId
+            })
+          });
+        }
+        ticketPosts += 1;
+        throw new Error("--print-command must not mint a ticket");
+      },
+      runProcess: async () => {
+        throw new Error("no subprocess expected");
+      },
+      stdout: (line) => output.push(line)
+    });
+    assert.equal(code, 0);
+    assert.deepEqual(posted, { deploymentId: "158691" });
+    assert.equal(ticketPosts, 0);
+    const printed = JSON.parse(output.join("")) as { connection: Record<string, unknown> };
+    assert.equal(printed.connection.liskovDeploymentId, null);
+    assert.equal(printed.connection.liskovJobId, null);
+    assert.equal(printed.connection.deploymentId, "158691");
+    assert.equal(printed.connection.jobId, providerJobId);
+    assert.equal(printed.connection.hostFingerprint, fingerprint(hostKey));
+  });
+});
+
+test("a V5 descriptor with a malformed spine id is still refused", async () => {
+  await withSession(async (sessionFile) => {
+    const { identity, identityKey, hostKey } = await prepareV5Identity(sessionFile);
+    const errors: string[] = [];
+    const code = await runRuntimeSshConnection({
+      applicationRef: "app",
+      config: sessionFile,
+      identity,
+      printCommand: true
+    }, {
+      fetchImpl: async () => Response.json({
+        ok: true,
+        connection: v5ManagedConnection(identityKey, hostKey, { liskovJobId: "bad\u0009id" })
+      }),
+      stderr: (line) => errors.push(line),
+      stdout: () => {}
+    });
+    assert.equal(code, 1);
+    assert.match(errors.join("|"), /RUNTIME_SSH_CONNECTION_INVALID/u);
   });
 });
 
