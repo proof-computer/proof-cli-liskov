@@ -34,6 +34,9 @@ proof liskov application resume proof-docs --reason "funded" --yes
 proof liskov application retire proof-docs
 proof liskov application retire proof-docs --reason "project complete" --yes
 proof liskov application retire cancel proof-docs --yes
+proof liskov application retirement-census
+proof liskov application retirement-census --organization proof --lifecycle retiring
+proof liskov application retirement-census --remediation-class operator_adjudication --json
 proof liskov application devtools view-key proof-docs 66059 --json
 proof liskov application runtime-image workflow proof-docs --manifest .liskov/proof-docs.json
 proof liskov application deployment import proof-docs --sequence 701 --origin 5... --yes
@@ -94,6 +97,21 @@ billing commands' `--json` output is the raw response object. Human transaction
 rows omit provider references and memos. Execution-history reads remain
 unbounded when pagination flags are omitted; human output reports returned
 count, total, and next offset.
+
+`application retirement-census` is the organization-scoped, read-only view of
+safe Application retirement. It is authorized by an active organization
+membership rather than by a per-Application repository binding, so it also
+describes Applications that `application retire <ref>` refuses, reporting the
+refusal as a coverage failure instead of hiding the row. It groups blocker
+facts into correlated obligations: one unresolved obligation is otherwise
+reported once by the canonical job, once by the deploy-spend reserve, and once
+by the billing parent, so raw fact counts overstate how much is wrong. Human
+output reports Applications, raw facts, and correlated obligations as three
+distinct quantities, and leads with the causes rather than a per-row worklist.
+Pages are bounded (`--limit`, default 25, maximum 100) and walked with
+`--cursor`; `--all` follows every page and cannot be combined with `--json`,
+which emits one canonical page unchanged. The command starts no retirement and
+resolves no review.
 
 Application logging is opt-in through Manifest V4
 `observability.logs.enabled`. Liskov provisions and reads it as a managed

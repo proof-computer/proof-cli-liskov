@@ -40,6 +40,7 @@ COMMANDS
   application publish APP_REF [--artifact-version ID] [--dry-run] [--paused --reason TEXT] [--yes]
   application pause APP_REF --yes
   application resume APP_REF --yes
+  application retirement-census [--limit N] [--cursor CURSOR] [--lifecycle STATE] [--remediation-class CLASS] [--all] [--json]
   application status APPLICATION_ID
   application execution show APPLICATION_ID [--json] [--watch] [--poll-ms N] [--timeout-seconds N] [--until-terminal]
   application plans APPLICATION_ID
