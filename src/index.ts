@@ -32,6 +32,7 @@ export {
   runSlipwayApplicationCreate,
   runSlipwayApplicationRename,
   runSlipwayApplicationRetirement,
+  runSlipwayApplicationRetirementCensus,
   runSlipwayApplicationRetirementCancel,
   runSlipwayApplicationRuntimeImageWorkflow,
   runSlipwayApplicationSecrets,

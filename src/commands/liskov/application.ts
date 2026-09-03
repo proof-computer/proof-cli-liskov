@@ -39,6 +39,7 @@ COMMANDS
   policy explain APPLICATION_ID [--json]
   policy publish APP_REF --file PATH --artifact-digest SHA256 --binding-revision N --revocation-epoch N --source-ref REF --source-commit SHA --workflow-identity ID --expected-pointer-version N --yes
   retire APP_REF [--reason TEXT] [--yes]
+  retirement-census [--limit N] [--cursor CURSOR] [--lifecycle STATE] [--remediation-class CLASS] [--all] [--json]
   retire cancel APP_REF [--reason TEXT] --yes
   resume APP_REF [--owner OWNER] [--reason TEXT] [--yes]
   status APPLICATION_ID
@@ -63,5 +64,7 @@ DESCRIPTION
   stopping Acurast jobs, revoking Lockbox grants, or draining routes. Retire
   pauses immediately, waits for chain schedules and bounded financial closeout,
   then writes an immutable zero-gate receipt. Delete is a deprecated clean-only
-  compatibility bridge.`);
+  compatibility bridge. Retirement-census reads the whole authorized estate for
+  one organization in bounded pages, grouping correlated obligations so one
+  unresolved obligation is not counted once per owner.`);
 }

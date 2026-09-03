@@ -2180,6 +2180,213 @@ export async function runSlipwayApplicationRetirement(
   );
 }
 
+
+export interface SlipwayApplicationRetirementCensusInput {
+  limit?: number;
+  cursor?: string;
+  lifecycle?: string;
+  remediationClass?: string;
+  all?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+interface SlipwayRetirementCensusResponse extends SlipwayGenericResponse {
+  generatedAtMs?: number;
+  census?: Record<string, unknown>;
+}
+
+/** Bounded, read-only ADR-0038 retirement estate census (BKLG-20260902-zwn0). */
+export async function runSlipwayApplicationRetirementCensus(
+  input: SlipwayApplicationRetirementCensusInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  // Paging flags and the canonical envelope do not combine: --json emits the
+  // backend body verbatim, and there is no single body for a multi-page walk.
+  // Reject before any network I/O, as `application logs` does.
+  if (input.all === true && input.json === true) {
+    writeStructuredOrHuman(
+      options,
+      input.json,
+      { ok: false, error: "SLIPWAY_APPLICATION_RETIREMENT_CENSUS_INPUT_INVALID", reason: "all_with_json" },
+      "Error (SLIPWAY_APPLICATION_RETIREMENT_CENSUS_INPUT_INVALID): --all cannot be combined with --json; --json emits one canonical page."
+    );
+    return 1;
+  }
+  if (input.limit !== undefined && (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 100)) {
+    writeStructuredOrHuman(
+      options,
+      input.json,
+      { ok: false, error: "SLIPWAY_APPLICATION_RETIREMENT_CENSUS_INPUT_INVALID", reason: "limit_out_of_range" },
+      "Error (SLIPWAY_APPLICATION_RETIREMENT_CENSUS_INPUT_INVALID): --limit must be an integer between 1 and 100."
+    );
+    return 1;
+  }
+
+  let cursor = input.cursor;
+  let pages = 0;
+  for (;;) {
+    const query = new URLSearchParams();
+    if (input.limit !== undefined) query.set("limit", String(input.limit));
+    if (cursor !== undefined) query.set("cursor", cursor);
+    if (input.lifecycle !== undefined) query.set("lifecycle", input.lifecycle);
+    if (input.remediationClass !== undefined) query.set("remediationClass", input.remediationClass);
+    const suffix = query.toString();
+    const request = await authenticatedSlipwayRequest<SlipwayRetirementCensusResponse>({
+      config: input.config,
+      slipwayUrl: input.slipwayUrl,
+      json: input.json,
+      path: `/api/console/retirement-census${suffix ? `?${suffix}` : ""}`,
+      organizationSelector: options.organization,
+      requestErrorCode: "SLIPWAY_APPLICATION_RETIREMENT_CENSUS_FAILED",
+      notFoundMessage: "No Liskov CLI session is stored locally.",
+      fetchFailedMessage: "could not read the Liskov retirement estate census"
+    }, options);
+    if (!request.ok) return request.exitCode;
+
+    const code = writeCommandResponse({
+      body: request.body,
+      response: request.response,
+      errorCode: "SLIPWAY_APPLICATION_RETIREMENT_CENSUS_FAILED",
+      json: input.json,
+      human: () => formatRetirementCensus(objectRecord(request.body?.census)),
+      options
+    });
+    if (code !== 0) return code;
+
+    pages += 1;
+    const next = stringValue(objectRecord(request.body?.census).nextCursor);
+    if (input.all !== true || next === undefined) {
+      if (input.all === true) emit(options, `Walked ${pages} page(s); the estate census is complete.`);
+      return 0;
+    }
+    cursor = next;
+  }
+}
+
+/**
+ * Human rendering leads with the rate and the causes, not a per-row worklist:
+ * two applications held 89% of the 2026-09-02 estate's 6,074 blocker facts, so
+ * a flat list of facts describes the estate less honestly than its totals do
+ * (ADR-0102 §5). Raw facts, correlated obligations, and applications are
+ * reported as distinct quantities because conflating them is the defect this
+ * census exists to fix.
+ */
+function formatRetirementCensus(census: Record<string, unknown>): string {
+  const estate = objectRecord(census.estate);
+  const page = objectRecord(census.page);
+  const fingerprint = stringValue(census.fingerprint) ?? "unknown";
+  const lines: string[] = [
+    `Liskov retirement estate census (fingerprint ${fingerprint.slice(0, 12)}).`
+  ];
+
+  const lifecycle = objectRecord(estate.applicationsByLifecycle);
+  const lifecycleSummary = Object.keys(lifecycle)
+    .sort()
+    .map((key) => `${numberValue(lifecycle[key]) ?? 0} ${key}`)
+    .join(", ");
+  const receipts = objectRecord(estate.receiptsByKind);
+  const receiptSummary = Object.keys(receipts)
+    .sort()
+    .map((key) => `${numberValue(receipts[key]) ?? 0} ${key}`)
+    .join(", ");
+  lines.push(`Estate: ${lifecycleSummary || "no applications"}.`);
+  const activeRetirements = numberValue(estate.activeRetirementCount) ?? 0;
+  const oldestUnchanged = numberValue(estate.oldestUnchangedAssessmentAgeMs);
+  lines.push(
+    `Active retirements: ${activeRetirements}${
+      oldestUnchanged === undefined
+        ? "."
+        : `; least recently advanced ${formatRetirementAgeMs(oldestUnchanged)} ago.`
+    }`
+  );
+  if (receiptSummary) lines.push(`Deletion receipts: ${receiptSummary}.`);
+
+  const facts = numberValue(page.blockerFacts) ?? 0;
+  const lineages = numberValue(page.correlatedLineages) ?? 0;
+  lines.push(
+    `This page: ${numberValue(page.applications) ?? 0} application(s), ` +
+      `${numberValue(page.applicationsWithBlockers) ?? 0} with blockers, ` +
+      `${numberValue(page.coverageUnavailable) ?? 0} without coverage.`
+  );
+  lines.push(
+    `Obligations: ${facts} raw blocker fact(s) group into ${lineages} correlated obligation(s).`
+  );
+
+  const causes = objectRecord(page.lineageCountsByRemediationClass);
+  const ranked = Object.keys(causes)
+    .map((key) => ({ key, count: numberValue(causes[key]) ?? 0 }))
+    .filter((entry) => entry.count > 0)
+    .sort((left, right) => right.count - left.count || left.key.localeCompare(right.key));
+  lines.push(
+    ranked.length === 0
+      ? "Causes: none on this page."
+      : `Causes: ${ranked.map((entry) => `${entry.key} ${entry.count}`).join(", ")}.`
+  );
+
+  const applications = Array.isArray(census.applications) ? census.applications : [];
+  if (applications.length > 0) lines.push("Applications:");
+  for (const entry of applications) {
+    lines.push(`- ${formatRetirementCensusRow(objectRecord(entry))}`);
+  }
+
+  const next = stringValue(census.nextCursor);
+  lines.push(
+    next === undefined
+      ? "No further pages."
+      : `Next page: --cursor ${next}`
+  );
+  return lines.join("\n");
+}
+
+function formatRetirementCensusRow(row: Record<string, unknown>): string {
+  const name = stringValue(row.displayName) ?? stringValue(row.applicationName) ?? "unknown";
+  const uid = stringValue(row.applicationUid) ?? "unknown";
+  const lifecycle = stringValue(row.lifecycle) ?? "unknown";
+  const coverage = objectRecord(row.coverage);
+  if (booleanValue(coverage.available) === false) {
+    return `${name} (${uid}) ${lifecycle}: coverage unavailable (${stringValue(coverage.reason) ?? "unknown"}).`;
+  }
+  // Absent and zero are different facts; a receipt may legitimately carry an
+  // unknown historical count, and it must not read as a clean gate.
+  const count = (value: unknown): string => {
+    const parsed = numberValue(value);
+    return parsed === undefined ? "unknown" : String(parsed);
+  };
+  const parts = [
+    `${count(row.executionBlockerCount)} execution`,
+    `${count(row.financialBlockerCount)} financial`,
+    `${count(row.ambiguityBlockerCount)} ambiguity`
+  ].join(", ");
+  const lineages = numberValue(row.correlatedLineageCount);
+  const facts = numberValue(row.blockerFactCount);
+  const grouping = lineages === undefined || facts === undefined
+    ? ""
+    : ` (${facts} fact(s) in ${lineages} obligation(s))`;
+  const phase = stringValue(row.phase);
+  const receiptKind = stringValue(row.receiptKind);
+  const unchanged = numberValue(row.unchangedAssessmentAgeMs);
+  const trailer = [
+    phase === undefined ? undefined : `phase ${phase}`,
+    receiptKind === undefined ? undefined : `receipt ${receiptKind}`,
+    unchanged === undefined ? undefined : `unchanged ${formatRetirementAgeMs(unchanged)}`
+  ].filter((value): value is string => value !== undefined).join("; ");
+  return `${name} (${uid}) ${lifecycle}: ${parts} blocker(s)${grouping}${trailer ? `; ${trailer}` : ""}.`;
+}
+
+/** Coarse age rendering for retirement ages, which are days rather than milliseconds. */
+function formatRetirementAgeMs(value: number): string {
+  if (!Number.isFinite(value) || value < 0) return "an unknown time";
+  const days = Math.floor(value / 86_400_000);
+  if (days >= 1) return `${days}d`;
+  const hours = Math.floor(value / 3_600_000);
+  if (hours >= 1) return `${hours}h`;
+  const minutes = Math.floor(value / 60_000);
+  if (minutes >= 1) return `${minutes}m`;
+  return `${Math.floor(value / 1000)}s`;
+}
+
 export async function runSlipwayApplicationRetirementCancel(
   input: SlipwayApplicationRetirementCancelInput,
   options: SlipwayCliOptions = {}
