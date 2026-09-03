@@ -10,15 +10,55 @@ const MAX_TOKEN_BYTES = 16 * 1024;
 const SAFE_CLOSE_CATEGORIES = new Set([
   "byte_limit",
   "connector_closed",
+  "connector_not_registered",
   "connector_unavailable",
+  "credential_rejected",
   "frame_too_large",
   "gateway_closed",
   "heartbeat_timeout",
   "operator_closed",
   "peer_closed",
+  "session_already_open",
   "session_limit",
   "unexpected_text"
 ]);
+
+/// The gateway refuses an operator before the WebSocket upgrade, with an HTTP
+/// status and the category in the body. `ws` reports that as
+/// `unexpected-response`, and until BKLG-20260805-rykk this code threw the
+/// status and body away and reported the bare token `access_proxy_rejected` —
+/// so "a colleague is already connected" and "the runtime never dialled in"
+/// arrived identically, under OpenSSH's own `kex_exchange_identification`
+/// complaint. The categories are the same closed vocabulary as the close
+/// frames above, and are read back through the same allowlist: an unrecognised
+/// one still degrades to the bare token rather than echoing whatever the
+/// upstream said.
+const MAX_REJECTION_BODY_BYTES = 256;
+
+interface RejectionResponse {
+  on: (event: string, listener: (chunk: Buffer) => void) => void;
+}
+
+async function rejectionCategory(response: RejectionResponse): Promise<string | undefined> {
+  const body = await new Promise<string>((resolve) => {
+    const chunks: Buffer[] = [];
+    let total = 0;
+    let done = false;
+    const finish = (): void => {
+      if (done) return;
+      done = true;
+      resolve(Buffer.concat(chunks).toString("utf8").trim());
+    };
+    response.on("data", (chunk: Buffer) => {
+      total += chunk.length;
+      if (total <= MAX_REJECTION_BODY_BYTES) chunks.push(chunk);
+      if (total > MAX_REJECTION_BODY_BYTES) finish();
+    });
+    response.on("end", finish);
+    response.on("error", finish);
+  });
+  return SAFE_CLOSE_CATEGORIES.has(body) ? body : undefined;
+}
 
 export class ManagedAccessProxyError extends Error {
   constructor(public readonly code: string) {
@@ -150,7 +190,18 @@ export async function runManagedAccessProxy(
       socket.terminate();
       reject(new ManagedAccessProxyError(code));
     };
-    socket.once("unexpected-response", () => fail("access_proxy_rejected"));
+    socket.once("unexpected-response", (...args: unknown[]) => {
+      const response = args[1] as RejectionResponse | undefined;
+      if (!response) {
+        fail("access_proxy_rejected");
+        return;
+      }
+      void rejectionCategory(response)
+        .then((category) => {
+          fail(category ? `access_proxy_rejected_${category}` : "access_proxy_rejected");
+        })
+        .catch(() => fail("access_proxy_rejected"));
+    });
     socket.once("error", () => fail("access_proxy_transport_failed"));
     socket.once("open", () => {
       if (socket.protocol !== ACCESS_SUBPROTOCOL) {

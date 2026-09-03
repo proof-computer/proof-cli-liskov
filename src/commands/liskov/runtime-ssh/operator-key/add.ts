@@ -5,7 +5,7 @@ import { runRuntimeSshOperatorKeyAdd } from "../../../../runtime-ssh.js";
 
 export default class RuntimeSshOperatorKeyAdd extends OrganizationScopedCommand {
   static args = { organization_id: Args.string({ description: "Exact Liskov organization ID or slug.", required: false }) };
-  static description = "Register an ssh-ed25519 operator public key for managed Runtime SSH. Only the public key is sent. Registering a key does not grant access: an application policy must list it in ingress.ssh.provider.authorizedKeys.";
+  static description = "Register an ssh-ed25519 operator public key for managed Runtime SSH. Only the public key is sent. Registering a key authorizes new attachments, not existing ones: a V5 application snapshots this registry when its next attachment is created, and a V4 application must also list the key in its policy's ingress.ssh.provider.authorizedKeys.";
   static examples = [
     "<%= config.bin %> liskov runtime-ssh operator-key add org_123 --name patrick-mbp --identity ~/.ssh/id_ed25519",
     "<%= config.bin %> liskov runtime-ssh operator-key add org_123 --name ci-break-glass --public-key-file ./ci.pub",
