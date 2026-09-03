@@ -486,6 +486,42 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.applications[1]?.deleteReason, "test cleanup");
   });
 
+  it("prints the organization's slot quota beside the list, and unlimited when the plan has no cap", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "slipway_quota_token_do_not_print",
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const application = {
+      applicationUid: "app-1111111111111111",
+      applicationName: "alpha",
+      applicationId: "alpha",
+      ownerAddress: "5owner-alpha",
+      status: "paused"
+    };
+    const list = async (quota: unknown, json: boolean): Promise<string> => {
+      const out = writer();
+      const code = await runSlipwayApplicationList({ config: sessionFile, json }, {
+        fetchImpl: async () => jsonResponse({ ok: true, count: 1, applications: [application], quota }),
+        stdout: out.write
+      });
+      assert.equal(code, 0);
+      return out.text;
+    };
+
+    const capped = await list({ used: 2, limit: 2 }, false);
+    assert.match(capped, /^1 Liskov Application\(s\):\nSlots in use: 2 of 2 \(paused applications hold a slot; retiring one releases it\)\.\n- /);
+    const unlimited = await list({ used: 7, limit: null }, false);
+    assert.match(unlimited, /\nSlots in use: 7 of unlimited \(/);
+    const absent = await list(undefined, false);
+    assert.equal(absent.includes("Slots in use"), false, "an older server without the quota block prints the list unchanged");
+    const parsed = JSON.parse(await list({ used: 2, limit: 2 }, true)) as { quota?: { used: number; limit: number | null } };
+    assert.deepEqual(parsed.quota, { used: 2, limit: 2 });
+  });
+
   it("propagates one trimmed request organization across GET, POST, and DELETE", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");

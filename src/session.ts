@@ -884,6 +884,8 @@ interface SlipwayApplicationListResponse {
   ok?: boolean;
   count?: number;
   applications?: PublicSlipwayApplicationSummary[];
+  /** The organization's slot view: applications holding a plan slot against the resolved limit (`null` = unlimited). */
+  quota?: { used?: number; limit?: number | null };
   error?: string;
   reason?: string;
   [key: string]: unknown;
@@ -6409,8 +6411,10 @@ function compactSignerAddress(address: string): string {
 function formatApplicationList(body: SlipwayApplicationListResponse): string {
   const applications = body.applications ?? [];
   const count = typeof body.count === "number" ? body.count : applications.length;
-  if (applications.length === 0) return "No Liskov Applications found.";
+  const quota = formatApplicationQuota(body.quota);
+  if (applications.length === 0) return quota ? `No Liskov Applications found.\n${quota}` : "No Liskov Applications found.";
   const lines = [`${count} Liskov Application(s):`];
+  if (quota) lines.push(quota);
   for (const application of applications) {
     const primary = application.applicationName ?? application.applicationUid ?? application.applicationId ?? "unknown";
     const applicationId = formatApplicationLabel(application);
@@ -6431,6 +6435,13 @@ function formatApplicationList(body: SlipwayApplicationListResponse): string {
     lines.push(`- ${applicationId}: ${status}${details.length > 0 ? ` (${details.join(", ")})` : ""}`);
   }
   return lines.join("\n");
+}
+
+/** Slots in use against the plan limit; paused applications hold a slot, retired ones release it. */
+function formatApplicationQuota(quota: SlipwayApplicationListResponse["quota"]): string | undefined {
+  if (!quota || typeof quota.used !== "number") return undefined;
+  const limit = typeof quota.limit === "number" ? String(quota.limit) : "unlimited";
+  return `Slots in use: ${quota.used} of ${limit} (paused applications hold a slot; retiring one releases it).`;
 }
 
 function formatApplicationBackfillIdentities(body: SlipwayApplicationBackfillIdentitiesResponse): string {
