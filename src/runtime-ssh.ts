@@ -261,6 +261,10 @@ interface ConnectionResponse {
 interface ManagedTicketResponse {
   ok?: boolean;
   error?: string;
+  message?: string;
+  byteAllowance?: { includedBytes?: number; usedBytes?: number };
+  availableServiceCreditMicros?: number;
+  billingPage?: string;
   ticket?: {
     gatewayUrl: string;
     tunnelId: string;
@@ -842,7 +846,26 @@ async function runManagedConnection(
   if (!ticketResponse.ok) return ticketResponse.exitCode;
   const ticket = ticketResponse.body?.ticket;
   if (!ticketResponse.response.ok || ticketResponse.body?.ok !== true || !validManagedTicket(ticket)) {
-    return apiFailure(input.json, options, ticketResponse.response.status, ticketResponse.body?.error);
+    const error = ticketResponse.body?.error;
+    if (error === "runtime_ssh_service_credit_required") {
+      const refusal = {
+        ok: false,
+        error,
+        message: ticketResponse.body?.message,
+        byteAllowance: ticketResponse.body?.byteAllowance,
+        availableServiceCreditMicros: ticketResponse.body?.availableServiceCreditMicros,
+        billingPage: ticketResponse.body?.billingPage
+      };
+      return apiFailure(
+        input.json,
+        options,
+        ticketResponse.response.status,
+        error,
+        " The shared byte allowance is exhausted and the organization has no spendable Service Credit. Open Billing & funding, then retry.",
+        refusal
+      );
+    }
+    return apiFailure(input.json, options, ticketResponse.response.status, error);
   }
 
   const ticketDirectory = await mkdtemp(path.join(path.dirname(sessionFile), ".runtime-ssh-ticket-"));
