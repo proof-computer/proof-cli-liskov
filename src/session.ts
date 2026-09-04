@@ -4538,8 +4538,15 @@ export async function runSlipwayCustodyAccountEnsure(input: SlipwayCustodyAccoun
     errorCode: "SLIPWAY_CUSTODY_ACCOUNT_ENSURE_FAILED",
     fetchFailedMessage: "could not ensure Liskov live custody account",
     human: (body) => {
-      const account = objectRecord(objectRecord(body).account);
-      return `${input.applicationRef} ${stringValue(account.chain) ?? input.chain} custody account ${stringValue(account.address) ?? stringValue(account.accountRef) ?? "ready"}.`;
+      const record = objectRecord(body);
+      const account = objectRecord(record.account);
+      const address = stringValue(account.address) ?? stringValue(account.accountRef) ?? "ready";
+      const queued = record.fundingQueued === true;
+      const waitMs = numberValue(record.expectedWaitMs);
+      const funding = queued
+        ? ` Initial ACU funding queued${waitMs !== undefined ? ` (typically within ${Math.ceil(waitMs / 1000)}s)` : ""}.`
+        : "";
+      return `${input.applicationRef} ${stringValue(account.chain) ?? input.chain} custody account ${address}.${funding}`;
     }
   }, options);
 }

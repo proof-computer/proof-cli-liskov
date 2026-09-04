@@ -183,6 +183,24 @@ describe("canonical launch eligibility", () => {
     assert.equal(output.includes("launch_submit_test_token_do_not_print"), false);
   });
 
+  it("renders the initial-funding wait as a wait, not a customer funding failure", () => {
+    const read = readLaunchEligibility({
+      schema: "proof.liskov.launch-eligibility.v1",
+      code: "blocked",
+      evidenceAuthority: "canonical_launch_preflight",
+      userActionable: false,
+      nextAction: "wait_for_initial_funding",
+      blockerCodes: ["awaiting_initial_funding"]
+    });
+    assert.equal(read.known, true);
+    assert.equal(read.eligible, false);
+    assert.match(
+      formatLaunchEligibility(read),
+      /waiting for initial ACU funding \(typically under a minute\)/u
+    );
+    assert.doesNotMatch(formatLaunchEligibility(read), /next resolve_blockers/u);
+  });
+
   it("does not repeat a preview ready claim when eligibility is missing", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-liskov-preview-eligibility-"));
     const sessionFile = path.join(dir, "session.json");
