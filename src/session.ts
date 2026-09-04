@@ -216,6 +216,37 @@ export interface SlipwayApplicationPolicyPublishInput {
   json?: boolean;
 }
 
+export interface SlipwayApplicationSourceBindingSetInput {
+  applicationRef: string;
+  repository: string;
+  allowedRefs: string[];
+  workflowIdentity: string;
+  manifestPath: string;
+  expectedRevision?: number;
+  reason?: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationSourceBindingShowInput {
+  applicationRef: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationSourceBindingRevokeInput {
+  applicationRef: string;
+  expectedRevision: number;
+  reason: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationListInput {
   deleted?: boolean;
   slipwayUrl?: string;
@@ -967,6 +998,33 @@ interface SlipwayApplicationCreateResponse {
   application?: PublicSlipwayApplicationSummary;
   error?: string;
   reason?: string;
+  [key: string]: unknown;
+}
+
+interface SlipwayApplicationSourceBindingResponse {
+  ok?: boolean;
+  sourceBinding?: {
+    binding?: {
+      organizationId?: string;
+      applicationUid?: string;
+      revision?: number;
+      repository?: string;
+      allowedRefs?: string[];
+      workflowIdentity?: string;
+      manifestPath?: string;
+      revocationEpoch?: number;
+    };
+    revoked?: boolean;
+    operation?: string;
+    actor?: unknown;
+    reason?: string;
+    createdAtMs?: number;
+  };
+  error?: string;
+  reason?: string;
+  reasonCode?: string;
+  capability?: string;
+  candidates?: PublicSlipwayApplicationRefCandidate[];
   [key: string]: unknown;
 }
 
@@ -2903,6 +2961,344 @@ function registeredPolicyPublicationInputError(input: SlipwayApplicationPolicyPu
     return "--expected-pointer-version must be a non-negative safe integer.";
   }
   return undefined;
+}
+
+export async function runSlipwayApplicationSourceBindingSet(
+  input: SlipwayApplicationSourceBindingSetInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  if (!input.yes) {
+    return writeConfirmationRequired(
+      options,
+      input.json,
+      "SLIPWAY_APPLICATION_SOURCE_BINDING_SET_CONFIRMATION_REQUIRED",
+      "Application source-binding set"
+    );
+  }
+
+  const parsed = parseSourceBindingSetInput(input);
+  if (!parsed.ok) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_SOURCE_BINDING_SET_INVALID",
+      message: parsed.message,
+      applicationRef: input.applicationRef
+    }, `Error (SLIPWAY_APPLICATION_SOURCE_BINDING_SET_INVALID): ${parsed.message}`);
+    return 1;
+  }
+
+  const body: Record<string, unknown> = { binding: parsed.binding };
+  if (parsed.reason) body.reason = parsed.reason;
+  if (parsed.expectedRevision !== undefined) body.expectedRevision = parsed.expectedRevision;
+
+  const request = await authenticatedSlipwayJsonRequest<SlipwayApplicationSourceBindingResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "PUT",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/source-binding`,
+    body,
+    requestErrorCode: "SLIPWAY_APPLICATION_SOURCE_BINDING_SET_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not set Liskov Application source binding"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  return writeSourceBindingCommandResponse({
+    applicationRef: input.applicationRef,
+    body: request.body,
+    errorCode: "SLIPWAY_APPLICATION_SOURCE_BINDING_SET_FAILED",
+    failedHuman: `Liskov could not set the source binding for ${input.applicationRef}.`,
+    json: input.json,
+    options,
+    response: request.response,
+    sessionFile: request.sessionFile,
+    slipwayUrl: request.slipwayUrl,
+    successHuman: formatSourceBindingSet(input.applicationRef, request.body)
+  });
+}
+
+export async function runSlipwayApplicationSourceBindingShow(
+  input: SlipwayApplicationSourceBindingShowInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  const applicationRef = input.applicationRef.trim();
+  if (!applicationRef) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_SOURCE_BINDING_SHOW_INVALID",
+      message: "applicationRef must not be empty"
+    }, "Error (SLIPWAY_APPLICATION_SOURCE_BINDING_SHOW_INVALID): a non-empty application ref is required.");
+    return 1;
+  }
+
+  const request = await authenticatedSlipwayRequest<SlipwayApplicationSourceBindingResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(applicationRef)}/source-binding`,
+    requestErrorCode: "SLIPWAY_APPLICATION_SOURCE_BINDING_SHOW_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application source binding"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  return writeSourceBindingCommandResponse({
+    applicationRef,
+    body: request.body,
+    errorCode: "SLIPWAY_APPLICATION_SOURCE_BINDING_SHOW_FAILED",
+    failedHuman: `Liskov could not read the source binding for ${applicationRef}.`,
+    json: input.json,
+    options,
+    response: request.response,
+    sessionFile: request.sessionFile,
+    slipwayUrl: request.slipwayUrl,
+    successHuman: formatSourceBindingShow(applicationRef, request.body)
+  });
+}
+
+export async function runSlipwayApplicationSourceBindingRevoke(
+  input: SlipwayApplicationSourceBindingRevokeInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  if (!input.yes) {
+    return writeConfirmationRequired(
+      options,
+      input.json,
+      "SLIPWAY_APPLICATION_SOURCE_BINDING_REVOKE_CONFIRMATION_REQUIRED",
+      "Application source-binding revoke"
+    );
+  }
+
+  const invalidInput = sourceBindingRevokeInputError(input);
+  if (invalidInput) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_SOURCE_BINDING_REVOKE_INVALID",
+      message: invalidInput,
+      applicationRef: input.applicationRef
+    }, `Error (SLIPWAY_APPLICATION_SOURCE_BINDING_REVOKE_INVALID): ${invalidInput}`);
+    return 1;
+  }
+
+  const request = await authenticatedSlipwayJsonRequest<SlipwayApplicationSourceBindingResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "DELETE",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/source-binding`,
+    body: {
+      expectedRevision: input.expectedRevision,
+      reason: input.reason.trim()
+    },
+    requestErrorCode: "SLIPWAY_APPLICATION_SOURCE_BINDING_REVOKE_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not revoke Liskov Application source binding"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  return writeSourceBindingCommandResponse({
+    applicationRef: input.applicationRef,
+    body: request.body,
+    errorCode: "SLIPWAY_APPLICATION_SOURCE_BINDING_REVOKE_FAILED",
+    failedHuman: `Liskov could not revoke the source binding for ${input.applicationRef}.`,
+    json: input.json,
+    options,
+    response: request.response,
+    sessionFile: request.sessionFile,
+    slipwayUrl: request.slipwayUrl,
+    successHuman: formatSourceBindingRevoke(input.applicationRef, request.body)
+  });
+}
+
+function parseSourceBindingSetInput(input: SlipwayApplicationSourceBindingSetInput):
+  | {
+      ok: true;
+      binding: {
+        repository: string;
+        allowedRefs: string[];
+        workflowIdentity: string;
+        manifestPath: string;
+      };
+      expectedRevision: number | undefined;
+      reason: string | undefined;
+    }
+  | { ok: false; message: string } {
+  if (!input.applicationRef.trim()) return { ok: false, message: "applicationRef must not be empty." };
+  let repository: string;
+  try {
+    repository = parseRepositorySlug(input.repository);
+  } catch {
+    return { ok: false, message: "--repository must be owner/repo." };
+  }
+  const allowedRefs = (input.allowedRefs ?? []).map((value) => value.trim()).filter((value) => value.length > 0);
+  if (allowedRefs.length === 0) {
+    return { ok: false, message: "--allowed-ref must be stated at least once; there is no default." };
+  }
+  const seen = new Set<string>();
+  for (const reference of allowedRefs) {
+    if (!reference.startsWith("refs/") || /\s/u.test(reference)) {
+      return { ok: false, message: "--allowed-ref values must be exact non-empty refs/... values with no whitespace." };
+    }
+    if (seen.has(reference)) {
+      return { ok: false, message: "--allowed-ref values must not contain duplicates." };
+    }
+    seen.add(reference);
+  }
+  const workflowIdentity = input.workflowIdentity.trim();
+  if (!workflowIdentity) return { ok: false, message: "--workflow-identity must not be empty." };
+  const manifestPath = input.manifestPath.trim();
+  if (!manifestPath) return { ok: false, message: "--manifest-path must not be empty." };
+  if (
+    input.expectedRevision !== undefined
+    && (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0)
+  ) {
+    return { ok: false, message: "--expected-revision must be a non-negative safe integer." };
+  }
+  const reason = input.reason?.trim();
+  return {
+    ok: true,
+    binding: { repository, allowedRefs, workflowIdentity, manifestPath },
+    expectedRevision: input.expectedRevision,
+    reason: reason || undefined
+  };
+}
+
+function sourceBindingRevokeInputError(input: SlipwayApplicationSourceBindingRevokeInput): string | undefined {
+  if (!input.applicationRef.trim()) return "applicationRef must not be empty.";
+  if (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0) {
+    return "--expected-revision must be a non-negative safe integer.";
+  }
+  if (!input.reason.trim()) return "--reason must not be empty.";
+  return undefined;
+}
+
+function writeSourceBindingCommandResponse(input: {
+  applicationRef: string;
+  body: SlipwayApplicationSourceBindingResponse | undefined;
+  errorCode: string;
+  failedHuman: string;
+  json?: boolean;
+  options: SlipwayCliOptions;
+  response: Response;
+  sessionFile: string;
+  slipwayUrl: string;
+  successHuman: string;
+}): number {
+  if (input.response.ok && input.body?.ok === true && input.body.sourceBinding) {
+    writeStructuredOrHuman(input.options, input.json, input.body, input.successHuman);
+    return 0;
+  }
+
+  const mapped = sourceBindingRefusal(input.applicationRef, input.body, input.response.status);
+  const error = input.response.status === 401
+    ? "SLIPWAY_SESSION_UNAUTHORIZED"
+    : mapped?.error ?? input.errorCode;
+  const mappedMessage = mapped?.human.replace(/^Error \([^)]+\): /u, "");
+  const human = mapped?.error === "SLIPWAY_APPLICATION_AMBIGUOUS"
+    ? mapped.human
+    : mapped
+      ? (mapped.human.startsWith("Error (") ? mapped.human : `Error (${error}): ${mapped.human}`)
+      : `Error (${error}): ${input.body?.reason ?? input.body?.error ?? input.failedHuman}`;
+  writeStructuredOrHuman(input.options, input.json, {
+    ok: false,
+    error,
+    status: input.response.status,
+    message: mappedMessage,
+    reason: input.body?.reason ?? input.body?.error,
+    reasonCode: input.body?.reasonCode,
+    capability: input.body?.capability,
+    applicationRef: input.applicationRef,
+    candidates: input.body?.candidates,
+    slipwayUrl: input.slipwayUrl,
+    sessionFile: input.sessionFile
+  }, human);
+  return 1;
+}
+
+function sourceBindingRefusal(
+  applicationRef: string,
+  body: SlipwayApplicationSourceBindingResponse | undefined,
+  status: number
+): { error: string; human: string } | undefined {
+  const error = stringValue(body?.error);
+  const reasonCode = stringValue(body?.reasonCode) ?? error;
+  const capability = stringValue(body?.capability);
+  if (status === 401) {
+    return {
+      error: "SLIPWAY_SESSION_UNAUTHORIZED",
+      human: `Error (SLIPWAY_SESSION_UNAUTHORIZED): Liskov rejected the stored session.`
+    };
+  }
+  if (error === "ambiguous_application" && Array.isArray(body?.candidates)) {
+    return {
+      error: "SLIPWAY_APPLICATION_AMBIGUOUS",
+      human: formatApplicationAmbiguity(applicationRef, body.candidates)
+    };
+  }
+  if (reasonCode === "github_repository_required" || error === "github_repository_required") {
+    return {
+      error: "SLIPWAY_APPLICATION_SOURCE_BINDING_REPOSITORY_REQUIRED",
+      human: "Error (SLIPWAY_APPLICATION_SOURCE_BINDING_REPOSITORY_REQUIRED): create the Application with --repository first."
+    };
+  }
+  if (
+    reasonCode === "organization_admin_required"
+    || capability === "application.source_binding.manage"
+  ) {
+    return {
+      error: "SLIPWAY_APPLICATION_SOURCE_BINDING_ADMIN_REQUIRED",
+      human: "Error (SLIPWAY_APPLICATION_SOURCE_BINDING_ADMIN_REQUIRED): this needs an organization admin with application.source_binding.manage (a maintainer or an application-scoped grant cannot retarget source)."
+    };
+  }
+  if (error === "source_binding_revision_conflict") {
+    return {
+      error: "SLIPWAY_APPLICATION_SOURCE_BINDING_REVISION_CONFLICT",
+      human: "Error (SLIPWAY_APPLICATION_SOURCE_BINDING_REVISION_CONFLICT): re-read with `proof liskov application source-binding show`."
+    };
+  }
+  if (error === "source_binding_revoked" || error === "source_binding_already_revoked") {
+    return {
+      error: "SLIPWAY_APPLICATION_SOURCE_BINDING_REVOKED",
+      human: "Error (SLIPWAY_APPLICATION_SOURCE_BINDING_REVOKED): the revocation epoch moved; set again naming --expected-revision from `show`."
+    };
+  }
+  if (error === "source_binding_not_found") {
+    return {
+      error: "SLIPWAY_APPLICATION_SOURCE_BINDING_NOT_FOUND",
+      human: `Application ${applicationRef} is not bound yet.`
+    };
+  }
+  return undefined;
+}
+
+function formatSourceBindingSet(applicationRef: string, body: SlipwayApplicationSourceBindingResponse | undefined): string {
+  const record = objectRecord(body?.sourceBinding);
+  const binding = objectRecord(record.binding);
+  const revision = numberValue(binding.revision);
+  const repository = stringValue(binding.repository) ?? "the bound repository";
+  const operation = stringValue(record.operation);
+  if (operation === "rotated") {
+    return `Rotated source binding to revision ${revision ?? "unknown"} for ${applicationRef} (${repository}).`;
+  }
+  return `Created source binding revision ${revision ?? "unknown"} for ${applicationRef} (${repository}).`;
+}
+
+function formatSourceBindingShow(applicationRef: string, body: SlipwayApplicationSourceBindingResponse | undefined): string {
+  const record = objectRecord(body?.sourceBinding);
+  const binding = objectRecord(record.binding);
+  const revision = numberValue(binding.revision);
+  const epoch = numberValue(binding.revocationEpoch);
+  const repository = stringValue(binding.repository) ?? "the bound repository";
+  if (record.revoked === true) {
+    return `${applicationRef} source binding is revoked (revision ${revision ?? "unknown"}, revocation epoch ${epoch ?? "unknown"}). A later set must name --expected-revision ${revision ?? "N"}.`;
+  }
+  return `${applicationRef} is bound to ${repository} at revision ${revision ?? "unknown"}, revocation epoch ${epoch ?? "unknown"}.`;
+}
+
+function formatSourceBindingRevoke(applicationRef: string, body: SlipwayApplicationSourceBindingResponse | undefined): string {
+  const record = objectRecord(body?.sourceBinding);
+  const binding = objectRecord(record.binding);
+  const revision = numberValue(binding.revision);
+  const epoch = numberValue(binding.revocationEpoch);
+  return `Revoked source binding for ${applicationRef}; revocation epoch is now ${epoch ?? "unknown"}. A later set must name --expected-revision ${revision ?? "N"}.`;
 }
 
 export async function runSlipwayApplicationPlans(input: SlipwayApplicationPlansInput, options: SlipwayCliOptions = {}): Promise<number> {
@@ -5204,7 +5600,7 @@ async function authenticatedSlipwayJsonRequest<T>(
     config?: string;
     slipwayUrl?: string;
     json?: boolean;
-    method: "DELETE" | "POST";
+    method: "DELETE" | "POST" | "PUT";
     path: string;
     body: unknown;
     authToken?: string;
@@ -5307,7 +5703,7 @@ async function runSlipwayJsonCommand(
     config?: string;
     slipwayUrl?: string;
     json?: boolean;
-    method: "DELETE" | "POST";
+    method: "DELETE" | "POST" | "PUT";
     path: string;
     body: unknown;
     errorCode: string;

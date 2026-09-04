@@ -15,6 +15,9 @@ proof liskov application manifest validate --file .slipway/application-policy.js
 proof liskov application execution show proof-docs
 proof liskov application execution show proof-docs --watch --timeout-seconds 900
 proof liskov application policy publish proof-docs --file .liskov/proof-docs-v5.json --artifact-digest sha256:... --binding-revision 1 --revocation-epoch 0 --source-ref refs/heads/main --source-commit 0123456789abcdef0123456789abcdef01234567 --workflow-identity proof-computer/proof-docs/.github/workflows/release.yml@refs/heads/main --expected-pointer-version 0 --yes
+proof liskov application source-binding set proof-docs --repository proof-computer/proof-docs --allowed-ref refs/heads/main --workflow-identity proof-computer/proof-docs/.github/workflows/release.yml@refs/heads/main --manifest-path .liskov/proof-docs-v5.json --yes
+proof liskov application source-binding show proof-docs
+proof liskov application source-binding revoke proof-docs --expected-revision 1 --reason "credential exposure" --yes
 proof liskov application import --github proof-computer/docs:.slipway/application-policy.json@main --server-fetch
 proof liskov application list
 proof liskov application list --organization org-123
@@ -183,6 +186,16 @@ read-only publication preflight. Actual publication observes preflight first
 and submits its `authoredDigest` as the race fence.
 
 Registered V5 publication is a distinct source-evidence path:
+`application create` (identity, with `--repository`) then
+`application source-binding set` then the attesting workflow, then
+`application policy publish`. `source-binding set` is the admin-only bind
+step over `PUT /api/applications/{id}/source-binding`; omit
+`--expected-revision` on create (`0` means update revision 0 and conflicts).
+`show` is an `application.read`; 404 `source_binding_not_found` means not
+bound yet. `revoke` advances the revocation epoch and a later `set` must name
+it. Set and revoke send no request without `--yes`. There is no default for
+`--allowed-ref`.
+
 `application policy publish` validates the retained schema-5 document locally,
 requires the exact attested artifact/build facts and observed active-pointer
 version, then submits them to the server-owned `policy-versions` writer. It

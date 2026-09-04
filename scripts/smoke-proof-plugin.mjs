@@ -102,6 +102,22 @@ try {
   assertIncludes(registeredPolicyPublishHelp.stdout, "--workflow-identity");
   assertIncludes(registeredPolicyPublishHelp.stdout, "--yes");
 
+  const sourceBindingSetHelp = run(process.execPath, [proofDevBin, "liskov", "application", "source-binding", "set", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(sourceBindingSetHelp.stdout, "--repository");
+  assertIncludes(sourceBindingSetHelp.stdout, "--allowed-ref");
+  assertIncludes(sourceBindingSetHelp.stdout, "--workflow-identity");
+  assertIncludes(sourceBindingSetHelp.stdout, "--manifest-path");
+  assertIncludes(sourceBindingSetHelp.stdout, "--expected-revision");
+  assertIncludes(sourceBindingSetHelp.stdout, "--yes");
+
+  const sourceBindingShowHelp = run(process.execPath, [proofDevBin, "liskov", "application", "source-binding", "show", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(sourceBindingShowHelp.stdout, "APP_REF");
+
+  const sourceBindingRevokeHelp = run(process.execPath, [proofDevBin, "liskov", "application", "source-binding", "revoke", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(sourceBindingRevokeHelp.stdout, "--expected-revision");
+  assertIncludes(sourceBindingRevokeHelp.stdout, "--reason");
+  assertIncludes(sourceBindingRevokeHelp.stdout, "--yes");
+
   const applicationResumeHelp = run(process.execPath, [proofDevBin, "liskov", "application", "resume", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationResumeHelp.stdout, "Resume new Liskov work");
   assertIncludes(applicationResumeHelp.stdout, "--reason");

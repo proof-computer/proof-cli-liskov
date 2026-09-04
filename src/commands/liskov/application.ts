@@ -38,6 +38,9 @@ COMMANDS
   manifest validate --file PATH [--json]
   policy explain APPLICATION_ID [--json]
   policy publish APP_REF --file PATH --artifact-digest SHA256 --binding-revision N --revocation-epoch N --source-ref REF --source-commit SHA --workflow-identity ID --expected-pointer-version N --yes
+  source-binding set APP_REF --repository OWNER/REPO --allowed-ref REF [--allowed-ref …] --workflow-identity IDENTITY --manifest-path PATH [--expected-revision N] [--reason TEXT] --yes
+  source-binding show APP_REF
+  source-binding revoke APP_REF --expected-revision N --reason TEXT --yes
   retire APP_REF [--reason TEXT] [--yes]
   retirement-census [--limit N] [--cursor CURSOR] [--lifecycle STATE] [--remediation-class CLASS] [--all] [--json]
   retire cancel APP_REF [--reason TEXT] --yes
