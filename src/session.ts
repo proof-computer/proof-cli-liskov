@@ -3651,7 +3651,14 @@ export async function runSlipwayApplicationActionPlan(input: SlipwayApplicationA
     writeStructuredOrHuman(options, input.json, { ok: false, error, status: request.response.status, reason: body?.reason ?? body?.error, applicationRef: input.applicationRef, slipwayUrl: request.slipwayUrl, sessionFile: request.sessionFile }, `Error (${error}): Liskov could not read the action plan for Application ${input.applicationRef}.`);
     return 1;
   }
-  writeStructuredOrHuman(options, input.json, body, `Action plan for ${input.applicationRef}.`);
+  const coverageRedirect = body.readKind === "coverage_redirect";
+  const sourceArtifactMissing = body.reason === "v5_source_artifact_missing";
+  const human = coverageRedirect
+    ? sourceArtifactMissing
+      ? `V5 Application ${input.applicationRef} has no attested source artifact yet; no execution can begin. Use \`proof liskov application execution show ${input.applicationRef}\` for typed execution state.`
+      : `V5 Application ${input.applicationRef} is served by typed Coverage, not the legacy Action Plan. Use \`proof liskov application execution show ${input.applicationRef}\` for execution state.`
+    : `Action plan for ${input.applicationRef}.`;
+  writeStructuredOrHuman(options, input.json, body, human);
   return 0;
 }
 

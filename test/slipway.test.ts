@@ -12,6 +12,7 @@ import {
   runSlipwayAdminExecutorOperationReconcile,
   runSlipwayApplicationBackfillIdentities,
   runSlipwayApplicationActivity,
+  runSlipwayApplicationActionPlan,
   runSlipwayApplicationActionPlanRetry,
   runSlipwayApplicationDelete,
   runSlipwayApplicationDeploymentImport,
@@ -3602,6 +3603,65 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(await runSlipwayApplicationActionPlanRetry({ applicationRef: "alpha", decisionId: "decision-1", reason: "retry", config: sessionFile, json: true }, options), 1);
     assert.match(out.text, /--yes/u);
     assert.match(out.text, /--yes-spend/u);
+  });
+
+  it("renders a V5 Action Plan Coverage redirect without a legacy blocker", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_v5_action_plan_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const out = writer();
+    const code = await runSlipwayApplicationActionPlan({
+      applicationRef: "v5-two-job",
+      config: sessionFile
+    }, {
+      fetchImpl: async (url: URL | RequestInfo) => {
+        assert.equal(String(url), "https://slipway.test/api/applications/v5-two-job/action-plan");
+        return jsonResponse({
+          ok: true,
+          applicationId: "v5-two-job",
+          readKind: "coverage_redirect",
+          reason: "v5_typed_coverage",
+          coverageHref: "/api/applications/v5-two-job/coverage"
+        });
+      },
+      stdout: out.write
+    });
+    assert.equal(code, 0);
+    assert.match(out.text, /typed Coverage/u);
+    assert.match(out.text, /application execution show v5-two-job/u);
+    assert.doesNotMatch(out.text, /missing_script_cid/u);
+  });
+
+  it("renders the typed V5 source-artifact absence", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "slipway_v5_missing_artifact_token_do_not_print",
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const out = writer();
+    const code = await runSlipwayApplicationActionPlan({
+      applicationRef: "v5-no-artifact",
+      config: sessionFile
+    }, {
+      fetchImpl: async () => jsonResponse({
+        ok: true,
+        readKind: "coverage_redirect",
+        reason: "v5_source_artifact_missing"
+      }),
+      stdout: out.write
+    });
+    assert.equal(code, 0);
+    assert.match(out.text, /no attested source artifact/u);
+    assert.doesNotMatch(out.text, /missing_script_cid/u);
   });
 
   it("refreshes a clock-changed run-one plan id by its unchanged opaque idempotency key", async () => {
