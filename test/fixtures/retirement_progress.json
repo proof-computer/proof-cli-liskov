@@ -1,0 +1,121 @@
+{
+  "ok": true,
+  "domain": "proof.liskov.application-retirement.v1",
+  "lifecycleState": "retiring",
+  "creationAvailability": {
+    "domain": "proof.liskov.application-retirement-creation-availability.v1",
+    "available": true,
+    "reason": null
+  },
+  "capabilities": { "create": true, "cancel": true },
+  "retirement": {
+    "domain": "proof.liskov.application-retirement.v1",
+    "retirementId": "ret-fixture-1",
+    "applicationUid": "app-fixture-0000000000000001",
+    "status": "active",
+    "lifecycleState": "retiring",
+    "phase": "waiting_for_schedule_end",
+    "reason": "no longer needed",
+    "requestedAtMs": 1700000000000,
+    "updatedAtMs": 1700000600000,
+    "cancelledAtMs": null,
+    "completedAtMs": null,
+    "assessment": {
+      "domain": "proof.liskov.application-retirement-assessment.v1",
+      "applicationUid": "app-fixture-0000000000000001",
+      "executionBlockerCount": 1,
+      "financialBlockerCount": 2,
+      "ambiguityBlockerCount": 0,
+      "latestKnownScheduleEndAtMs": 1700003600000,
+      "phase": "waiting_for_schedule_end",
+      "blockers": [
+        {
+          "category": "execution",
+          "code": "chain_schedule_not_terminal",
+          "evidenceAuthority": "liskov_jobs",
+          "resourceKind": "job",
+          "resourceId": "job-fixture-1",
+          "remediationClass": "wait_for_chain_evidence"
+        },
+        {
+          "category": "financial",
+          "code": "deploy_spend_reserved",
+          "evidenceAuthority": "slipway_deploy_spend_reservations",
+          "resourceKind": "deploy_spend_reservation",
+          "resourceId": "reserve-fixture-1",
+          "remediationClass": "automatic_financial_closeout"
+        },
+        {
+          "category": "financial",
+          "code": "billing_transaction_not_released",
+          "evidenceAuthority": "liskov_billing_transactions",
+          "resourceKind": "billing_transaction",
+          "resourceId": "reserve-fixture-1",
+          "remediationClass": "automatic_financial_closeout"
+        }
+      ]
+    },
+    "assessmentDigest": "5b1f2c0e6a7d4938a1c0f5b2e3d47681c9a0b2d4e6f80917a2b3c4d5e6f70819",
+    "deletionReceiptDigest": null
+  },
+  "remediation": {
+    "domain": "proof.liskov.application-retirement-remediation.v1",
+    "lineages": [
+      {
+        "lineageKey": "job-fixture-1",
+        "category": "execution",
+        "remediationClass": "wait_for_chain_evidence",
+        "owner": "chain",
+        "actionable": false,
+        "factCount": 1,
+        "facts": [
+          {
+            "category": "execution",
+            "code": "chain_schedule_not_terminal",
+            "evidenceAuthority": "liskov_jobs",
+            "resourceKind": "job",
+            "resourceId": "job-fixture-1",
+            "remediationClass": "wait_for_chain_evidence"
+          }
+        ]
+      },
+      {
+        "lineageKey": "reserve-fixture-1",
+        "category": "financial",
+        "remediationClass": "automatic_financial_closeout",
+        "owner": "liskov",
+        "actionable": false,
+        "factCount": 2,
+        "facts": [
+          {
+            "category": "financial",
+            "code": "deploy_spend_reserved",
+            "evidenceAuthority": "slipway_deploy_spend_reservations",
+            "resourceKind": "deploy_spend_reservation",
+            "resourceId": "reserve-fixture-1",
+            "remediationClass": "automatic_financial_closeout"
+          },
+          {
+            "category": "financial",
+            "code": "billing_transaction_not_released",
+            "evidenceAuthority": "liskov_billing_transactions",
+            "resourceKind": "billing_transaction",
+            "resourceId": "reserve-fixture-1",
+            "remediationClass": "automatic_financial_closeout"
+          }
+        ]
+      }
+    ],
+    "lineageCountsByRemediationClass": {
+      "automatic_local_terminalization": 0,
+      "automatic_financial_closeout": 1,
+      "wait_for_chain_evidence": 1,
+      "evidence_backed_adjudication": 0,
+      "operator_adjudication": 0,
+      "normalize_or_adjudicate": 0,
+      "classify_or_adjudicate": 0
+    },
+    "retirementAgeMs": 600000,
+    "unchangedAssessmentAgeMs": 7200000
+  }
+}

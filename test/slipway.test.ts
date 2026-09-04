@@ -5521,8 +5521,10 @@ describe("canonical application posture rendering", () => {
         }),
         stdout: list.write
       }), 0);
-      assert.match(list.text, /- app_1: active \(posture Running\)/u);
-      assert.match(list.text, /- app_2: active$/mu);
+      // The lifecycle leads the row; the stored status stays beside it as one
+      // more detail (BKLG-20260902-e7l1).
+      assert.match(list.text, /- app_1: Current \(status active, posture Running\)/u);
+      assert.match(list.text, /- app_2: Current \(status active\)$/mu);
     } finally {
       await rmdir(directory, { recursive: true });
     }

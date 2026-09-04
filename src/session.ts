@@ -859,6 +859,15 @@ interface PublicSlipwayApplicationSummary {
   duplicateLegacyId?: boolean;
   /** The server's canonical posture; absent on an older server. */
   applicationPosture?: unknown;
+  /**
+   * The lifecycle word (ADR-0038 §1): `retiring` is derived from an active
+   * intent and is never a stored status, and `deleted` is the persisted
+   * compatibility detail behind the product's **Retired**. Absent on a server
+   * older than BKLG-20260902-e7l1.
+   */
+  lifecycleState?: string;
+  /** `safe_retirement` or `legacy_immediate_tombstone`, once a receipt exists. */
+  receiptKind?: string;
 }
 
 interface PublicSlipwayApplicationRefCandidate {
@@ -952,6 +961,12 @@ interface SlipwayApplicationRetirementResponse extends SlipwayGenericResponse {
   retirement?: Record<string, unknown>;
   receipt?: Record<string, unknown>;
   legacyCleanup?: Record<string, unknown>;
+  /**
+   * Correlated obligations beside the assessment, each naming the owner who
+   * must act. A sibling, never part of the assessment: those bytes feed the
+   * deletion receipt's digest.
+   */
+  remediation?: Record<string, unknown>;
 }
 
 interface SlipwayApplicationStatusTransitionResponse {
@@ -1823,11 +1838,15 @@ export async function runSlipwayApplicationList(input: SlipwayApplicationListInp
     return 1;
   }
 
+  // `includeDeleted=true` returns live rows *and* tombstones, so the retired
+  // view still selects. It selects on the server's lifecycle word rather than
+  // re-deriving one, and it recounts because `count` describes the whole
+  // response, not this view.
   const output = input.deleted === true
     ? {
         ...body,
-        count: body.applications.filter((application) => application.status === "deleted" || typeof application.deletedAtMs === "number").length,
-        applications: body.applications.filter((application) => application.status === "deleted" || typeof application.deletedAtMs === "number")
+        count: body.applications.filter(applicationIsRetired).length,
+        applications: body.applications.filter(applicationIsRetired)
       }
     : body;
   writeStructuredOrHuman(
@@ -6811,6 +6830,26 @@ function compactSignerAddress(address: string): string {
   return trimmed.length > 18 ? `${trimmed.slice(0, 8)}…${trimmed.slice(-7)}` : trimmed;
 }
 
+/**
+ * The product's lifecycle word for one row.
+ *
+ * `lifecycleState` is the server's own (BKLG-20260902-e7l1). The
+ * `status`/`deletedAtMs` fallback exists only so an older server still prints
+ * something true; it is not a second derivation of anything.
+ */
+function applicationLifecycleLabel(application: PublicSlipwayApplicationSummary): string {
+  const lifecycleState = application.lifecycleState;
+  if (lifecycleState === "retiring") return "Retiring";
+  if (lifecycleState === "deleted" || lifecycleState === "retired") return "Retired";
+  if (application.status === "deleted" || typeof application.deletedAtMs === "number") return "Retired";
+  return "Current";
+}
+
+/** Whether a row is retired, for the `--retired` view. */
+function applicationIsRetired(application: PublicSlipwayApplicationSummary): boolean {
+  return applicationLifecycleLabel(application) === "Retired";
+}
+
 function formatApplicationList(body: SlipwayApplicationListResponse): string {
   const applications = body.applications ?? [];
   const count = typeof body.count === "number" ? body.count : applications.length;
@@ -6823,7 +6862,15 @@ function formatApplicationList(body: SlipwayApplicationListResponse): string {
     const applicationId = formatApplicationLabel(application);
     const policyVersionId = application.activePolicy?.policyVersionId ?? application.activePolicyVersionId;
     const status = application.status ?? application.activePolicy?.status ?? "unknown";
+    // The lifecycle leads; the stored status stays beside it, because `deleted`
+    // is a compatibility detail an operator still needs to see and never the
+    // word a customer is shown (ADR-0038 §12).
+    const lifecycle = applicationLifecycleLabel(application);
     const details = [
+      `status ${status}`,
+      application.receiptKind === "safe_retirement" ? "safe-retirement receipt"
+        : application.receiptKind === "legacy_immediate_tombstone" ? "legacy tombstone receipt"
+        : undefined,
       typeof application.replicas === "number" ? `${application.replicas} replica(s)` : undefined,
       application.artifact?.status ? `artifact ${application.artifact.status}` : undefined,
       policyVersionId ? `policy ${policyVersionId}` : undefined,
@@ -6835,7 +6882,7 @@ function formatApplicationList(body: SlipwayApplicationListResponse): string {
       typeof application.deletedAtMs === "number" ? `deleted ${new Date(application.deletedAtMs).toISOString()}` : undefined,
       applicationPostureDetail(application.applicationPosture)
     ].filter((item): item is string => item !== undefined);
-    lines.push(`- ${applicationId}: ${status}${details.length > 0 ? ` (${details.join(", ")})` : ""}`);
+    lines.push(`- ${applicationId}: ${lifecycle}${details.length > 0 ? ` (${details.join(", ")})` : ""}`);
   }
   return lines.join("\n");
 }
@@ -6910,9 +6957,28 @@ function writeRetirementResponse(
   fallbackError: string
 ): number {
   if (!body) return writeMalformedReadResponse(fallbackError, response, json, options);
+  // The completion race. `409 retirement_already_completed` is the one refusal
+  // in this resource that carries the outcome the caller wanted: the retirement
+  // finished before the cancellation was applied, and the body holds the
+  // immutable receipt (ADR-0038 §3). Reporting a receipt as a failure is what
+  // made a successful retirement look like an error and exit non-zero
+  // (BKLG-20260902-e7l1).
+  const racedReceipt = body.error === "retirement_already_completed"
+    ? objectRecord(body.receipt)
+    : {};
+  const completionWon = Object.keys(racedReceipt).length > 0;
   if (json) {
+    // The canonical envelope is echoed byte-for-byte either way; only the exit
+    // status changes, because that is the part that was untrue.
     writeStructuredOrHuman(options, true, body, "");
-    return response.ok && body.ok !== false ? 0 : 1;
+    return completionWon || (response.ok && body.ok !== false) ? 0 : 1;
+  }
+  if (completionWon) {
+    emit(options, [
+      "Retirement completed before the cancellation was applied; there was nothing left to cancel.",
+      formatRetirementReceipt(racedReceipt)
+    ].join("\n"));
+    return 0;
   }
   if (!response.ok || body.ok === false) {
     const error = response.status === 401
@@ -6940,7 +7006,11 @@ function formatApplicationRetirement(body: SlipwayApplicationRetirementResponse)
       lines.push(
         booleanValue(legacyCleanup.resourcesTerminalized) === true
           ? "Legacy post-deletion resources are terminalized."
-          : `Legacy post-deletion cleanup remains open. ${formatRetirementAssessment(objectRecord(legacyCleanup.assessment))}`
+          : [
+            "Legacy post-deletion cleanup remains open.",
+            formatRetirementAssessment(objectRecord(legacyCleanup.assessment)),
+            formatRetirementRemediation(objectRecord(legacyCleanup.remediation))
+          ].filter(Boolean).join("\n")
       );
     }
     return lines.join("\n");
@@ -6958,9 +7028,11 @@ function formatApplicationRetirement(body: SlipwayApplicationRetirementResponse)
     const header = status === "active"
       ? `Retirement ${retirementId} is active (${phase}).`
       : `Retirement ${retirementId} is ${status}.`;
-    return [header, formatRetirementAssessment(objectRecord(retirement.assessment))]
-      .filter(Boolean)
-      .join("\n");
+    return [
+      header,
+      formatRetirementAssessment(objectRecord(retirement.assessment)),
+      formatRetirementRemediation(objectRecord(body.remediation))
+    ].filter(Boolean).join("\n");
   }
 
   const preview = objectRecord(body.preview);
@@ -6975,8 +7047,9 @@ function formatApplicationRetirement(body: SlipwayApplicationRetirementResponse)
     return [
       "Retirement preview (read only).",
       formatRetirementAssessment(objectRecord(preview.assessment)),
+      formatRetirementRemediation(objectRecord(preview.remediation)),
       action
-    ].join("\n");
+    ].filter(Boolean).join("\n");
   }
   return "Liskov returned application retirement state.";
 }
@@ -7003,6 +7076,48 @@ function formatRetirementReceipt(receipt: Record<string, unknown>): string {
   return `${label}: ${digest}.`;
 }
 
+/** Who has to act before an obligation can converge, in the customer's words. */
+const REMEDIATION_OWNER_LABEL: Record<string, string> = {
+  liskov: "Liskov",
+  chain: "the Acurast chain",
+  operator: "operator review"
+};
+
+/**
+ * The correlated obligations beside an assessment.
+ *
+ * One line per obligation rather than per raw fact: the estate census found
+ * 40.5% of reported "problems" were the same obligation counted more than once
+ * (a held reserve and its unreleased billing parent are one thing to resolve).
+ * The owner and the actionability come from the server; the CLI never decides
+ * that an obligation is automatic (BKLG-20260902-e7l1).
+ */
+function formatRetirementRemediation(remediation: Record<string, unknown>): string {
+  const lineages = arrayValue(remediation.lineages);
+  if (lineages.length === 0) return "";
+  const lines = [`${lineages.length} correlated obligation(s):`];
+  for (const value of lineages) {
+    const lineage = objectRecord(value);
+    const category = typeof lineage.category === "string" ? lineage.category : "unknown";
+    const key = typeof lineage.lineageKey === "string" ? lineage.lineageKey : "unknown";
+    const owner = typeof lineage.owner === "string" ? lineage.owner : "operator";
+    const remediationClass = typeof lineage.remediationClass === "string"
+      ? lineage.remediationClass
+      : "operator_adjudication";
+    const factCount = numberValue(lineage.factCount) ?? 0;
+    const action = booleanValue(lineage.actionable) === true
+      ? "you must act"
+      : "no action from you";
+    const facts = factCount > 1 ? `, ${factCount} facts` : "";
+    lines.push(`- ${category}/${key}: waiting on ${REMEDIATION_OWNER_LABEL[owner] ?? owner}; ${action}; ${remediationClass}${facts}.`);
+  }
+  const unchanged = numberValue(remediation.unchangedAssessmentAgeMs);
+  if (unchanged !== undefined) {
+    lines.push(`Assessment unchanged for ${Math.floor(unchanged / 60000)} minute(s).`);
+  }
+  return lines.join("\n");
+}
+
 function formatRetirementAssessment(assessment: Record<string, unknown>): string {
   if (Object.keys(assessment).length === 0) return "";
   const execution = numberValue(assessment.executionBlockerCount) ?? 0;
@@ -7025,9 +7140,11 @@ function formatRetirementAssessment(assessment: Record<string, unknown>): string
     const authority = typeof blocker.evidenceAuthority === "string"
       ? blocker.evidenceAuthority
       : "unknown authority";
+    // A missing class is unknown, not "review": naming an owner the server did
+    // not name is the untruthful remediation this packet is closing.
     const remediation = typeof blocker.remediationClass === "string"
       ? blocker.remediationClass
-      : "review";
+      : "unclassified";
     lines.push(`- ${category}/${code}: ${resourceKind} ${resourceId}; evidence ${authority}; remediation ${remediation}.`);
   }
   return lines.join("\n");
