@@ -88,8 +88,19 @@ export function formatLaunchEligibility(read: LaunchEligibilityRead): string {
   const details = [
     `${launchEligibilityLabel(read.value.code)} (${read.value.code})`,
     `evidence ${read.value.evidenceAuthority}`,
-    read.value.nextAction ? `next ${read.value.nextAction}` : undefined,
+    formatNextAction(read.value.nextAction),
     read.value.blockerCodes.length > 0 ? `blockers ${read.value.blockerCodes.join(", ")}` : undefined
   ].filter((part): part is string => part !== undefined);
   return details.join("; ");
+}
+
+function formatNextAction(nextAction: string | undefined): string | undefined {
+  if (!nextAction) return undefined;
+  if (nextAction === "wait_for_initial_funding") {
+    return "waiting for initial ACU funding (typically under a minute)";
+  }
+  if (nextAction === "retry_preflight") {
+    return "retry preflight; the hot-wallet balance could not be read";
+  }
+  return `next ${nextAction}`;
 }
