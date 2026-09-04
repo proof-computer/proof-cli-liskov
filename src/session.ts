@@ -7084,6 +7084,40 @@ const REMEDIATION_OWNER_LABEL: Record<string, string> = {
 };
 
 /**
+ * What an obligation is *about*, for a person reading a list.
+ *
+ * `lineageKey` is the server's grouping anchor, not an identity to show: a
+ * financial obligation is keyed on the reserve that holds the money, which is
+ * the right anchor and the wrong label — production reserve ids are hundreds of
+ * characters of embedded JSON. The facts name the resources, so the obligation
+ * is described by them (BKLG-20260902-e7l1). Falls back to the key only when a
+ * lineage carries no fact at all, which the server does not emit.
+ */
+function lineageSubject(lineage: Record<string, unknown>): string {
+  const facts = arrayValue(lineage.facts).map(objectRecord);
+  const first = facts[0];
+  if (!first) {
+    const key = typeof lineage.lineageKey === "string" ? lineage.lineageKey : "unknown";
+    return shortResourceId(key);
+  }
+  const kind = typeof first.resourceKind === "string" ? first.resourceKind : "resource";
+  const id = typeof first.resourceId === "string" ? first.resourceId : "unknown";
+  const others = new Set(
+    facts.slice(1).map((fact) => (typeof fact.resourceId === "string" ? fact.resourceId : "")).filter(Boolean)
+  );
+  others.delete(id);
+  // Several facts about several resources are still one obligation; say so
+  // rather than silently showing only the first.
+  const more = others.size > 0 ? ` (+${others.size} more resource${others.size === 1 ? "" : "s"})` : "";
+  return `${kind} ${shortResourceId(id)}${more}`;
+}
+
+/** Keep a list readable. `--json` carries the exact identifier. */
+function shortResourceId(id: string): string {
+  return id.length <= 72 ? id : `${id.slice(0, 48)}…${id.slice(-16)}`;
+}
+
+/**
  * The correlated obligations beside an assessment.
  *
  * One line per obligation rather than per raw fact: the estate census found
@@ -7099,7 +7133,6 @@ function formatRetirementRemediation(remediation: Record<string, unknown>): stri
   for (const value of lineages) {
     const lineage = objectRecord(value);
     const category = typeof lineage.category === "string" ? lineage.category : "unknown";
-    const key = typeof lineage.lineageKey === "string" ? lineage.lineageKey : "unknown";
     const owner = typeof lineage.owner === "string" ? lineage.owner : "operator";
     const remediationClass = typeof lineage.remediationClass === "string"
       ? lineage.remediationClass
@@ -7109,7 +7142,7 @@ function formatRetirementRemediation(remediation: Record<string, unknown>): stri
       ? "you must act"
       : "no action from you";
     const facts = factCount > 1 ? `, ${factCount} facts` : "";
-    lines.push(`- ${category}/${key}: waiting on ${REMEDIATION_OWNER_LABEL[owner] ?? owner}; ${action}; ${remediationClass}${facts}.`);
+    lines.push(`- ${category}/${lineageSubject(lineage)}: waiting on ${REMEDIATION_OWNER_LABEL[owner] ?? owner}; ${action}; ${remediationClass}${facts}.`);
   }
   const unchanged = numberValue(remediation.unchangedAssessmentAgeMs);
   if (unchanged !== undefined) {
