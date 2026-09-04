@@ -473,8 +473,12 @@ describe("the lifecycle every surface shares", () => {
     // parent are one thing to resolve.
     assert.equal(fixture.retirement.assessment.blockers.length, 3);
     assert.match(out.text, /2 correlated obligation\(s\):/u);
-    assert.match(out.text, /execution\/job-fixture-1: waiting on the Acurast chain; no action from you; wait_for_chain_evidence\./u);
-    assert.match(out.text, /financial\/reserve-fixture-1: waiting on Liskov; no action from you; automatic_financial_closeout, 2 facts\./u);
+    // The obligation is named by what its facts are about, not by the server's
+    // grouping key: a financial obligation is keyed on the reserve that holds
+    // the money, and production reserve ids are hundreds of characters of
+    // embedded JSON (BKLG-20260902-e7l1).
+    assert.match(out.text, /execution\/job job-fixture-1: waiting on the Acurast chain; no action from you; wait_for_chain_evidence\./u);
+    assert.match(out.text, /financial\/deploy_spend_reservation reserve-fixture-1: waiting on Liskov; no action from you; automatic_financial_closeout, 2 facts\./u);
     assert.match(out.text, /Assessment unchanged for 120 minute\(s\)\./u);
     assert.equal(out.text.includes(session.token), false);
   });
@@ -506,5 +510,80 @@ describe("the lifecycle every surface shares", () => {
     }), 0);
     assert.match(out.text, /remediation unclassified\./u);
     assert.doesNotMatch(out.text, /remediation review\./u);
+  });
+});
+
+describe("an obligation is named by what it is about", () => {
+  const render = async (lineage: Record<string, unknown>) => {
+    const session = await sessionFile();
+    const out = writer();
+    const code = await runSlipwayApplicationRetirement({ applicationRef: "alpha", config: session.file }, {
+      fetchImpl: async () => jsonResponse({
+        ok: true,
+        preview: {
+          assessment: { phase: "blocked", executionBlockerCount: 1, financialBlockerCount: 0, ambiguityBlockerCount: 0, blockers: [] },
+          remediation: { lineages: [lineage] }
+        },
+        creationAvailability: { available: true },
+        capabilities: { create: true }
+      }),
+      stdout: out.write
+    });
+    assert.equal(code, 0);
+    return out.text;
+  };
+
+  const longReserve = "deploy-reserve:launch-proposal:slipway-application:app:app-v2:app:diagnostic:app:replica-0:policy_digest_changed:[{\"name\":\"Acurast\",\"values\":[[[216,252,254,25]]]},138304]:8feb3bbe29df";
+
+  it("shows the resource, not the grouping key", async () => {
+    // The production shape: an execution obligation about a job, grouped under
+    // a reserve id. Showing the key told the customer their job-abandonment
+    // obligation was a spend reservation.
+    const text = await render({
+      lineageKey: longReserve,
+      category: "execution",
+      remediationClass: "automatic_local_terminalization",
+      owner: "liskov",
+      actionable: false,
+      factCount: 1,
+      facts: [{ category: "execution", code: "local_job_not_abandoned", evidenceAuthority: "liskov_jobs", resourceKind: "job", resourceId: "job-7022", remediationClass: "automatic_local_terminalization" }]
+    });
+    assert.match(text, /execution\/job job-7022: waiting on Liskov/u);
+    assert.doesNotMatch(text, /deploy-reserve:launch-proposal/u);
+  });
+
+  it("truncates an id no one can read, and keeps it exact in --json", async () => {
+    const text = await render({
+      lineageKey: longReserve,
+      category: "financial",
+      remediationClass: "automatic_financial_closeout",
+      owner: "liskov",
+      actionable: false,
+      factCount: 1,
+      facts: [{ category: "financial", code: "deploy_spend_reserved", evidenceAuthority: "slipway_deploy_spend_reservations", resourceKind: "deploy_spend_reservation", resourceId: longReserve, remediationClass: "automatic_financial_closeout" }]
+    });
+    // Head and tail both survive: the head says what kind of thing it is, the
+    // tail is what distinguishes one reservation from another.
+    assert.match(text, /deploy_spend_reservation deploy-reserve:launch-proposal:.+….*8feb3bbe29df/u);
+    assert.doesNotMatch(text, /"name":"Acurast"/u);
+    assert.ok(text.split("\n").every((line) => line.length < 200), "no line is an unreadable wall");
+  });
+
+  it("says when one obligation spans several resources", async () => {
+    const text = await render({
+      lineageKey: "reserve-1",
+      category: "financial",
+      remediationClass: "automatic_financial_closeout",
+      owner: "liskov",
+      actionable: false,
+      factCount: 3,
+      facts: [
+        { category: "financial", code: "deploy_spend_reserved", evidenceAuthority: "a", resourceKind: "deploy_spend_reservation", resourceId: "reserve-1", remediationClass: "automatic_financial_closeout" },
+        { category: "financial", code: "billing_transaction_not_released", evidenceAuthority: "b", resourceKind: "billing_transaction", resourceId: "reserve-1", remediationClass: "automatic_financial_closeout" },
+        { category: "financial", code: "job_financial_closeout_incomplete", evidenceAuthority: "c", resourceKind: "job", resourceId: "job-9", remediationClass: "automatic_financial_closeout" }
+      ]
+    });
+    assert.match(text, /deploy_spend_reservation reserve-1 \(\+1 more resource\)/u);
+    assert.match(text, /3 facts/u);
   });
 });
