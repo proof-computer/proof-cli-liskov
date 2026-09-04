@@ -7,6 +7,9 @@ import test from "node:test";
 
 import LiskovSsh from "../src/commands/liskov/ssh.js";
 import {
+  connectionRefusalAdvice,
+  runRuntimeSshAttachmentList,
+  runRuntimeSshAttachmentRevoke,
   runRuntimeSshConnection,
   runRuntimeSshIntegrationCreate,
   runRuntimeSshOperatorKeyAdd,
@@ -1377,4 +1380,146 @@ test("operator-key remove requires a key id", async () => {
     assert.equal(code, 1);
     assert.match(output.join("\n"), /RUNTIME_SSH_OPERATOR_KEY_ID_REQUIRED/u);
   });
+});
+
+// BKLG-20260903-suie. Before this the CLI could not name an attachment at all,
+// so `revoke` had nothing to point at.
+test("attachment list renders one row per attachment and reports truncation", async () => {
+  await withSession(async (sessionFile) => {
+    const requested: string[] = [];
+    const listing = async (json: boolean, sink: string[], includeTerminal: boolean) =>
+      runRuntimeSshAttachmentList(
+        { organizationId: "organization-one", includeTerminal, json, config: sessionFile },
+        {
+          stdout: (line) => sink.push(line),
+          stderr: (line) => sink.push(line),
+          fetchImpl: async (url, init) => {
+            if (String(url).endsWith("/api/organizations")) return Response.json(organizationListBody);
+            assert.equal(init?.method, "GET");
+            requested.push(String(url));
+            return Response.json({
+              ok: true,
+              attachments: [{
+                attachmentId: "att_1a2b3c",
+                applicationName: "diagnostic",
+                deploymentId: "158841",
+                jobId: "job-provider-wire",
+                provider: "liskov",
+                readiness: "ready",
+                failureCode: null,
+                hostFingerprint: "SHA256:host",
+                createdAtMs: 1_000
+              }],
+              truncated: true
+            });
+          }
+        }
+      );
+
+    const human: string[] = [];
+    assert.equal(await listing(false, human, false), 0);
+    assert.equal(requested.at(-1), "https://liskov.test/api/organizations/org_1/runtime-ssh/attachments");
+    assert.match(human.join("\n"), /att_1a2b3c\tready\tliskov\tdiagnostic\tjob-provider-wire\t-/u);
+    // Truncation is stated rather than left to look like the whole list.
+    assert.match(human.join("\n"), /truncated/u);
+
+    const machine: string[] = [];
+    assert.equal(await listing(true, machine, true), 0);
+    assert.equal(requested.at(-1), "https://liskov.test/api/organizations/org_1/runtime-ssh/attachments?includeTerminal=true");
+    assert.equal(JSON.parse(machine.join("\n")).attachments[0].attachmentId, "att_1a2b3c");
+    assert.doesNotMatch(machine.join("\n"), new RegExp(token));
+  });
+});
+
+test("attachment revoke reports the effect and the boundary on both output paths", async () => {
+  await withSession(async (sessionFile) => {
+    const note = "Access to this attachment is revoked for everyone on it: no new connection request, ticket, or connector registration will be granted, and its unused tickets are revoked. A session already open drains, bounded by the gateway's two-hour maximum session duration and its 60-second heartbeat timeout. The customer's job is not affected and keeps running.";
+    const revoke = async (json: boolean, sink: string[], newlyRevoked: boolean) =>
+      runRuntimeSshAttachmentRevoke(
+        { organizationId: "organization-one", attachmentId: "att_1a2b3c", json, config: sessionFile },
+        {
+          stdout: (line) => sink.push(line),
+          stderr: (line) => sink.push(line),
+          fetchImpl: async (url, init) => {
+            if (String(url).endsWith("/api/organizations")) return Response.json(organizationListBody);
+            assert.equal(init?.method, "POST");
+            assert.equal(String(url), "https://liskov.test/api/organizations/org_1/runtime-ssh/attachments/att_1a2b3c/revoke");
+            return Response.json({ ok: true, revokedTicketCount: 2, newlyRevoked, note });
+          }
+        }
+      );
+
+    const human: string[] = [];
+    assert.equal(await revoke(false, human, true), 0);
+    assert.match(human.join("\n"), /Access revoked for attachment att_1a2b3c\./u);
+    // The effect, not a claim about it.
+    assert.match(human.join("\n"), /Unused tickets revoked: 2\./u);
+    // And the boundary that remains: an open session is not cut, and the job
+    // is not ended — which is the entire point of having this command.
+    assert.match(human.join("\n"), /already open drains/u);
+    assert.match(human.join("\n"), /keeps running/u);
+
+    // Idempotent: a retried offboarding script must not have to tell "I did
+    // it" from "it was already done".
+    const repeat: string[] = [];
+    assert.equal(await revoke(false, repeat, false), 0);
+    assert.match(repeat.join("\n"), /Already revoked: att_1a2b3c/u);
+
+    const machine: string[] = [];
+    assert.equal(await revoke(true, machine, true), 0);
+    assert.equal(JSON.parse(machine.join("\n")).note, note);
+    assert.equal(JSON.parse(machine.join("\n")).revokedTicketCount, 2);
+    assert.doesNotMatch(machine.join("\n"), new RegExp(token));
+  });
+});
+
+test("attachment revoke refuses locally without an attachment id", async () => {
+  await withSession(async (sessionFile) => {
+    const output: string[] = [];
+    const code = await runRuntimeSshAttachmentRevoke(
+      { organizationId: "organization-one", config: sessionFile },
+      {
+        stdout: (line) => output.push(line),
+        stderr: (line) => output.push(line),
+        // A missing id is a local mistake; it must not cost a round trip.
+        fetchImpl: async () => {
+          throw new Error("no request should be made");
+        }
+      }
+    );
+    assert.equal(code, 1);
+    assert.match(output.join("\n"), /RUNTIME_SSH_ATTACHMENT_ID_REQUIRED/u);
+  });
+});
+
+// The acceptance this closes: the refusal a customer meets next must name the
+// revocation. The server has always sent `failureCode`; nothing read it, so a
+// deliberate revocation and a runtime that never reported its host key gave the
+// same answer.
+test("a connection refused by a revoked attachment names the revocation, not 'not ready'", async () => {
+  await withSession(async (sessionFile) => {
+    const output: string[] = [];
+    const code = await runRuntimeSshConnection(
+      { applicationRef: "diagnostic", jobId: "158841", printCommand: true, config: sessionFile },
+      {
+        stdout: (line) => output.push(line),
+        stderr: (line) => output.push(line),
+        fetchImpl: async () => Response.json(
+          { ok: false, error: "runtime_ssh_attachment_not_ready", failureCode: "operator_revoked" },
+          { status: 409 }
+        )
+      }
+    );
+    assert.equal(code, 1);
+    const rendered = output.join("\n");
+    assert.match(rendered, /revoked by an operator in your organization/u);
+    assert.match(rendered, /retrying will not help/u);
+    assert.doesNotMatch(rendered, new RegExp(token));
+  });
+});
+
+test("connectionRefusalAdvice is silent on codes it has nothing to add to", () => {
+  assert.equal(connectionRefusalAdvice("runtime_ssh_attachment_not_ready", undefined), "");
+  assert.equal(connectionRefusalAdvice("runtime_ssh_request_invalid", "something_new"), "");
+  assert.match(connectionRefusalAdvice("runtime_ssh_attachment_not_ready", "job_terminal"), /has ended/u);
 });
