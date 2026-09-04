@@ -53,6 +53,11 @@ proof liskov runtime-ssh integration disable org-123 int_123
 proof liskov runtime-ssh operator-key list org-123
 proof liskov runtime-ssh operator-key add org-123 --name patrick-mbp --identity ~/.ssh/id_ed25519
 proof liskov runtime-ssh operator-key remove org-123 key_123
+proof liskov runtime-ssh withdrawn-key list org-123
+proof liskov runtime-ssh withdrawn-key add org-123 --fingerprint SHA256:... --reason "left the team"
+proof liskov runtime-ssh withdrawn-key remove org-123 rsw_123
+proof liskov runtime-ssh attachment list org-123 --include-terminal
+proof liskov runtime-ssh attachment revoke org-123 att_123
 proof liskov ssh proof-docs --print-command
 proof liskov ssh proof-docs --deployment dep-123 --job job-123
 proof liskov ssh proof-docs --job 155468

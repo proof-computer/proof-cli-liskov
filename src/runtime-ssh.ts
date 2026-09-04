@@ -81,6 +81,17 @@ export interface RuntimeSshWithdrawnKeyRemoveInput extends RuntimeSshOperatorKey
   withdrawalId?: string;
 }
 
+export interface RuntimeSshAttachmentInput extends RuntimeSshCommandInput {
+  organizationId?: string;
+  /** Include attachments that have already stopped, as the console does. */
+  includeTerminal?: boolean;
+}
+
+export interface RuntimeSshAttachmentRevokeInput extends RuntimeSshCommandInput {
+  organizationId?: string;
+  attachmentId?: string;
+}
+
 export interface RuntimeSshConnectionInput extends RuntimeSshCommandInput {
   acceptHostKey?: boolean;
   applicationRef: string;
@@ -167,6 +178,35 @@ interface WithdrawnKeyResponse {
   note?: string;
 }
 
+/** One attachment row as the organization-wide listing serves it. */
+interface RuntimeSshAttachmentSummary {
+  attachmentId: string;
+  applicationName?: string | null;
+  deploymentId?: string;
+  jobId?: string;
+  provider?: string;
+  readiness?: string;
+  failureCode?: string | null;
+  hostFingerprint?: string | null;
+  createdAtMs?: number;
+}
+
+interface AttachmentListResponse {
+  ok?: boolean;
+  error?: string;
+  attachments?: RuntimeSshAttachmentSummary[];
+  truncated?: boolean;
+}
+
+interface AttachmentRevokeResponse {
+  ok?: boolean;
+  error?: string;
+  attachment?: RuntimeSshAttachmentSummary;
+  revokedTicketCount?: number;
+  newlyRevoked?: boolean;
+  note?: string;
+}
+
 interface TailscaleConnection {
   provider: "tailscale";
   attachmentId: string;
@@ -208,6 +248,12 @@ type RuntimeSshConnection = TailscaleConnection | ManagedConnection;
 interface ConnectionResponse {
   ok?: boolean;
   error?: string;
+  /**
+   * Why the newest matching attachment is not usable. The server has always
+   * sent it beside a 409; until `BKLG-20260903-suie` nothing here read it, so
+   * every refusal rendered as a bare "not ready".
+   */
+  failureCode?: string;
   candidates?: Array<{ attachmentId: string; deploymentId: string; jobId: string }>;
   connection?: RuntimeSshConnection;
 }
@@ -415,6 +461,120 @@ export async function runRuntimeSshOperatorKeyRemove(
   return 0;
 }
 
+/// One sentence per connection refusal an operator can act on.
+///
+/// The server has always reported *why* the newest matching attachment is
+/// unusable, as `failureCode` beside the 409. Nothing read it, so a revoked
+/// attachment and a runtime that never reported its host key produced the same
+/// sentence — "not ready" — and the operator could not tell a deliberate
+/// revocation from a stall. Keyed on `failureCode` first, because that is the
+/// specific fact, and on the error code second.
+export function connectionRefusalAdvice(error: string | undefined, failureCode: string | undefined): string {
+  switch (failureCode) {
+    case "operator_revoked":
+      return ": access to this attachment was revoked by an operator in your organization. This is deliberate and retrying will not help; a new attachment is created when a new job launches.";
+    case "schedule_ended":
+    case "job_terminal":
+      return ": the job this attachment belonged to has ended, so its access ended with it. Launch a new job.";
+    case "entitlement_lost":
+      return ": the organization's plan no longer includes managed Runtime SSH, so its attachments were torn down.";
+    case "connector_unreachable":
+    case "connector_refused":
+      return ": the runtime never established its relay connection for this job. If its access sidecar failed, that is terminal for this run; launch a new job.";
+    default:
+      break;
+  }
+  return error === "runtime_ssh_plan_required"
+    ? ": this organization's plan does not include managed Runtime SSH. Do not retry the same request."
+    : "";
+}
+
+function formatAttachment(entry: RuntimeSshAttachmentSummary): string {
+  return [
+    entry.attachmentId,
+    entry.readiness ?? "-",
+    entry.provider ?? "-",
+    entry.applicationName ?? "-",
+    entry.jobId ?? "-",
+    entry.failureCode ?? "-"
+  ].join("\t");
+}
+
+/// The organization's attachments, newest first.
+///
+/// The endpoint has existed since the console's settings page shipped; the CLI
+/// has never called it, which is why `revoke` below had nothing to name
+/// (`BKLG-20260903-suie`).
+export async function runRuntimeSshAttachmentList(
+  input: RuntimeSshAttachmentInput,
+  options: RuntimeSshCliOptions = {}
+): Promise<number> {
+  const organization = await resolveRuntimeSshOrganization(input, options);
+  if (!organization.ok) return organization.exitCode;
+  const path = input.includeTerminal
+    ? `${attachmentCollectionPath(organization.organizationId)}?includeTerminal=true`
+    : attachmentCollectionPath(organization.organizationId);
+  const response = await runtimeSshRequest<AttachmentListResponse>(input, options, {
+    method: "GET",
+    path,
+    organizationSelector: null
+  });
+  if (!response.ok) return response.exitCode;
+  if (!response.response.ok || response.body?.ok !== true || !Array.isArray(response.body.attachments)) {
+    return apiFailure(input.json, options, response.response.status, response.body?.error);
+  }
+  const rows = response.body.attachments.map(formatAttachment);
+  if (response.body.truncated) {
+    rows.push("(truncated: this organization has more attachments than one page.)");
+  }
+  writeOutput(input.json, options, response.body, rows.length === 0
+    ? "No Runtime SSH attachments. One is created when a job launches with SSH access enabled."
+    : rows.join("\n"));
+  return 0;
+}
+
+/// Cut access to one exact attachment, deliberately.
+///
+/// Blast radius is the whole attachment and everyone on it, which is what makes
+/// this different from `withdrawn-key add`: that denies one person across the
+/// organization, this ends one job's access for all of them. The customer's job
+/// is not touched either way.
+export async function runRuntimeSshAttachmentRevoke(
+  input: RuntimeSshAttachmentRevokeInput,
+  options: RuntimeSshCliOptions = {}
+): Promise<number> {
+  const attachmentId = input.attachmentId?.trim();
+  if (!attachmentId) {
+    return localFailure(
+      input.json,
+      options,
+      "RUNTIME_SSH_ATTACHMENT_ID_REQUIRED",
+      "Revoking needs the attachment id from `proof liskov runtime-ssh attachment list` or `proof liskov ssh --print-command --json`."
+    );
+  }
+  const organization = await resolveRuntimeSshOrganization(input, options);
+  if (!organization.ok) return organization.exitCode;
+  const response = await runtimeSshRequest<AttachmentRevokeResponse>(input, options, {
+    method: "POST",
+    path: attachmentRevokePath(organization.organizationId, attachmentId),
+    organizationSelector: null
+  });
+  if (!response.ok) return response.exitCode;
+  if (!response.response.ok || response.body?.ok !== true) {
+    return apiFailure(input.json, options, response.response.status, response.body?.error);
+  }
+  const revoked = response.body.revokedTicketCount ?? 0;
+  writeOutput(input.json, options, response.body, [
+    response.body.newlyRevoked === false
+      ? `Already revoked: ${attachmentId}`
+      : `Access revoked for attachment ${attachmentId}.`,
+    `Unused tickets revoked: ${revoked}.`,
+    response.body.note
+      ?? "No new connection request, ticket or connector registration will be granted. A session already open drains. The job itself keeps running."
+  ].join("\n"));
+  return 0;
+}
+
 function formatWithdrawnKey(entry: RuntimeSshWithdrawnKey): string {
   return [
     entry.withdrawalId,
@@ -552,7 +712,7 @@ export async function runRuntimeSshConnection(
   if (!response.response.ok || response.body?.ok !== true || !connection) {
     const hint = response.body?.error === "runtime_ssh_attachment_ambiguous"
       ? ambiguousAttachmentHint(response.body)
-      : "";
+      : connectionRefusalAdvice(response.body?.error, response.body?.failureCode);
     return apiFailure(input.json, options, response.response.status, response.body?.error, hint, response.body);
   }
   if (!validConnection(connection)) {
@@ -1378,6 +1538,14 @@ function withdrawnKeyCollectionPath(organizationId: string): string {
 
 function withdrawnKeyPath(organizationId: string, withdrawalId: string): string {
   return `${withdrawnKeyCollectionPath(organizationId)}/${encodeURIComponent(withdrawalId)}`;
+}
+
+function attachmentCollectionPath(organizationId: string): string {
+  return `/api/organizations/${encodeURIComponent(organizationId)}/runtime-ssh/attachments`;
+}
+
+function attachmentRevokePath(organizationId: string, attachmentId: string): string {
+  return `${attachmentCollectionPath(organizationId)}/${encodeURIComponent(attachmentId)}/revoke`;
 }
 
 function integrationCollectionPath(organizationId: string): string {
