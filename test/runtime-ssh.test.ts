@@ -956,6 +956,54 @@ test("V5 managed ssh mint 409 never spawns ssh or leaks the ticket", async () =>
   }
 });
 
+test("managed ssh credit refusal points to Billing and preserves typed JSON", async () => {
+  for (const json of [false, true]) {
+    await withSession(async (sessionFile) => {
+      const { identity, identityKey, hostKey } = await prepareV5Identity(sessionFile);
+      const output: string[] = [];
+      let spawned = 0;
+      const refusal = {
+        ok: false,
+        error: "runtime_ssh_service_credit_required",
+        message: "The shared byte allowance is exhausted and available Service Credit is at or below zero.",
+        byteAllowance: { includedBytes: 1_000_000_000, usedBytes: 1_000_000_001 },
+        availableServiceCreditMicros: 0,
+        billingPage: "/billing"
+      };
+      const code = await runRuntimeSshConnection({
+        acceptHostKey: true,
+        applicationRef: "app",
+        config: sessionFile,
+        identity,
+        json
+      }, {
+        fetchImpl: async (url) => {
+          if (String(url).endsWith("/connection-requests")) {
+            return Response.json({ ok: true, connection: v5ManagedConnection(identityKey, hostKey) });
+          }
+          return Response.json(refusal, { status: 402 });
+        },
+        runProcess: async () => {
+          spawned += 1;
+          throw new Error("no subprocess expected");
+        },
+        stdout: (line) => output.push(line),
+        stderr: (line) => output.push(line)
+      });
+      assert.equal(code, 1);
+      assert.equal(spawned, 0);
+      const text = output.join("\n");
+      if (json) {
+        assert.deepEqual(JSON.parse(output.at(-1) ?? ""), refusal);
+      } else {
+        assert.match(text, /runtime_ssh_service_credit_required/u);
+        assert.match(text, /shared byte allowance is exhausted/u);
+        assert.match(text, /Open Billing & funding/u);
+      }
+    });
+  }
+});
+
 test("V5 managed ssh rejects provider liskov_managed as an invented connection-request word", async () => {
   await withSession(async (sessionFile) => {
     const { identity, identityKey, hostKey } = await prepareV5Identity(sessionFile);
