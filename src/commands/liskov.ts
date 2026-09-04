@@ -34,7 +34,7 @@ COMMANDS
   organization service-credits ORG_ID
   organization billing transactions ORG_ID [--limit N] [--before MS]
   application import --github owner/repo:path@ref [--server-fetch]
-  application list
+  application list [--retired] [--json]
   application manifest validate --file PATH [--json]
   application policy publish APP_REF --file PATH --artifact-digest SHA256 --binding-revision N --revocation-epoch N --source-ref REF --source-commit SHA --workflow-identity ID --expected-pointer-version N --yes
   application source-binding set APP_REF --repository OWNER/REPO --allowed-ref REF [--allowed-ref …] --workflow-identity IDENTITY --manifest-path PATH [--expected-revision N] [--reason TEXT] --yes
@@ -43,7 +43,10 @@ COMMANDS
   application publish APP_REF [--artifact-version ID] [--dry-run] [--paused --reason TEXT] [--yes]
   application pause APP_REF --yes
   application resume APP_REF --yes
+  application retire APP_REF [--reason TEXT] [--yes] [--json]
+  application retire cancel APP_REF [--reason TEXT] --yes [--json]
   application retirement-census [--limit N] [--cursor CURSOR] [--lifecycle STATE] [--remediation-class CLASS] [--all] [--json]
+  application delete APP_REF --reason TEXT --yes   (deprecated clean-only bridge; use application retire)
   application status APPLICATION_ID
   application execution show APPLICATION_ID [--json] [--watch] [--poll-ms N] [--timeout-seconds N] [--until-terminal]
   application plans APPLICATION_ID

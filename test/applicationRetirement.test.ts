@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 
 import {
   runSlipwayApplicationDelete,
+  runSlipwayApplicationList,
   runSlipwayApplicationRetirement,
   runSlipwayApplicationRetirementCancel,
   saveSlipwaySession
@@ -256,7 +257,7 @@ describe("application retirement CLI", () => {
     );
   });
 
-  it("posts cancellation and preserves a completion-race receipt in canonical JSON", async () => {
+  it("treats a completion race as the success it is, in JSON and for people", async () => {
     const session = await sessionFile();
     const response = {
       ok: false,
@@ -286,9 +287,29 @@ describe("application retirement CLI", () => {
       stdout: out.write
     });
 
-    assert.equal(code, 1);
+    // The cancellation lost the race, but the caller got the outcome it wanted:
+    // the retirement is complete and the body carries the immutable receipt
+    // (ADR-0038 §3). Exiting 1 made a successful retirement look like a failure
+    // to every script that checks the status (BKLG-20260902-e7l1). The
+    // canonical envelope is still echoed byte-for-byte; only the status moved.
+    assert.equal(code, 0);
     assert.deepEqual(JSON.parse(out.text), response);
     assert.equal(out.text.includes(session.token), false);
+
+    const human = writer();
+    const humanCode = await runSlipwayApplicationRetirementCancel({
+      applicationRef: "alpha",
+      config: session.file,
+      yes: true
+    }, {
+      fetchImpl: async () => jsonResponse(response, 409),
+      stdout: human.write
+    });
+    assert.equal(humanCode, 0);
+    assert.match(human.text, /Retirement completed before the cancellation was applied/u);
+    assert.match(human.text, /Safe application retirement receipt: abc123\./u);
+    assert.doesNotMatch(human.text, /^Error \(/mu);
+    assert.equal(human.text.includes(session.token), false);
   });
 
   it("renders phases, typed blockers, schedule estimates, and receipt kinds for people", async () => {
@@ -357,5 +378,133 @@ describe("application retirement CLI", () => {
     assert.equal(receiptCode, 0);
     assert.match(receipt.text, /Legacy immediate tombstone receipt: legacy123/u);
     assert.match(receipt.text, /Legacy post-deletion cleanup remains open/u);
+  });
+});
+
+describe("the lifecycle every surface shares", () => {
+  /** The same canonical progress payload the Console's component test renders,
+   *  so a phase, an owner and a digest cannot mean two things across clients. */
+  const progress = async () => JSON.parse(await readFile(
+    new URL("./fixtures/retirement_progress.json", import.meta.url), "utf8"
+  ));
+
+  it("prints Current, Retiring and Retired, never the persisted word", async () => {
+    const session = await sessionFile();
+    const out = writer();
+    assert.equal(await runSlipwayApplicationList({ config: session.file }, {
+      fetchImpl: async () => jsonResponse({
+        ok: true,
+        count: 3,
+        applications: [
+          { applicationId: "live", status: "active", lifecycleState: "active" },
+          { applicationId: "going", status: "paused", lifecycleState: "retiring" },
+          { applicationId: "gone", status: "deleted", lifecycleState: "deleted", receiptKind: "safe_retirement" }
+        ]
+      }),
+      stdout: out.write
+    }), 0);
+    assert.match(out.text, /- live: Current \(status active\)/u);
+    assert.match(out.text, /- going: Retiring \(status paused\)/u);
+    assert.match(out.text, /- gone: Retired \(status deleted, safe-retirement receipt\)/u);
+    // `deleted` survives only as the stored status beside the lifecycle, never
+    // as the row's own word.
+    assert.doesNotMatch(out.text, /: deleted \(/u);
+  });
+
+  it("falls back to the stored status only when the server did not say", async () => {
+    // A server older than BKLG-20260902-e7l1 sends no `lifecycleState`; the row
+    // must still read truthfully rather than printing `deleted` at a customer.
+    const session = await sessionFile();
+    const out = writer();
+    assert.equal(await runSlipwayApplicationList({ config: session.file }, {
+      fetchImpl: async () => jsonResponse({
+        ok: true,
+        count: 2,
+        applications: [
+          { applicationId: "old-live", status: "active" },
+          { applicationId: "old-gone", status: "deleted", deletedAtMs: 5 }
+        ]
+      }),
+      stdout: out.write
+    }), 0);
+    assert.match(out.text, /- old-live: Current/u);
+    assert.match(out.text, /- old-gone: Retired/u);
+  });
+
+  it("selects the retired view on the lifecycle the server states", async () => {
+    const session = await sessionFile();
+    const out = writer();
+    let requested = "";
+    assert.equal(await runSlipwayApplicationList({ config: session.file, deleted: true, json: true }, {
+      fetchImpl: async (url) => {
+        requested = String(url);
+        return jsonResponse({
+          ok: true,
+          count: 3,
+          applications: [
+            { applicationId: "live", status: "active", lifecycleState: "active" },
+            { applicationId: "going", status: "paused", lifecycleState: "retiring" },
+            { applicationId: "gone", status: "deleted", lifecycleState: "deleted" }
+          ]
+        });
+      },
+      stdout: out.write
+    }), 0);
+    assert.match(requested, /\?includeDeleted=true$/u);
+    const body = JSON.parse(out.text);
+    // A retiring application has not been retired: it must not appear here.
+    assert.deepEqual(body.applications.map((row: { applicationId: string }) => row.applicationId), ["gone"]);
+    assert.equal(body.count, 1);
+  });
+
+  it("names the owner of every obligation, and never invents one", async () => {
+    const session = await sessionFile();
+    const fixture = await progress();
+    const out = writer();
+    assert.equal(await runSlipwayApplicationRetirement({
+      applicationRef: "alpha",
+      config: session.file
+    }, {
+      fetchImpl: async () => jsonResponse(fixture),
+      stdout: out.write
+    }), 0);
+
+    // Three raw facts, two obligations: the reserve and its unreleased billing
+    // parent are one thing to resolve.
+    assert.equal(fixture.retirement.assessment.blockers.length, 3);
+    assert.match(out.text, /2 correlated obligation\(s\):/u);
+    assert.match(out.text, /execution\/job-fixture-1: waiting on the Acurast chain; no action from you; wait_for_chain_evidence\./u);
+    assert.match(out.text, /financial\/reserve-fixture-1: waiting on Liskov; no action from you; automatic_financial_closeout, 2 facts\./u);
+    assert.match(out.text, /Assessment unchanged for 120 minute\(s\)\./u);
+    assert.equal(out.text.includes(session.token), false);
+  });
+
+  it("reports a blocker with no remediation class as unclassified, not as review", async () => {
+    // "Review" names an owner the server did not name. An absent class is
+    // unknown, and saying so is the whole point of this packet.
+    const session = await sessionFile();
+    const out = writer();
+    assert.equal(await runSlipwayApplicationRetirement({
+      applicationRef: "alpha",
+      config: session.file
+    }, {
+      fetchImpl: async () => jsonResponse({
+        ok: true,
+        preview: {
+          assessment: {
+            phase: "blocked",
+            executionBlockerCount: 1,
+            financialBlockerCount: 0,
+            ambiguityBlockerCount: 0,
+            blockers: [{ category: "execution", code: "mystery", resourceKind: "job", resourceId: "job-9" }]
+          }
+        },
+        creationAvailability: { available: true },
+        capabilities: { create: true }
+      }),
+      stdout: out.write
+    }), 0);
+    assert.match(out.text, /remediation unclassified\./u);
+    assert.doesNotMatch(out.text, /remediation review\./u);
   });
 });
