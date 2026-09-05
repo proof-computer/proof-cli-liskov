@@ -266,3 +266,17 @@ To smoke the plugin through the root CLI:
 ```sh
 pnpm run smoke:proof-plugin
 ```
+
+### Publish a registered policy while paused
+
+`application policy publish` supports `--paused --reason TEXT` for required
+secret setup. Use `--dry-run` to preview the exact artifact/source binding and
+active-pointer fence without committing. Replace `--dry-run` with `--yes` to
+publish and pause in one transaction, configure the declared secrets, then use
+`application resume --reason TEXT --yes` when execution is intended. Publication
+of a `once` policy normally starts a spend event; the paused form holds planning.
+
+`--dry-run` and `--yes` are mutually exclusive. A pause reason must contain
+1–500 characters after trimming. A stale `--expected-pointer-version` refuses;
+read the new pointer and review again before confirming. These options require
+a server supporting registered publication previews and atomic setup holds.

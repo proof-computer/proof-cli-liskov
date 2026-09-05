@@ -166,6 +166,12 @@ for (const command of unscopedCommands) {
   }
 }
 
+
+const publication = oclifManifest.commands["liskov:application:policy:publish"];
+if (!publication?.flags?.["dry-run"] || !publication.flags.paused || !publication.flags.reason || publication.flags.yes.required) {
+  errors.push("Registered publication must package preview and paused-setup flags without requiring --yes for preview");
+}
+
 if (errors.length > 0) {
   throw new Error(errors.join("\n"));
 }

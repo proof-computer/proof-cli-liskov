@@ -2911,6 +2911,58 @@ describe("proof-cli Liskov runner", () => {
     ].join("\n"));
   });
 
+  it("previews a paused registered publication and sends the hold only with valid flags", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-liskov-paused-publish-"));
+    const config = path.join(dir, "session.json");
+    const file = path.join(dir, "manifest.json");
+    await writeFile(file, JSON.stringify(retainedV5SourceManifest("alpha")), "utf8");
+    const token = "private-publication-token";
+    await saveSlipwaySession({ version: 1, slipwayUrl: "https://slipway.test", sessionToken: token, savedAtMs: 0 }, { config });
+    const base = {
+      applicationRef: "alpha", config, file, artifactDigest: `sha256:${"a".repeat(64)}`,
+      bindingRevision: 1, revocationEpoch: 0, expectedPointerVersion: 0,
+      sourceCommit: "b".repeat(40), sourceRef: "refs/heads/main",
+      workflowIdentity: "proof-computer/alpha/.github/workflows/release.yml@refs/heads/main"
+    };
+    for (const dryRun of [true, false]) {
+      const out = writer();
+      let calls = 0;
+      const code = await runSlipwayApplicationPolicyPublish({
+        ...base, dryRun, yes: !dryRun, paused: true, reason: " configure code key "
+      }, {
+        stdout: out.write,
+        fetchImpl: async (_url, init) => {
+          calls += 1;
+          const body = JSON.parse(String(init?.body));
+          assert.equal(body.postPublishStatus, "paused");
+          assert.equal(body.reason, "configure code key");
+          assert.equal(body.dryRun, dryRun ? true : undefined);
+          assert.equal(body.expectedActivePointerVersion, 0);
+          return jsonResponse({ ok: true, ...(dryRun ? { dryRun: true } : {}), policyVersion: { policyVersionId: "alpha-v1" } });
+        }
+      });
+      assert.equal(code, 0);
+      assert.equal(calls, 1);
+      assert.match(out.text, dryRun ? /Previewed alpha-v1/u : /Published alpha-v1/u);
+      assert.equal(out.text.includes(token), false);
+    }
+    for (const flags of [
+      { dryRun: true, yes: true },
+      { dryRun: true, paused: true },
+      { dryRun: true, paused: true, reason: "  " },
+      { dryRun: true, paused: true, reason: "x".repeat(501) },
+      { dryRun: true, reason: "unpaired" }
+    ]) {
+      const out = writer();
+      const code = await runSlipwayApplicationPolicyPublish({ ...base, ...flags, json: true }, {
+        stdout: out.write,
+        fetchImpl: async () => { throw new Error("invalid flags must not reach the server"); }
+      });
+      assert.equal(code, 1);
+      assert.equal(JSON.parse(out.text).error, "SLIPWAY_APPLICATION_POLICY_PUBLISH_INVALID");
+    }
+  });
+
   it("refuses registered V5 publication without confirmation or with an invalid document before network I/O", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-liskov-v5-publish-refusal-"));
     const invalidManifestPath = path.join(dir, "invalid.json");

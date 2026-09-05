@@ -214,6 +214,9 @@ export interface SlipwayApplicationPolicyPublishInput {
   slipwayUrl?: string;
   config?: string;
   json?: boolean;
+  dryRun?: boolean;
+  paused?: boolean;
+  reason?: string;
 }
 
 export interface SlipwayApplicationSourceBindingSetInput {
@@ -2845,7 +2848,7 @@ export async function runSlipwayApplicationPolicyPublish(
   input: SlipwayApplicationPolicyPublishInput,
   options: SlipwayCliOptions = {}
 ): Promise<number> {
-  if (!input.yes) {
+  if (!input.yes && !input.dryRun) {
     return writeConfirmationRequired(
       options,
       input.json,
@@ -2945,7 +2948,9 @@ export async function runSlipwayApplicationPolicyPublish(
           artifactDigests: [input.artifactDigest]
         }
       },
-      expectedActivePointerVersion: input.expectedPointerVersion
+      expectedActivePointerVersion: input.expectedPointerVersion,
+      ...(input.dryRun ? { dryRun: true } : {}),
+      ...(input.paused ? { postPublishStatus: "paused", reason: input.reason!.trim() } : {})
     },
     errorCode: "SLIPWAY_APPLICATION_POLICY_PUBLISH_FAILED",
     fetchFailedMessage: "could not publish registered V5 policy",
@@ -2954,13 +2959,21 @@ export async function runSlipwayApplicationPolicyPublish(
       const version = stringValue(policy.policyVersionId) ?? "registered V5 policy";
       const pointer = numberValue(policy.activePointerVersion);
       const generation = numberValue(policy.handlerGeneration);
-      const summary = `Published ${version} for ${input.applicationRef}${pointer === undefined ? "" : ` at pointer ${pointer}`}${generation === undefined ? "" : ` under handler generation ${generation}`}.`;
-      return [summary, ...formatPolicyDiagnosticLines(policy.policyDiagnostics)].join("\n");
+      const summary = `${input.dryRun ? "Previewed" : "Published"} ${version} for ${input.applicationRef}${pointer === undefined ? "" : ` at pointer ${pointer}`}${generation === undefined ? "" : ` under handler generation ${generation}`}.`;
+      const setup = input.paused ? (input.dryRun
+        ? "The Application would remain paused; no publication was committed."
+        : "The Application is paused. Configure required secrets before resuming.") : undefined;
+      return [summary, ...(setup ? [setup] : []), ...formatPolicyDiagnosticLines(policy.policyDiagnostics)].join("\n");
     }
   }, options);
 }
 
 function registeredPolicyPublicationInputError(input: SlipwayApplicationPolicyPublishInput): string | undefined {
+  if (input.dryRun && input.yes) return "--dry-run and --yes are mutually exclusive.";
+  if (input.paused && (!input.reason?.trim() || [...input.reason.trim()].length > 500)) {
+    return "--paused requires --reason with 1 to 500 characters.";
+  }
+  if (!input.paused && input.reason !== undefined) return "--reason requires --paused.";
   if (!input.file.trim()) return "--file must not be empty.";
   if (!/^sha256:[0-9a-f]{64}$/u.test(input.artifactDigest)) {
     return "--artifact-digest must be sha256: followed by 64 lowercase hexadecimal characters.";

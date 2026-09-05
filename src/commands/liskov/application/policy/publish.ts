@@ -17,6 +17,9 @@ export default class LiskovApplicationPolicyPublish extends OrganizationScopedCo
     "binding-revision": Flags.integer({ description: "Source-binding revision carried by the attested build.", min: 0, required: true }),
     config: Flags.string({ description: "Path to the local Liskov session file." }),
     "expected-pointer-version": Flags.integer({ description: "Active pointer version observed before publication.", min: 0, required: true }),
+    "dry-run": Flags.boolean({ description: "Preview the registered publication without committing policy, pointer, or wakeup.", exclusive: ["yes"] }),
+    paused: Flags.boolean({ description: "Atomically leave the published Application paused for setup." }),
+    reason: Flags.string({ description: "Required reason for --paused (1 to 500 characters).", dependsOn: ["paused"] }),
     file: Flags.string({ char: "f", description: "Supported Application manifest JSON file.", required: true }),
     help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
@@ -25,7 +28,7 @@ export default class LiskovApplicationPolicyPublish extends OrganizationScopedCo
     "source-commit": Flags.string({ description: "Exact 40-character source commit attested by the build.", required: true }),
     "source-ref": Flags.string({ description: "Exact source ref attested by the build.", required: true }),
     "workflow-identity": Flags.string({ description: "Exact GitHub workflow identity attested by the build.", required: true }),
-    yes: Flags.boolean({ char: "y", description: "Confirm the registered policy publication mutation.", required: true })
+    yes: Flags.boolean({ char: "y", description: "Confirm the registered policy publication mutation.", exclusive: ["dry-run"] })
   };
   static summary = "Publish a registered source policy version.";
 
@@ -38,6 +41,9 @@ export default class LiskovApplicationPolicyPublish extends OrganizationScopedCo
       config: flags.config as string | undefined,
       expectedPointerVersion: flags["expected-pointer-version"] as number,
       file: flags.file as string,
+      dryRun: flags["dry-run"] as boolean | undefined,
+      paused: flags.paused as boolean | undefined,
+      reason: flags.reason as string | undefined,
       json: flags.json as boolean | undefined,
       revocationEpoch: flags["revocation-epoch"] as number,
       slipwayUrl: flags["slipway-url"] as string | undefined,
