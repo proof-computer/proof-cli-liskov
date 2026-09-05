@@ -70,6 +70,18 @@ describe("local application-manifest v4 tools", () => {
       error.code === "unknown_field" && error.pointer === "/release/cid"));
   });
 
+  it("refuses the compiled Acurast duration and max-start-delay bounds with exact pointers", () => {
+    const tooShort = manifest();
+    ((tooShort.deployment as Record<string, unknown>).schedule as Record<string, unknown>).durationMs = 30_000;
+    assert.ok(validateApplicationManifestV4(tooShort).some((error) =>
+      error.pointer === "/deployment/schedule/durationMs" && error.message.includes("60000")));
+
+    const tooWide = manifest();
+    ((tooWide.deployment as Record<string, unknown>).schedule as Record<string, unknown>).maxStartDelayMs = 7_200_000;
+    assert.ok(validateApplicationManifestV4(tooWide).some((error) =>
+      error.pointer === "/deployment/schedule/maxStartDelayMs" && error.message.includes("3600000")));
+  });
+
   it("rejects empty, malformed, unsafe, duplicate, and wrong-kind release evidence", () => {
     const input = manifest();
     const release = input.release as Record<string, unknown>;

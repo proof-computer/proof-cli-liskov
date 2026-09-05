@@ -3606,6 +3606,28 @@
       },
       "expectedCode": "invalid_manifest",
       "expectedPointer": "/runtime"
+    },
+    {
+      "name": "v4/duration-below-acurast-minimum",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 4, \"applicationId\": \"golden-fixture\", \"applicationUid\": \"app-00000000000000000000000000000001\", \"metadata\": {\"description\": \"canonical V4 golden fixture\"}, \"release\": {\"mode\": \"pinned\", \"artifact\": {\"kind\": \"ipfs_bundle\", \"cid\": \"ipfs://QmGoldenFixtureCidV4Contract0000000000000001\", \"digest\": \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"encryption\": {\"mode\": \"none\"}}}, \"runtime\": {\"command\": \"node index.js\"}, \"deployment\": {\"parallelism\": 1, \"schedule\": {\"durationMs\": 30000}, \"lifecycle\": {\"renewal\": {\"mode\": \"after_scheduled_end\"}, \"update\": {\"timing\": \"immediate\", \"existingJobs\": {\"mode\": \"run_until_scheduled_end\"}}, \"recovery\": {\"launch\": {\"maxRetries\": 0}, \"runtimeFailure\": {\"mode\": \"wait_until_scheduled_end\"}}}}, \"observability\": {\"logs\": {\"enabled\": true, \"sinkName\": \"golden-fixture\", \"context\": {\"component\": \"golden\"}}, \"runtimeDiagnostics\": {\"signed\": true}}}"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/schedule/durationMs"
+    },
+    {
+      "name": "v4/max-start-delay-above-acurast-maximum",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 4, \"applicationId\": \"golden-fixture\", \"applicationUid\": \"app-00000000000000000000000000000001\", \"metadata\": {\"description\": \"canonical V4 golden fixture\"}, \"release\": {\"mode\": \"pinned\", \"artifact\": {\"kind\": \"ipfs_bundle\", \"cid\": \"ipfs://QmGoldenFixtureCidV4Contract0000000000000001\", \"digest\": \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"encryption\": {\"mode\": \"none\"}}}, \"runtime\": {\"command\": \"node index.js\"}, \"deployment\": {\"parallelism\": 1, \"schedule\": {\"durationMs\": 1800000, \"maxStartDelayMs\": 7200000}, \"lifecycle\": {\"renewal\": {\"mode\": \"after_scheduled_end\"}, \"update\": {\"timing\": \"immediate\", \"existingJobs\": {\"mode\": \"run_until_scheduled_end\"}}, \"recovery\": {\"launch\": {\"maxRetries\": 0}, \"runtimeFailure\": {\"mode\": \"wait_until_scheduled_end\"}}}}, \"observability\": {\"logs\": {\"enabled\": true, \"sinkName\": \"golden-fixture\", \"context\": {\"component\": \"golden\"}}, \"runtimeDiagnostics\": {\"signed\": true}}}"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/schedule/maxStartDelayMs"
     }
   ],
   "unknown": {
