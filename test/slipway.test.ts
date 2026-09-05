@@ -4643,6 +4643,70 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.count, 1);
   });
 
+  it("refuses an out-of-bounds local manifest before sending an import request", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const policyFile = path.join(dir, "application-manifest.json");
+    const document = {
+      schema: "proof.liskov.application-manifest",
+      schemaVersion: 4,
+      applicationId: "alpha",
+      release: {
+        mode: "pinned",
+        artifact: {
+          kind: "ipfs_bundle",
+          cid: "ipfs://bafyalpha",
+          digest: `sha256:${"a".repeat(64)}`,
+          encryption: { mode: "none" }
+        }
+      },
+      runtime: {
+        bootstrap: {
+          trustProfile: "proof.liskov.attested-runtime.v1",
+          signedDiagnosticsRequired: true,
+          identityBoundSecretsRequired: true
+        }
+      },
+      deployment: {
+        parallelism: 1,
+        schedule: { durationMs: 30_000, maxStartDelayMs: 7_200_000 },
+        lifecycle: {
+          renewal: { mode: "after_scheduled_end" },
+          update: { timing: "immediate", existingJobs: { mode: "run_until_scheduled_end" } },
+          recovery: {
+            launch: { maxRetries: 0 },
+            runtimeFailure: { mode: "wait_until_scheduled_end" }
+          }
+        }
+      }
+    };
+    await writeFile(policyFile, `${JSON.stringify(document)}\n`, "utf8");
+    const requests: string[] = [];
+    const out = writer();
+    const code = await runSlipwayApplicationImport({
+      file: policyFile,
+      config: path.join(dir, "missing-session.json"),
+      json: true
+    }, {
+      fetchImpl: async (url) => {
+        requests.push(String(url));
+        return jsonResponse({ ok: true });
+      },
+      stdout: out.write
+    });
+
+    assert.equal(code, 1);
+    assert.deepEqual(requests, []);
+    const result = JSON.parse(out.text) as {
+      error: string;
+      errors: Array<{ pointer: string }>;
+    };
+    assert.equal(result.error, "SLIPWAY_APPLICATION_IMPORT_MANIFEST_INVALID");
+    assert.deepEqual(result.errors.map((error) => error.pointer), [
+      "/deployment/schedule/durationMs",
+      "/deployment/schedule/maxStartDelayMs"
+    ]);
+  });
+
   it("can client-fetch a public GitHub Application manifest before import", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");

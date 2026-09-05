@@ -4432,6 +4432,17 @@ export async function runSlipwayApplicationLockboxGrantVerify(input: SlipwayAppl
   }, options);
 }
 
+const ACURAST_REGISTRATION_BOUND_POINTERS = new Set([
+  "/deployment/schedule/durationMs",
+  "/deployment/schedule/startDelayMs",
+  "/deployment/schedule/maxStartDelayMs"
+]);
+
+function applicationImportRegistrationBoundErrors(document: unknown) {
+  return validateApplicationManifestV4(document).filter((diagnostic) =>
+    ACURAST_REGISTRATION_BOUND_POINTERS.has(diagnostic.pointer));
+}
+
 export async function runSlipwayApplicationImport(input: SlipwayApplicationImportInput, options: SlipwayCliOptions = {}): Promise<number> {
   if (!input.file && !input.github) {
     writeStructuredOrHuman(options, input.json, {
@@ -4504,6 +4515,19 @@ export async function runSlipwayApplicationImport(input: SlipwayApplicationImpor
         return 1;
       }
       body = { document, source };
+    }
+  }
+
+  if (body.document !== undefined) {
+    const errors = applicationImportRegistrationBoundErrors(body.document);
+    if (errors.length > 0) {
+      writeStructuredOrHuman(options, input.json, {
+        ok: false,
+        error: "SLIPWAY_APPLICATION_IMPORT_MANIFEST_INVALID",
+        message: "The Application manifest violates the current Acurast registration bounds.",
+        errors
+      }, `Error (SLIPWAY_APPLICATION_IMPORT_MANIFEST_INVALID): ${errors[0].message} at ${errors[0].pointer}`);
+      return 1;
     }
   }
 
