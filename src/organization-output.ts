@@ -89,7 +89,8 @@ function numericPart(value: number | undefined, label: string): string | undefin
     : undefined;
 }
 
-function usd(value: number): string {
+/** Shared USD rendering, so every money surface in the CLI reads the same. */
+export function usd(value: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",

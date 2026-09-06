@@ -29,6 +29,7 @@ import {
   runSlipwayApplicationDevtoolsViewKey,
   runSlipwayApplicationCreate,
   runSlipwayApplicationRename,
+  runSlipwayApplicationRun,
   runSlipwayApplicationRuntimeImageWorkflow,
   runSlipwayApplicationSetRepository,
   runSlipwayApplicationStatus,
@@ -5353,6 +5354,327 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.ok, true);
     assert.equal(parsed.timings.pollCount, 2);
   });
+
+  it("previews an Application run and then authorizes it, without printing the bearer token", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    try {
+      const token = "slipway_application_run_secret_token_do_not_print";
+      const sessionFile = await applicationRunSession(directory, token);
+      const requests: Array<{ url: string; method?: string; authorization?: string; body?: Record<string, unknown> }> = [];
+      const fetchImpl = async (url: URL | RequestInfo, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { confirm?: boolean };
+        requests.push({
+          url: String(url),
+          method: init?.method,
+          authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+          body
+        });
+        return jsonResponse(applicationRunResponse({
+          authorized: body.confirm === true,
+          dryRun: body.confirm !== true
+        }));
+      };
+
+      const preview = writer();
+      const previewCode = await runSlipwayApplicationRun({
+        applicationRef: "proof-docs",
+        config: sessionFile
+      }, { fetchImpl, stdout: preview.write });
+      const confirm = writer();
+      const confirmCode = await runSlipwayApplicationRun({
+        applicationRef: "proof-docs",
+        reason: "rerun after data fix",
+        yes: true,
+        config: sessionFile
+      }, { fetchImpl, stdout: confirm.write });
+
+      assert.equal(previewCode, 0);
+      assert.equal(confirmCode, 0);
+      assert.deepEqual(requests, [{
+        url: "https://slipway.test/api/applications/proof-docs/run",
+        method: "POST",
+        authorization: `Bearer ${token}`,
+        body: { confirm: false }
+      }, {
+        url: "https://slipway.test/api/applications/proof-docs/run",
+        method: "POST",
+        authorization: `Bearer ${token}`,
+        body: { confirm: true, reason: "rerun after data fix" }
+      }]);
+
+      assert.equal(preview.text.includes(token), false);
+      assert.match(preview.text, /^Dry run: proof-docs would run again after settled generation 1\.$/mu);
+      assert.match(preview.text, /^1 job over a 45s window; a reserve of up to \$0\.05 Service Credit would be opened\.$/mu);
+      assert.match(preview.text, /^Available Service Credit: \$24\.950038\.$/mu);
+      assert.match(preview.text, /Add --yes to authorize the run\.$/mu);
+      // The route records intent and opens no reserve; the human output must
+      // never read as a promise that the run happened.
+      assert.equal(/will run|has run|is running/u.test(preview.text), false);
+
+      assert.equal(confirm.text.includes(token), false);
+      assert.match(confirm.text, /^Authorized one more run of proof-docs after settled generation 1\.$/mu);
+      assert.match(confirm.text, /a reserve of up to \$0\.05 Service Credit will be opened\.$/mu);
+      assert.match(confirm.text, /^Track it with `proof liskov application execution show proof-docs --watch`\.$/mu);
+    } finally {
+      await rmdir(directory, { recursive: true });
+    }
+  });
+
+  it("scopes an Application run by owner and passes the server body through under --json", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    try {
+      const token = "slipway_application_run_owner_secret_token_do_not_print";
+      const sessionFile = await applicationRunSession(directory, token);
+      const serverBody = applicationRunResponse();
+      const urls: string[] = [];
+      const out = writer();
+      const code = await runSlipwayApplicationRun({
+        applicationRef: "app-0123456789abcdef",
+        owner: "github:12345",
+        config: sessionFile,
+        json: true
+      }, {
+        fetchImpl: async (url: URL | RequestInfo) => {
+          urls.push(String(url));
+          return jsonResponse(serverBody);
+        },
+        stdout: out.write
+      });
+
+      assert.equal(code, 0);
+      assert.deepEqual(urls, [
+        "https://slipway.test/api/applications/app-0123456789abcdef/run?owner=github%3A12345"
+      ]);
+      assert.equal(out.text.includes(token), false);
+      // The canonical machine reading is the server's own body, unchanged, so
+      // the Console and the CLI never drift apart.
+      assert.deepEqual(JSON.parse(out.text), serverBody);
+    } finally {
+      await rmdir(directory, { recursive: true });
+    }
+  });
+
+  it("maps every Application run refusal to a distinct code and a remedy", async () => {
+    const cases = [{
+      code: "application_run_not_supported",
+      detail: "only a `once` application is run again by hand; continuous and interval applications schedule their own occurrences",
+      settledGeneration: null,
+      cliCode: "SLIPWAY_APPLICATION_RUN_NOT_SUPPORTED",
+      remedy: /Publish a `once` policy for this Application, or let a continuous or interval Application schedule its own occurrences\./u
+    }, {
+      code: "application_run_not_terminal",
+      detail: "the application's current occurrence has not settled; a run authorizes the generation after a settled one",
+      settledGeneration: null,
+      cliCode: "SLIPWAY_APPLICATION_RUN_NOT_TERMINAL",
+      remedy: /Watch it with `proof liskov application execution show proof-docs --watch --until-terminal`, then run again once it settles\./u
+    }, {
+      code: "application_run_not_admitted",
+      detail: "a paused, retiring or retired application does not admit new execution; resume it first",
+      settledGeneration: 1,
+      cliCode: "SLIPWAY_APPLICATION_RUN_NOT_ADMITTED",
+      remedy: /Resume it with `proof liskov application resume proof-docs --yes` first\. A retired or deleted Application is never re-runnable\./u
+    }];
+
+    for (const scenario of cases) {
+      const directory = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+      try {
+        const token = `slipway_run_${scenario.code}_secret_token_do_not_print`;
+        const sessionFile = await applicationRunSession(directory, token);
+        // A refusal is HTTP 200 with `ok: false`, never a 4xx: the client that
+        // reads the status instead of the body silently reports success.
+        const serverBody = applicationRunResponse({
+          ok: false,
+          settledGeneration: scenario.settledGeneration,
+          availableServiceCreditMicros: null,
+          refusal: { code: scenario.code, detail: scenario.detail }
+        });
+
+        const human = writer();
+        const humanCode = await runSlipwayApplicationRun({
+          applicationRef: "proof-docs",
+          yes: true,
+          config: sessionFile
+        }, { fetchImpl: async () => jsonResponse(serverBody), stdout: human.write });
+        assert.equal(humanCode, 1);
+        assert.equal(human.text.includes(token), false);
+        assert.ok(human.text.includes(`Error (${scenario.cliCode}): ${scenario.detail}.`), human.text);
+        assert.match(human.text, scenario.remedy);
+
+        const structured = writer();
+        const structuredCode = await runSlipwayApplicationRun({
+          applicationRef: "proof-docs",
+          yes: true,
+          config: sessionFile,
+          json: true
+        }, { fetchImpl: async () => jsonResponse(serverBody), stdout: structured.write });
+        assert.equal(structuredCode, 1);
+        assert.deepEqual(JSON.parse(structured.text), serverBody);
+      } finally {
+        await rmdir(directory, { recursive: true });
+      }
+    }
+  });
+
+  it("treats an already-requested Application run as a no-op success, for a preview as well as a confirm", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    try {
+      const token = "slipway_application_run_replay_secret_token_do_not_print";
+      const sessionFile = await applicationRunSession(directory, token);
+      // The replay is a three-key envelope that shares nothing with the preview
+      // shape, and the route returns it for `confirm: false` too.
+      const serverBody = { ok: true, noop: true, reason: "application_run_already_requested" };
+      const confirms: boolean[] = [];
+      const fetchImpl = async (_url: URL | RequestInfo, init?: RequestInit) => {
+        confirms.push((JSON.parse(String(init?.body ?? "{}")) as { confirm?: boolean }).confirm === true);
+        return jsonResponse(serverBody);
+      };
+
+      const replay = writer();
+      const replayCode = await runSlipwayApplicationRun({
+        applicationRef: "proof-docs",
+        yes: true,
+        config: sessionFile
+      }, { fetchImpl, stdout: replay.write });
+      const preview = writer();
+      const previewCode = await runSlipwayApplicationRun({
+        applicationRef: "proof-docs",
+        config: sessionFile,
+        json: true
+      }, { fetchImpl, stdout: preview.write });
+
+      // Pressing Run twice is one run, not a failure: the requested state holds.
+      assert.equal(replayCode, 0);
+      assert.equal(previewCode, 0);
+      assert.deepEqual(confirms, [true, false]);
+      assert.equal(replay.text.includes(token), false);
+      assert.match(replay.text, /^proof-docs already has a run authorized and not yet spent\.$/mu);
+      assert.match(replay.text, /^Pressing Run again does not queue a second run\.$/mu);
+      assert.deepEqual(JSON.parse(preview.text), serverBody);
+    } finally {
+      await rmdir(directory, { recursive: true });
+    }
+  });
+
+  it("echoes an Application run refusal code it does not recognize", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    try {
+      const token = "slipway_application_run_unknown_secret_token_do_not_print";
+      const sessionFile = await applicationRunSession(directory, token);
+      const serverBody = applicationRunResponse({
+        ok: false,
+        availableServiceCreditMicros: null,
+        refusal: { code: "application_run_some_future_reason", detail: "a reason this client has never heard of" }
+      });
+      const out = writer();
+      const code = await runSlipwayApplicationRun({
+        applicationRef: "proof-docs",
+        yes: true,
+        config: sessionFile
+      }, { fetchImpl: async () => jsonResponse(serverBody), stdout: out.write });
+
+      assert.equal(code, 1);
+      assert.equal(out.text.includes(token), false);
+      // The route's refusal vocabulary is not append-guaranteed; a stale client
+      // must surface an unknown code rather than rename or hide it.
+      assert.match(out.text, /^Error \(SLIPWAY_APPLICATION_RUN_FAILED\): a reason this client has never heard of\.$/mu);
+      assert.match(out.text, /^Server refusal code: application_run_some_future_reason\.$/mu);
+    } finally {
+      await rmdir(directory, { recursive: true });
+    }
+  });
+
+  it("omits the Application run reserve when the policy carries no per-job amount", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    try {
+      const token = "slipway_application_run_caps_secret_token_do_not_print";
+      const sessionFile = await applicationRunSession(directory, token);
+      // An `independent_caps` policy has no unified per-job exposure, so the
+      // route sends null and the preview must promise no number at all.
+      const out = writer();
+      const code = await runSlipwayApplicationRun({
+        applicationRef: "proof-docs",
+        config: sessionFile
+      }, {
+        fetchImpl: async () => jsonResponse(applicationRunResponse({
+          jobWindowMs: 21_600_000,
+          perJobServiceCreditMicros: null
+        })),
+        stdout: out.write
+      });
+
+      assert.equal(code, 0);
+      assert.equal(out.text.includes(token), false);
+      assert.match(out.text, /^1 job over a 6h window\.$/mu);
+      assert.equal(/reserve/u.test(out.text), false);
+      assert.equal(/NaN/u.test(out.text), false);
+      assert.match(out.text, /^Available Service Credit: \$24\.950038\.$/mu);
+    } finally {
+      await rmdir(directory, { recursive: true });
+    }
+  });
+
+  it("reports Application run transport refusals with the shared session vocabulary", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    try {
+      const token = "slipway_application_run_transport_secret_token_do_not_print";
+      const sessionFile = await applicationRunSession(directory, token);
+
+      const unauthorized = writer();
+      const unauthorizedCode = await runSlipwayApplicationRun({
+        applicationRef: "proof-docs",
+        yes: true,
+        config: sessionFile,
+        json: true
+      }, {
+        fetchImpl: async () => jsonResponse({ ok: false, error: "unauthorized" }, 401),
+        stdout: unauthorized.write
+      });
+      assert.equal(unauthorizedCode, 1);
+      assert.equal(unauthorized.text.includes(token), false);
+      assert.equal((JSON.parse(unauthorized.text) as { error: string }).error, "SLIPWAY_SESSION_UNAUTHORIZED");
+
+      const missing = writer();
+      const missingCode = await runSlipwayApplicationRun({
+        applicationRef: "no-such-application",
+        config: sessionFile
+      }, {
+        fetchImpl: async () => jsonResponse({
+          ok: false,
+          error: "application_not_found",
+          reason: "Liskov application no-such-application was not found"
+        }, 404),
+        stdout: missing.write
+      });
+      assert.equal(missingCode, 1);
+      assert.equal(missing.text.includes(token), false);
+      // The server's reason is the only text that says which transport refusal
+      // this was, so it must reach the human line, not only --json.
+      assert.match(missing.text, /^Error \(SLIPWAY_APPLICATION_RUN_FAILED\): Liskov could not request a run of Application no-such-application \(Liskov application no-such-application was not found\)\.$/mu);
+
+      const ambiguous = writer();
+      const ambiguousCode = await runSlipwayApplicationRun({
+        applicationRef: "alpha",
+        config: sessionFile
+      }, {
+        fetchImpl: async () => jsonResponse({
+          ok: false,
+          error: "ambiguous_application",
+          reason: "Application ref alpha matched multiple readable Applications",
+          candidates: [
+            { applicationUid: "app-1111111111111111", applicationName: "alpha", ownerAddress: "5owner" },
+            { applicationUid: "app-2222222222222222", applicationName: "alpha", ownerAddress: "5other" }
+          ]
+        }, 409),
+        stdout: ambiguous.write
+      });
+      assert.equal(ambiguousCode, 1);
+      assert.equal(ambiguous.text.includes(token), false);
+      assert.match(ambiguous.text, /Error \(SLIPWAY_APPLICATION_AMBIGUOUS\)/u);
+      assert.match(ambiguous.text, /Use an Application uid\/name, or pass --owner OWNER with the legacy id\./u);
+    } finally {
+      await rmdir(directory, { recursive: true });
+    }
+  });
 });
 
 function writer(): { text: string; write: (line: string) => void } {
@@ -5363,6 +5685,34 @@ function writer(): { text: string; write: (line: string) => void } {
     }
   };
   return output;
+}
+
+function applicationRunResponse(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  // The route's nine-key shape, with the figures the `once_rerun` harness
+  // scenario actually read back from production-shaped state.
+  return {
+    ok: true,
+    authorized: false,
+    dryRun: true,
+    settledGeneration: 1,
+    jobs: 1,
+    jobWindowMs: 45_000,
+    perJobServiceCreditMicros: "50000",
+    availableServiceCreditMicros: 24_950_038,
+    refusal: null,
+    ...overrides
+  };
+}
+
+async function applicationRunSession(directory: string, token: string): Promise<string> {
+  const sessionFile = path.join(directory, "session.json");
+  await saveSlipwaySession({
+    version: 1,
+    slipwayUrl: "https://slipway.test",
+    sessionToken: token,
+    savedAtMs: 0
+  }, { config: sessionFile });
+  return sessionFile;
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
