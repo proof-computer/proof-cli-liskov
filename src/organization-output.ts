@@ -29,6 +29,12 @@ export function formatOrganizationBilling(body: LiskovOrganizationBillingRespons
     `Billing for ${body.organization.name} (${body.organization.id}): plan ${plan}.`,
     formatCredits(body.serviceCredits)
   ];
+  const funds = body.addFunds;
+  lines.push(funds === undefined ? "Card checkout: availability unknown (server did not report it)." :
+    funds.checkoutAvailable ? "Card checkout: available in the Console." :
+    funds.checkoutAdmission?.reason === "checkout_admission_disabled" ?
+      "Card checkout: temporarily paused. Previously paid purchases continue to be processed; use existing Service Credits or contact PROOF support." :
+      "Card checkout: unavailable. Use existing Service Credits or contact PROOF support.");
   const usageParts = [
     numericPart(usage.applications, "application"),
     numericPart(usage.users, "user"),

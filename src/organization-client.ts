@@ -48,6 +48,10 @@ export interface LiskovOrganizationBillingResponse {
   usage?: { applications?: number; users?: number; meteredSeats?: number };
   nextCharge?: { totalUsd?: number | null; [key: string]: unknown };
   serviceCredits: LiskovServiceCredits;
+  addFunds?: {
+    checkoutAvailable: boolean;
+    checkoutAdmission?: { enabled: boolean; configured: boolean; available: boolean; reason: string | null };
+  };
   transactions?: LiskovBillingTransaction[];
   [key: string]: unknown;
 }
@@ -114,6 +118,7 @@ export function isOrganizationBillingResponse(value: unknown): value is LiskovOr
   return body?.ok === true &&
     isOrganizationSummary(body.organization) &&
     isServiceCredits(body.serviceCredits) &&
+    (body.addFunds === undefined || isAddFunds(body.addFunds)) &&
     (body.transactions === undefined ||
       (Array.isArray(body.transactions) && body.transactions.every(isBillingTransaction)));
 }
@@ -180,4 +185,14 @@ function record(value: unknown): Record<string, unknown> | undefined {
 
 function finiteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+function isAddFunds(value: unknown): boolean {
+  const body = record(value);
+  if (body === undefined || typeof body.checkoutAvailable !== "boolean") return false;
+  if (body.checkoutAdmission === undefined) return true;
+  const admission = record(body.checkoutAdmission);
+  return admission !== undefined && typeof admission.enabled === "boolean" &&
+    typeof admission.configured === "boolean" && typeof admission.available === "boolean" &&
+    (admission.reason === null || typeof admission.reason === "string");
 }
