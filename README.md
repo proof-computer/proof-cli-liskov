@@ -34,6 +34,8 @@ proof liskov application publish proof-docs --artifact-version av-... --yes
 proof liskov application publish proof-docs --paused --reason "failure-matrix initialization" --yes
 proof liskov application pause proof-docs --reason "funding pending" --yes
 proof liskov application resume proof-docs --reason "funded" --yes
+proof liskov application run proof-docs
+proof liskov application run proof-docs --reason "rerun after data fix" --yes
 proof liskov application retire proof-docs
 proof liskov application retire proof-docs --reason "project complete" --yes
 proof liskov application retire cancel proof-docs --yes
@@ -155,7 +157,15 @@ Pause and resume stop or restart only new Liskov planning/executor work; they
 do not stop existing Acurast jobs, revoke Lockbox grants, drain routes, or
 spend.
 
-Pause, resume, delete, and identity backfill dry-run by default and require
+Run asks a settled `once` Application to run once more. It authorizes exactly
+one further occurrence, against the Application's current published revision,
+and refuses a continuous or interval Application — those schedule their own
+occurrences. It records intent: the dry run names the jobs, the paid window and
+the Service Credit reserve a run would open, and the executor's own admission
+checks remain the authority for whether the run happens. Pressing Run twice
+while the first is unspent is one run, not two.
+
+Pause, resume, run, delete, and identity backfill dry-run by default and require
 `--yes` to mutate. Publish and other mutating Application and custody commands
 require `--yes`; live execution submit also requires `--yes-spend`. The plugin does
 not expose the old direct manual Acurast spend fallback; diagnostics and

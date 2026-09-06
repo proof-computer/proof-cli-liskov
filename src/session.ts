@@ -28,7 +28,8 @@ import {
   formatOrganizationList,
   formatOrganizationServiceCredits,
   formatOrganizationTransactions,
-  formatOrganizationUse
+  formatOrganizationUse,
+  usd
 } from "./organization-output.js";
 import {
   canonicalOrganizationId,
@@ -329,6 +330,16 @@ export interface SlipwayApplicationStatusTransitionInput {
   owner?: string;
   reason?: string;
   overrideReplacementHold?: boolean;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationRunInput {
+  applicationRef: string;
+  owner?: string;
+  reason?: string;
   yes?: boolean;
   slipwayUrl?: string;
   config?: string;
@@ -981,6 +992,33 @@ interface SlipwayApplicationStatusTransitionResponse {
   application?: PublicSlipwayApplicationSummary;
   replacementHold?: PublicSlipwayReplacementHold;
   overrideRequired?: boolean;
+  error?: string;
+  reason?: string;
+  candidates?: PublicSlipwayApplicationRefCandidate[];
+  [key: string]: unknown;
+}
+
+/**
+ * `POST /api/applications/:applicationId/run`.
+ *
+ * The route answers preview, confirm and refusal with one nine-key shape at
+ * HTTP 200 — a refusal is `ok: false` with a `refusal` object, never a 4xx — so
+ * this client reads the body, not the status. The already-requested replay is
+ * the one exception: a three-key `{ok, noop, reason}` body that omits every
+ * other field, returned for a preview as well as a confirm.
+ */
+interface SlipwayApplicationRunResponse {
+  ok?: boolean;
+  authorized?: boolean;
+  dryRun?: boolean;
+  noop?: boolean;
+  settledGeneration?: number | null;
+  jobs?: number | null;
+  jobWindowMs?: number | null;
+  /** An exact decimal string, not a number: one delivered job's total exposure. */
+  perJobServiceCreditMicros?: string | null;
+  availableServiceCreditMicros?: number | null;
+  refusal?: { code?: string; detail?: string } | null;
   error?: string;
   reason?: string;
   candidates?: PublicSlipwayApplicationRefCandidate[];
@@ -2569,6 +2607,82 @@ export async function runSlipwayApplicationStatusTransition(input: SlipwayApplic
     formatApplicationStatusTransition(body)
   );
   return 0;
+}
+
+/**
+ * `POST /api/applications/:applicationId/run` (ADR-0125).
+ *
+ * A settled `once` Application mints nothing further on its own; a run is a
+ * durable authorization to mint exactly one more occurrence. The client adds no
+ * policy of its own — it renders the server's decision — so every branch below
+ * is a shape the route actually returns, and `--json` passes the server body
+ * through unchanged for all of them.
+ */
+export async function runSlipwayApplicationRun(input: SlipwayApplicationRunInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayJsonRequest<SlipwayApplicationRunResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: applicationRunPath(input.applicationRef, input.owner),
+    body: {
+      confirm: input.yes === true,
+      reason: input.reason
+    },
+    requestErrorCode: "SLIPWAY_APPLICATION_RUN_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not request a Liskov Application run"
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const body = request.body;
+
+  // An authorization is already written and unspent. The route answers this for
+  // a preview as much as a confirm, and answers it `ok: true`: the requested
+  // state holds, so pressing Run twice is a success, not a failure. `--json`
+  // keeps `noop: true` for a caller that must tell the two apart.
+  if (body?.noop === true) {
+    writeStructuredOrHuman(options, input.json, body, formatApplicationRunNoop(input.applicationRef));
+    return 0;
+  }
+
+  if (body?.ok === true && !body.refusal) {
+    writeStructuredOrHuman(options, input.json, body, formatApplicationRun(input.applicationRef, body));
+    return 0;
+  }
+
+  // A refusal arrives as HTTP 200 with `ok: false`, so the body decides, not the
+  // status. The server body is emitted unchanged: `refusal.code` is the
+  // canonical machine reading and the Console renders the same field.
+  const refusalCode = typeof body?.refusal?.code === "string" ? body.refusal.code : undefined;
+  if (refusalCode !== undefined) {
+    writeStructuredOrHuman(options, input.json, body, formatApplicationRunRefusal(
+      input.applicationRef,
+      refusalCode,
+      typeof body?.refusal?.detail === "string" ? body.refusal.detail : undefined
+    ));
+    return 1;
+  }
+
+  const ambiguous = body?.error === "ambiguous_application" && Array.isArray(body.candidates);
+  const error = request.response.status === 401
+    ? "SLIPWAY_SESSION_UNAUTHORIZED"
+    : ambiguous
+      ? "SLIPWAY_APPLICATION_AMBIGUOUS"
+      : "SLIPWAY_APPLICATION_RUN_FAILED";
+  writeStructuredOrHuman(options, input.json, {
+    ok: false,
+    error,
+    status: request.response.status,
+    reason: body?.reason ?? body?.error,
+    applicationRef: input.applicationRef,
+    candidates: body?.candidates,
+    slipwayUrl: request.slipwayUrl,
+    sessionFile: request.sessionFile
+  }, ambiguous
+    ? formatApplicationAmbiguity(input.applicationRef, body!.candidates!)
+    : formatApplicationRunFailure(input.applicationRef, error, body?.reason));
+  return 1;
 }
 
 export async function runSlipwayApplicationSetRepository(input: SlipwayApplicationSetRepositoryInput, options: SlipwayCliOptions = {}): Promise<number> {
@@ -6520,6 +6634,13 @@ function applicationStatusPath(applicationRef: string, owner: string | undefined
   return `${pathValue}?${query.toString()}`;
 }
 
+function applicationRunPath(applicationRef: string, owner: string | undefined): string {
+  const pathValue = `/api/applications/${encodeURIComponent(applicationRef)}/run`;
+  if (!owner || !owner.trim()) return pathValue;
+  const query = new URLSearchParams({ owner: owner.trim() });
+  return `${pathValue}?${query.toString()}`;
+}
+
 function applicationRepositoryPath(applicationRef: string, owner: string | undefined): string {
   const pathValue = `/api/applications/${encodeURIComponent(applicationRef)}/repository`;
   if (!owner || !owner.trim()) return pathValue;
@@ -7236,6 +7357,133 @@ function formatApplicationStatusTransition(body: SlipwayApplicationStatusTransit
   return body.changed === false
     ? `${target} is ${already}.`
     : `${verb[0]!.toUpperCase()}${verb.slice(1)} ${target}.`;
+}
+
+/**
+ * The remedy each refusal earns, keyed by the route's own code. The sentence
+ * says what to do instead; the server's `detail` already says what happened, so
+ * this never restates it.
+ */
+const APPLICATION_RUN_REFUSALS: Record<string, { cliCode: string; remedy: (applicationRef: string) => string }> = {
+  application_run_not_admitted: {
+    cliCode: "SLIPWAY_APPLICATION_RUN_NOT_ADMITTED",
+    remedy: (applicationRef) =>
+      `Resume it with \`proof liskov application resume ${applicationRef} --yes\` first. A retired or deleted Application is never re-runnable.`
+  },
+  application_run_not_supported: {
+    cliCode: "SLIPWAY_APPLICATION_RUN_NOT_SUPPORTED",
+    remedy: () =>
+      "Publish a `once` policy for this Application, or let a continuous or interval Application schedule its own occurrences."
+  },
+  application_run_not_terminal: {
+    cliCode: "SLIPWAY_APPLICATION_RUN_NOT_TERMINAL",
+    remedy: (applicationRef) =>
+      `Watch it with \`proof liskov application execution show ${applicationRef} --watch --until-terminal\`, then run again once it settles.`
+  }
+};
+
+function formatApplicationRunRefusal(applicationRef: string, code: string, detail: string | undefined): string {
+  const known = APPLICATION_RUN_REFUSALS[code];
+  const sentence = detail === undefined || detail.trim() === ""
+    ? `Liskov refused a run of Application ${applicationRef}`
+    : detail.trim();
+  const lines = [`Error (${known?.cliCode ?? "SLIPWAY_APPLICATION_RUN_FAILED"}): ${/[.!?]$/u.test(sentence) ? sentence : `${sentence}.`}`];
+  // An unrecognized code is echoed rather than renamed. The route's refusal
+  // vocabulary is not append-guaranteed, and a stale client must not hide one.
+  lines.push(known === undefined ? `Server refusal code: ${code}.` : known.remedy(applicationRef));
+  return lines.join("\n");
+}
+
+/**
+ * A transport refusal keeps its own envelope, and its `reason` is the only text
+ * that says which one it was — a 404's "was not found" reads very differently
+ * from a 403's. Carry it into the human line rather than leaving it in `--json`.
+ */
+function formatApplicationRunFailure(applicationRef: string, error: string, reason: unknown): string {
+  const detail = typeof reason === "string" && reason.trim() !== "" ? reason.trim() : undefined;
+  return `Error (${error}): Liskov could not request a run of Application ${applicationRef}${detail === undefined ? "" : ` (${detail})`}.`;
+}
+
+function formatApplicationRunNoop(applicationRef: string): string {
+  return [
+    `${applicationRef} already has a run authorized and not yet spent.`,
+    "Pressing Run again does not queue a second run."
+  ].join("\n");
+}
+
+/**
+ * The preview and the accepted confirm share one body, so they share one
+ * formatter; `authorized` is the only field whose meaning differs.
+ *
+ * Nothing here promises a launch. The route records intent and opens no
+ * reserve — the executor's admission checks remain the authority — so the
+ * wording is always that a reserve *would* or *will* be opened.
+ */
+function formatApplicationRun(applicationRef: string, body: SlipwayApplicationRunResponse): string {
+  const authorized = body.authorized === true;
+  const generation = typeof body.settledGeneration === "number"
+    ? ` after settled generation ${body.settledGeneration}`
+    : "";
+  const lines = [authorized
+    ? `Authorized one more run of ${applicationRef}${generation}.`
+    : `Dry run: ${applicationRef} would run again${generation}.`];
+
+  const shape = formatApplicationRunShape(body, authorized);
+  if (shape !== undefined) lines.push(shape);
+  if (typeof body.availableServiceCreditMicros === "number") {
+    lines.push(`Available Service Credit: ${usd(body.availableServiceCreditMicros / 1_000_000)}.`);
+  }
+
+  lines.push(authorized
+    ? `Track it with \`proof liskov application execution show ${applicationRef} --watch\`.`
+    : "This authorizes one more occurrence; it does not promise a launch. Add --yes to authorize the run.");
+  return lines.join("\n");
+}
+
+/**
+ * The jobs/window/reserve sentence, built only from figures the body actually
+ * carries. A policy compiled to `independent_caps` has no per-job amount, so
+ * the reserve clause is dropped rather than guessed at.
+ */
+function formatApplicationRunShape(body: SlipwayApplicationRunResponse, authorized: boolean): string | undefined {
+  const parts: string[] = [];
+  const jobs = typeof body.jobs === "number" ? body.jobs : undefined;
+  if (jobs !== undefined) {
+    const window = typeof body.jobWindowMs === "number" ? ` over a ${formatJobWindowMs(body.jobWindowMs)} window` : "";
+    parts.push(`${jobs} job${jobs === 1 ? "" : "s"}${window}`);
+  }
+  const reserveUsd = applicationRunReserveUsd(body.perJobServiceCreditMicros, jobs);
+  if (reserveUsd !== undefined) {
+    parts.push(`a reserve of up to ${usd(reserveUsd)} Service Credit ${authorized ? "will" : "would"} be opened`);
+  }
+  return parts.length === 0 ? undefined : `${parts.join("; ")}.`;
+}
+
+/**
+ * `perJobServiceCreditMicros` is an exact decimal string, not a number, so the
+ * multiplication is done in `BigInt`. Anything that is not a plain micro count
+ * — a null, a non-integer, a total past exact float range — returns undefined,
+ * and the caller omits the clause rather than printing `NaN`.
+ */
+function applicationRunReserveUsd(perJob: string | null | undefined, jobs: number | undefined): number | undefined {
+  if (typeof perJob !== "string" || !/^\d+$/u.test(perJob)) return undefined;
+  if (jobs === undefined || !Number.isSafeInteger(jobs) || jobs < 0) return undefined;
+  const micros = BigInt(perJob) * BigInt(jobs);
+  if (micros > BigInt(Number.MAX_SAFE_INTEGER)) return undefined;
+  return Number(micros) / 1_000_000;
+}
+
+/**
+ * A paid job window reads in the largest whole unit that divides it (`45s`,
+ * `6h`); anything that divides evenly into none of them stays in milliseconds
+ * rather than being rounded into a figure the policy does not say.
+ */
+function formatJobWindowMs(ms: number): string {
+  if (!Number.isSafeInteger(ms) || ms < 0) return `${ms} ms`;
+  for (const [unit, size] of [["d", 86_400_000], ["h", 3_600_000], ["m", 60_000], ["s", 1_000]] as const) {
+    if (ms >= size && ms % size === 0) return `${ms / size}${unit}`;
+  }
+  return `${ms} ms`;
 }
 
 function formatApplicationSetRepository(applicationRef: string, body: SlipwayApplicationSetRepositoryResponse): string {
