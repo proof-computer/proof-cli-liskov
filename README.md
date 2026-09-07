@@ -36,6 +36,8 @@ proof liskov application pause proof-docs --reason "funding pending" --yes
 proof liskov application resume proof-docs --reason "funded" --yes
 proof liskov application run proof-docs
 proof liskov application run proof-docs --reason "rerun after data fix" --yes
+proof liskov application hold release proof-docs
+proof liskov application hold release proof-docs --reason "config fixed" --yes
 proof liskov application retire proof-docs
 proof liskov application retire proof-docs --reason "project complete" --yes
 proof liskov application retire cancel proof-docs --yes
