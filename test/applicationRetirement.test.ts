@@ -379,6 +379,83 @@ describe("application retirement CLI", () => {
     assert.match(receipt.text, /Legacy immediate tombstone receipt: legacy123/u);
     assert.match(receipt.text, /Legacy post-deletion cleanup remains open/u);
   });
+
+  it("explains a repository-less 403 with the exact re-import command", async () => {
+    const session = await sessionFile();
+    const response = {
+      ok: false,
+      error: "forbidden",
+      reasonCode: "github_repository_required",
+      reason: "GitHub authorization requires a repository-backed Application",
+      capability: "application.read",
+      repositoryBinding: "missingByDrift",
+      lastKnownRepository: "owner/stranded",
+      nextAction: "reimport_source"
+    };
+    const human = writer();
+    const humanCode = await runSlipwayApplicationRetirement({
+      applicationRef: "app-uid-repo-less",
+      config: session.file
+    }, {
+      fetchImpl: async () => jsonResponse(response, 403),
+      stdout: human.write
+    });
+    assert.equal(humanCode, 1);
+    assert.match(human.text, /github_repository_required|forbidden/u);
+    assert.match(human.text, /import drift/u);
+    assert.match(
+      human.text,
+      /proof liskov application import --github owner\/stranded --server-fetch/u
+    );
+
+    const jsonOut = writer();
+    const jsonCode = await runSlipwayApplicationRetirement({
+      applicationRef: "app-uid-repo-less",
+      config: session.file,
+      json: true
+    }, {
+      fetchImpl: async () => jsonResponse(response, 403),
+      stdout: jsonOut.write
+    });
+    assert.equal(jsonCode, 1);
+    assert.deepEqual(JSON.parse(jsonOut.text), response);
+  });
+
+  it("prints the binding and repair on an admitted repository-less preview", async () => {
+    const session = await sessionFile();
+    const out = writer();
+    const code = await runSlipwayApplicationRetirement({
+      applicationRef: "app-uid-repo-less",
+      config: session.file
+    }, {
+      fetchImpl: async () => jsonResponse({
+        ok: true,
+        lifecycleState: "paused",
+        repositoryBinding: "missingByDrift",
+        lastKnownRepository: "owner/stranded",
+        nextAction: "reimport_source",
+        creationAvailability: { available: true },
+        capabilities: { create: true, cancel: true },
+        preview: {
+          assessment: {
+            phase: "terminalizing_local",
+            executionBlockerCount: 0,
+            financialBlockerCount: 0,
+            ambiguityBlockerCount: 0,
+            blockers: []
+          }
+        }
+      }),
+      stdout: out.write
+    });
+    assert.equal(code, 0);
+    assert.match(out.text, /Retirement preview/u);
+    assert.match(out.text, /import drift/u);
+    assert.match(
+      out.text,
+      /proof liskov application import --github owner\/stranded --server-fetch/u
+    );
+  });
 });
 
 describe("the lifecycle every surface shares", () => {
