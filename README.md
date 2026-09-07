@@ -82,6 +82,7 @@ proof liskov application delete proof-docs
 proof liskov application delete proof-docs --reason retired --yes
 proof liskov admin executor-operation reconcile op-123 --expect-application slipway-diagnostic --expect-kind runtime_replacement --expect-deployment dep-123 --expect-job job-123 --expect-status pending --reason "terminalize unsubmitted replacement" --json
 proof liskov admin deploy-spend resolve reserve-123 --expect-organization org-1 --expect-application app-1 --expect-deployment dep-1 --expect-execution exec-1 --expect-billing-transaction tx-1 --expect-status review_required --final-usd-micros 25000 --evidence-ref case:123 --evidence-sha256 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --reason "reviewed chain evidence" --json
+proof liskov admin retirement adjudicate-lineage app-uid --operation op-1 --expect-organization org-1 --expect-application app-1 --expect-application-uid app-uid --expect-operation-kind deploy_submit --expect-operation-status review_required --expect-deployment dep-1 --expect-job job-1 --expect-reserve reserve-1 --expect-reserve-status review_required --expect-billing-transaction tx-1 --expect-billing-status review_required --actor-id admin-1 --evidence-ref ticket://k4jz --evidence-sha256 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --reason "finalized JobRegistrationStartInPast" --json
 proof liskov whoami --json
 proof liskov logout
 ```

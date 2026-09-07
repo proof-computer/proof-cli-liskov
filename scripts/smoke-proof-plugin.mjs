@@ -193,6 +193,13 @@ try {
   assertIncludes(deploySpendResolveHelp.stdout, "--evidence-sha256");
   assertIncludes(deploySpendResolveHelp.stdout, "--yes");
 
+  const adjudicateHelp = run(process.execPath, [proofDevBin, "liskov", "admin", "retirement", "adjudicate-lineage", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(adjudicateHelp.stdout, "Adjudicate one review-blocked retirement lineage");
+  assertIncludes(adjudicateHelp.stdout, "--operation");
+  assertIncludes(adjudicateHelp.stdout, "--fingerprint");
+  assertIncludes(adjudicateHelp.stdout, "--confirm");
+  assertExcludes(adjudicateHelp.stdout, "--organization <selector>");
+
   const whoamiHelp = run(process.execPath, [proofDevBin, "liskov", "whoami", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(whoamiHelp.stdout, "Read the current Liskov CLI session");
   assertIncludes(whoamiHelp.stdout, "--json");
