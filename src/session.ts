@@ -1019,6 +1019,10 @@ interface SlipwayApplicationRetirementResponse extends SlipwayGenericResponse {
    * deletion receipt's digest.
    */
   remediation?: Record<string, unknown>;
+  repositoryBinding?: "bound" | "missingByDrift" | "unbound" | string;
+  lastKnownRepository?: string;
+  nextAction?: "reimport_source" | "platform_admin_review" | string;
+  reasonCode?: string;
 }
 
 interface SlipwayApplicationStatusTransitionResponse {
@@ -7405,7 +7409,10 @@ function writeRetirementResponse(
     const completion = Object.keys(receipt).length > 0
       ? ` ${formatRetirementReceipt(receipt)}`
       : "";
-    emit(options, `Error (${error}): ${body.reason ?? "Liskov retirement request failed."}${completion}`);
+    emit(options, [
+      `Error (${error}): ${body.reason ?? "Liskov retirement request failed."}${completion}`,
+      formatRepositoryBinding(body)
+    ].filter(Boolean).join("\n"));
     return 1;
   }
   emit(options, formatApplicationRetirement(body));
@@ -7446,7 +7453,8 @@ function formatApplicationRetirement(body: SlipwayApplicationRetirementResponse)
     return [
       header,
       formatRetirementAssessment(objectRecord(retirement.assessment)),
-      formatRetirementRemediation(objectRecord(body.remediation))
+      formatRetirementRemediation(objectRecord(body.remediation)),
+      formatRepositoryBinding(body)
     ].filter(Boolean).join("\n");
   }
 
@@ -7463,10 +7471,33 @@ function formatApplicationRetirement(body: SlipwayApplicationRetirementResponse)
       "Retirement preview (read only).",
       formatRetirementAssessment(objectRecord(preview.assessment)),
       formatRetirementRemediation(objectRecord(preview.remediation)),
+      formatRepositoryBinding(body),
       action
     ].filter(Boolean).join("\n");
   }
-  return "Liskov returned application retirement state.";
+  const bindingOnly = formatRepositoryBinding(body);
+  return bindingOnly ?? "Liskov returned application retirement state.";
+}
+
+function formatRepositoryBinding(body: SlipwayApplicationRetirementResponse): string | undefined {
+  const state = typeof body.repositoryBinding === "string" ? body.repositoryBinding : undefined;
+  if (!state || state === "bound") return undefined;
+  const lastKnown = typeof body.lastKnownRepository === "string"
+    ? body.lastKnownRepository.trim()
+    : "";
+  if (state === "missingByDrift") {
+    const repair = lastKnown.length > 0
+      ? `proof liskov application import --github ${lastKnown} --server-fetch`
+      : "proof liskov application import --github <owner/repo> --server-fetch";
+    return [
+      "GitHub repository binding is missing (import drift, not an intentionally unbound application).",
+      `Repair: ${repair}`
+    ].join("\n");
+  }
+  if (state === "unbound" || body.nextAction === "platform_admin_review") {
+    return "This application has no recoverable GitHub source. A platform administrator needs to review it.";
+  }
+  return `Repository binding: ${state}.`;
 }
 
 function formatRetirementCreationUnavailableReason(reason: unknown): string {
