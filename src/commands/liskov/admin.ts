@@ -5,11 +5,12 @@ export default class SlipwayAdmin extends Command {
   static examples = [
     "<%= config.bin %> liskov admin processor list --greylisted",
     "<%= config.bin %> liskov admin executor-operation reconcile --help",
-    "<%= config.bin %> liskov admin executor-operation recover-deploy-submit --help"
+    "<%= config.bin %> liskov admin executor-operation recover-deploy-submit --help",
+    "<%= config.bin %> liskov admin retirement adjudicate-lineage --help"
   ];
   static summary = "Liskov platform-admin operations.";
 
   async run(): Promise<void> {
-    this.log("Use `proof liskov admin processor list --help`, `proof liskov admin executor-operation reconcile --help`, `proof liskov admin executor-operation recover-deploy-submit --help`, or `proof liskov admin deploy-spend resolve --help`.");
+    this.log("Use `proof liskov admin processor list --help`, `proof liskov admin executor-operation reconcile --help`, `proof liskov admin executor-operation recover-deploy-submit --help`, `proof liskov admin deploy-spend resolve --help`, or `proof liskov admin retirement adjudicate-lineage --help`.");
   }
 }

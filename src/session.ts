@@ -573,6 +573,33 @@ export interface SlipwayAdminDeploySpendResolveInput {
   json?: boolean;
 }
 
+export interface SlipwayAdminRetirementAdjudicateLineageInput {
+  applicationUid: string;
+  expectOrganization: string;
+  expectApplication: string;
+  expectApplicationUid: string;
+  expectOperation: string;
+  expectOperationKind: string;
+  expectOperationStatus: string;
+  expectDeployment: string;
+  expectJob: string;
+  expectReserve: string;
+  expectReserveStatus: string;
+  expectBillingTransaction: string;
+  expectBillingStatus: string;
+  actorKind: string;
+  actorId: string;
+  evidenceRef: string;
+  evidenceSha256: string;
+  reason: string;
+  confirm?: boolean;
+  confirmationFingerprint?: string;
+  adminToken?: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationRuntimeImageWorkflowInput {
   applicationRef: string;
   manifestPath: string;
@@ -4293,6 +4320,104 @@ export async function runSlipwayAdminDeploySpendResolve(
     : body.idempotentReplay
       ? `Deploy-spend reserve ${input.reserveId} was already resolved identically.`
       : `Resolved deploy-spend reserve ${input.reserveId} at ${input.finalUsdMicros} USD micros.`);
+  return 0;
+}
+
+export async function runSlipwayAdminRetirementAdjudicateLineage(
+  input: SlipwayAdminRetirementAdjudicateLineageInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  const reason = input.reason?.trim();
+  const evidenceRef = input.evidenceRef?.trim();
+  const evidenceSha256 = input.evidenceSha256?.trim();
+  const actorKind = input.actorKind?.trim();
+  const actorId = input.actorId?.trim();
+  const confirm = input.confirm === true;
+  const fingerprint = input.confirmationFingerprint?.trim();
+  if (!reason || !evidenceRef || !actorKind || !actorId
+      || !/^[0-9a-f]{64}$/.test(evidenceSha256 ?? "")) {
+    const error = "SLIPWAY_ADMIN_RETIREMENT_ADJUDICATE_LINEAGE_INPUT_INVALID";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      applicationUid: input.applicationUid,
+      operationId: input.expectOperation
+    }, `Error (${error}): actor, reason, and evidence are required, and evidence SHA-256 must be 64 lowercase hex characters.`);
+    return 1;
+  }
+  if (confirm && !fingerprint) {
+    const error = "SLIPWAY_ADMIN_RETIREMENT_ADJUDICATE_LINEAGE_FINGERPRINT_REQUIRED";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      applicationUid: input.applicationUid,
+      operationId: input.expectOperation
+    }, `Error (${error}): --confirm requires --fingerprint from a prior dry-run.`);
+    return 1;
+  }
+  const request = await authenticatedSlipwayJsonRequest<SlipwayGenericResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/admin/applications/${encodeURIComponent(input.applicationUid)}/retirement/adjudicate-lineage`,
+    body: {
+      expectOrganization: input.expectOrganization,
+      expectApplication: input.expectApplication,
+      expectApplicationUid: input.expectApplicationUid,
+      expectOperation: input.expectOperation,
+      expectOperationKind: input.expectOperationKind,
+      expectOperationStatus: input.expectOperationStatus,
+      expectDeployment: input.expectDeployment,
+      expectJob: input.expectJob,
+      expectReserve: input.expectReserve,
+      expectReserveStatus: input.expectReserveStatus,
+      expectBillingTransaction: input.expectBillingTransaction,
+      expectBillingStatus: input.expectBillingStatus,
+      actorKind,
+      actorId,
+      reason,
+      evidenceRef,
+      evidenceSha256,
+      confirm,
+      ...(fingerprint ? { confirmationFingerprint: fingerprint } : {})
+    },
+    authToken: resolveAdminToken({ token: input.adminToken, env: options.env ?? process.env }),
+    requestErrorCode: "SLIPWAY_ADMIN_RETIREMENT_ADJUDICATE_LINEAGE_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not adjudicate Liskov retirement lineage"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  const body = request.body;
+  if (body?.ok !== true) {
+    const blockers = Array.isArray(body?.blockers)
+      ? body.blockers.filter((value): value is string => typeof value === "string")
+      : [];
+    const error = request.response.status === 401
+      ? "SLIPWAY_SESSION_UNAUTHORIZED"
+      : request.response.status === 403
+        ? "SLIPWAY_PLATFORM_ADMIN_REQUIRED"
+        : "SLIPWAY_ADMIN_RETIREMENT_ADJUDICATE_LINEAGE_FAILED";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      blockers,
+      applicationUid: input.applicationUid,
+      operationId: input.expectOperation,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, `Error (${error}): retirement lineage ${input.expectOperation} is not eligible${blockers.length ? ` (${blockers.join(", ")})` : ""}.`);
+    return 1;
+  }
+  const fingerprintOut = typeof body.confirmationFingerprint === "string"
+    ? body.confirmationFingerprint
+    : "";
+  writeStructuredOrHuman(options, input.json, body, body.dryRun
+    ? `Dry run: lineage ${input.expectOperation} is ${body.eligible === true ? "eligible" : "not confirmable"}${fingerprintOut ? ` (fingerprint ${fingerprintOut})` : ""}. Pass --confirm --fingerprint to apply.`
+    : body.idempotentReplay
+      ? `Retirement lineage ${input.expectOperation} was already adjudicated identically.`
+      : `Adjudicated retirement lineage ${input.expectOperation}.`);
   return 0;
 }
 
