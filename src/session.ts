@@ -346,6 +346,17 @@ export interface SlipwayApplicationRunInput {
   json?: boolean;
 }
 
+export interface SlipwayApplicationHoldReleaseInput {
+  applicationRef: string;
+  holdId?: string;
+  owner?: string;
+  reason?: string;
+  yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationSetRepositoryInput {
   applicationRef: string;
   repository: string;
@@ -1021,6 +1032,48 @@ interface SlipwayApplicationStatusTransitionResponse {
   overrideRequired?: boolean;
   error?: string;
   reason?: string;
+  candidates?: PublicSlipwayApplicationRefCandidate[];
+  [key: string]: unknown;
+}
+
+/**
+ * One failure hold as `POST /api/applications/:applicationId/holds/release`
+ * and Coverage describe it. `stableSlotId` / `generation` are the customer's
+ * coordinates for the job (`slot-N · gM`); `holdId` is what the release body
+ * names.
+ */
+interface SlipwayApplicationHoldSummary {
+  holdId?: string;
+  stableJobId?: string;
+  stableSlotId?: string | null;
+  generation?: number | null;
+  status?: string;
+  heldAtMs?: number;
+  pendingRelease?: { authorizationId?: string; requestedAtMs?: number } | null;
+  [key: string]: unknown;
+}
+
+/**
+ * `POST /api/applications/:applicationId/holds/release` (BKLG-20260907-r9wc).
+ *
+ * One shape for preview, confirm and refusal: `requested` is the only field
+ * whose meaning changes. A refusal is HTTP 200 with `ok: false` and
+ * `refusal.code`; an already-pending release replays as `{ok, noop, reason}`.
+ * The route records an authorization the executor applies on its next pass —
+ * nothing in the body promises that the job has relaunched.
+ */
+interface SlipwayApplicationHoldReleaseResponse {
+  ok?: boolean;
+  requested?: boolean;
+  dryRun?: boolean;
+  noop?: boolean;
+  reason?: string;
+  hold?: SlipwayApplicationHoldSummary | null;
+  openHolds?: SlipwayApplicationHoldSummary[];
+  authorizationId?: string | null;
+  nextAction?: string | null;
+  refusal?: { code?: string; detail?: string } | null;
+  error?: string;
   candidates?: PublicSlipwayApplicationRefCandidate[];
   [key: string]: unknown;
 }
@@ -2709,6 +2762,78 @@ export async function runSlipwayApplicationRun(input: SlipwayApplicationRunInput
   }, ambiguous
     ? formatApplicationAmbiguity(input.applicationRef, body!.candidates!)
     : formatApplicationRunFailure(input.applicationRef, error, body?.reason));
+  return 1;
+}
+
+/**
+ * `POST /api/applications/:applicationId/holds/release` (BKLG-20260907-r9wc).
+ *
+ * The client adds no policy of its own — it renders the server's decision — so
+ * every branch below is a shape the route actually returns, and `--json`
+ * passes the server body through unchanged for all of them.
+ */
+export async function runSlipwayApplicationHoldRelease(input: SlipwayApplicationHoldReleaseInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayJsonRequest<SlipwayApplicationHoldReleaseResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: applicationHoldReleasePath(input.applicationRef, input.owner),
+    body: {
+      confirm: input.yes === true,
+      holdId: input.holdId,
+      reason: input.reason
+    },
+    requestErrorCode: "SLIPWAY_APPLICATION_HOLD_RELEASE_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not request a Liskov Application hold release"
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const body = request.body;
+
+  // A release is already recorded and not yet applied. The route answers this
+  // for a preview as much as a confirm, and answers it `ok: true`: the
+  // requested state holds, so asking twice is a success, not a failure.
+  if (body?.noop === true) {
+    writeStructuredOrHuman(options, input.json, body, formatApplicationHoldReleaseNoop(input.applicationRef, body));
+    return 0;
+  }
+
+  if (body?.ok === true && !body.refusal) {
+    writeStructuredOrHuman(options, input.json, body, formatApplicationHoldRelease(input.applicationRef, body));
+    return 0;
+  }
+
+  const refusalCode = typeof body?.refusal?.code === "string" ? body.refusal.code : undefined;
+  if (refusalCode !== undefined) {
+    writeStructuredOrHuman(options, input.json, body, formatApplicationHoldReleaseRefusal(
+      input.applicationRef,
+      refusalCode,
+      typeof body?.refusal?.detail === "string" ? body.refusal.detail : undefined,
+      Array.isArray(body?.openHolds) ? body.openHolds : []
+    ));
+    return 1;
+  }
+
+  const ambiguous = body?.error === "ambiguous_application" && Array.isArray(body.candidates);
+  const error = request.response.status === 401
+    ? "SLIPWAY_SESSION_UNAUTHORIZED"
+    : ambiguous
+      ? "SLIPWAY_APPLICATION_AMBIGUOUS"
+      : "SLIPWAY_APPLICATION_HOLD_RELEASE_FAILED";
+  writeStructuredOrHuman(options, input.json, {
+    ok: false,
+    error,
+    status: request.response.status,
+    reason: body?.reason ?? body?.error,
+    applicationRef: input.applicationRef,
+    candidates: body?.candidates,
+    slipwayUrl: request.slipwayUrl,
+    sessionFile: request.sessionFile
+  }, ambiguous
+    ? formatApplicationAmbiguity(input.applicationRef, body!.candidates!)
+    : formatApplicationHoldReleaseFailure(input.applicationRef, error, body?.reason));
   return 1;
 }
 
@@ -6766,6 +6891,13 @@ function applicationRunPath(applicationRef: string, owner: string | undefined): 
   return `${pathValue}?${query.toString()}`;
 }
 
+function applicationHoldReleasePath(applicationRef: string, owner: string | undefined): string {
+  const pathValue = `/api/applications/${encodeURIComponent(applicationRef)}/holds/release`;
+  if (!owner || !owner.trim()) return pathValue;
+  const query = new URLSearchParams({ owner: owner.trim() });
+  return `${pathValue}?${query.toString()}`;
+}
+
 function applicationRepositoryPath(applicationRef: string, owner: string | undefined): string {
   const pathValue = `/api/applications/${encodeURIComponent(applicationRef)}/repository`;
   if (!owner || !owner.trim()) return pathValue;
@@ -7506,6 +7638,79 @@ const APPLICATION_RUN_REFUSALS: Record<string, { cliCode: string; remedy: (appli
       `Watch it with \`proof liskov application execution show ${applicationRef} --watch --until-terminal\`, then run again once it settles.`
   }
 };
+
+/** `slot-0 · g3`, or whichever half the server could name. */
+function holdCoordinate(hold: SlipwayApplicationHoldSummary): string {
+  const slot = typeof hold.stableSlotId === "string" && hold.stableSlotId !== "" ? hold.stableSlotId : undefined;
+  const generation = typeof hold.generation === "number" ? `g${hold.generation}` : undefined;
+  if (slot !== undefined && generation !== undefined) return `${slot} · ${generation}`;
+  return slot ?? generation ?? "a job";
+}
+
+function formatHoldLine(hold: SlipwayApplicationHoldSummary): string {
+  const held = typeof hold.heldAtMs === "number" ? ` held since ${new Date(hold.heldAtMs).toISOString()}` : "";
+  const pending = hold.pendingRelease ? " (release already requested)" : "";
+  return `- ${holdCoordinate(hold)}${held}${pending}; hold ${typeof hold.holdId === "string" ? hold.holdId : "unknown"}`;
+}
+
+const APPLICATION_HOLD_RELEASE_REFUSALS: Record<string, { cliCode: string; remedy: (applicationRef: string) => string }> = {
+  failure_hold_not_open: {
+    cliCode: "SLIPWAY_APPLICATION_HOLD_NOT_OPEN",
+    remedy: (applicationRef) => `Nothing to release: no job of ${applicationRef} is held. Read Coverage for what the application is doing.`
+  },
+  failure_hold_ambiguous: {
+    cliCode: "SLIPWAY_APPLICATION_HOLD_AMBIGUOUS",
+    remedy: () => "Name the hold to release with --hold-id."
+  }
+};
+
+function formatApplicationHoldReleaseRefusal(applicationRef: string, code: string, detail: string | undefined, openHolds: SlipwayApplicationHoldSummary[]): string {
+  const known = APPLICATION_HOLD_RELEASE_REFUSALS[code];
+  const sentence = detail === undefined || detail.trim() === ""
+    ? `Liskov refused to release a hold of Application ${applicationRef}`
+    : detail.trim();
+  const lines = [`Error (${known?.cliCode ?? "SLIPWAY_APPLICATION_HOLD_RELEASE_FAILED"}): ${/[.!?]$/u.test(sentence) ? sentence : `${sentence}.`}`];
+  for (const hold of openHolds) lines.push(formatHoldLine(hold));
+  // An unrecognized code is echoed rather than renamed. The route's refusal
+  // vocabulary is not append-guaranteed, and a stale client must not hide one.
+  lines.push(known === undefined ? `Server refusal code: ${code}.` : known.remedy(applicationRef));
+  return lines.join("\n");
+}
+
+function formatApplicationHoldReleaseFailure(applicationRef: string, error: string, reason: unknown): string {
+  const detail = typeof reason === "string" && reason.trim() !== "" ? reason.trim() : undefined;
+  return `Error (${error}): Liskov could not request a hold release for Application ${applicationRef}${detail === undefined ? "" : ` (${detail})`}.`;
+}
+
+function formatApplicationHoldReleaseNoop(applicationRef: string, body: SlipwayApplicationHoldReleaseResponse): string {
+  const coordinate = body.hold ? holdCoordinate(body.hold) : "a job";
+  return [
+    `${applicationRef} already has a release of ${coordinate} requested and not yet applied.`,
+    "Asking again does not queue a second release; the executor applies it on its next pass."
+  ].join("\n");
+}
+
+/**
+ * The preview and the accepted confirm share one body, so they share one
+ * formatter; `requested` is the only field whose meaning differs.
+ *
+ * Nothing here promises a relaunch. The route records intent; the executor
+ * applies the release and then plans the next generation under the same
+ * policy, so the wording is always that the release *would be* or *is*
+ * requested.
+ */
+function formatApplicationHoldRelease(applicationRef: string, body: SlipwayApplicationHoldReleaseResponse): string {
+  const requested = body.requested === true;
+  const coordinate = body.hold ? holdCoordinate(body.hold) : "the held job";
+  const lines = [requested
+    ? `Requested the release of ${coordinate} of ${applicationRef}.`
+    : `Dry run: ${coordinate} of ${applicationRef} would be released.`];
+  if (body.hold) lines.push(formatHoldLine(body.hold));
+  lines.push(requested
+    ? `Liskov applies it on the executor's next pass and plans the next generation under the current policy. Track it with \`proof liskov application execution show ${applicationRef} --watch\`.`
+    : "This releases the hold without changing the policy; the next generation launches under the current revision. Add --yes to request the release.");
+  return lines.join("\n");
+}
 
 function formatApplicationRunRefusal(applicationRef: string, code: string, detail: string | undefined): string {
   const known = APPLICATION_RUN_REFUSALS[code];
