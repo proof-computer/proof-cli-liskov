@@ -1,8 +1,9 @@
 import { Command, Flags, type Interfaces } from "@oclif/core";
+import { AnalyticsCommand } from "../../analytics-command.js";
 
 import { runSlipwayLogout } from "../../session.js";
 
-export default class SlipwayLogout extends Command {
+export default class SlipwayLogout extends AnalyticsCommand {
   static description = "Remove the local Liskov CLI session.";
   static examples = [
     "<%= config.bin %> liskov logout",

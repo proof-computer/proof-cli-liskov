@@ -1,6 +1,7 @@
 import { Command } from "@oclif/core";
+import { AnalyticsCommand } from "../../../analytics-command.js";
 
-export default class SlipwayAdminRetirement extends Command {
+export default class SlipwayAdminRetirement extends AnalyticsCommand {
   static description = "Platform-admin retirement lineage operations.";
   static examples = [
     "<%= config.bin %> liskov admin retirement adjudicate-lineage --help"

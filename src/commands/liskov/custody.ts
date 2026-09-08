@@ -1,6 +1,7 @@
 import { Command } from "@oclif/core";
+import { AnalyticsCommand } from "../../analytics-command.js";
 
-export default class SlipwayCustody extends Command {
+export default class SlipwayCustody extends AnalyticsCommand {
   static description = "Operate Liskov live custody for internal Applications.";
   static strict = false;
   static examples = [

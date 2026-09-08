@@ -96,6 +96,11 @@ private/internal plugin commands that use the saved GitHub App CLI session and
 the server's readable-Application checks. The private `liskov:ops` sr25519
 login remains an operator recovery path, not the normal builder-facing command.
 
+Liskov commands report one bounded completion event to the Liskov API by
+default: the command id, plugin version, and success or failure. Arguments,
+flag values, output, local paths, application names, and token material are not
+included. Add `--no-analytics` to any invocation to suppress that event.
+
 Organization billing, Service Credit, and billing-transaction commands are
 read-only projections of the existing Liskov routes. Network-backed
 organization-scoped commands accept an exact organization ID or slug through

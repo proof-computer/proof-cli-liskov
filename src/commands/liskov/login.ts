@@ -1,9 +1,10 @@
 import { Command, Flags, type Interfaces } from "@oclif/core";
+import { AnalyticsCommand } from "../../analytics-command.js";
 
 import { LISKOV_SESSION_TOKEN_ENV, liskovUrlFlag } from "../../organization-context.js";
 import { runSlipwayLogin } from "../../session.js";
 
-export default class SlipwayLogin extends Command {
+export default class SlipwayLogin extends AnalyticsCommand {
   static description = "Start browser-confirmed Liskov CLI login.";
   static examples = [
     "<%= config.bin %> liskov login",

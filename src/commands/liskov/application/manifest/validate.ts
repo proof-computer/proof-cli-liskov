@@ -1,13 +1,14 @@
 import { readFile } from "node:fs/promises";
 
 import { Command, Flags, type Interfaces } from "@oclif/core";
+import { AnalyticsCommand } from "../../../../analytics-command.js";
 
 import {
   evaluateApplicationManifestText,
   type PolicyContractEvaluation
 } from "../../../../application-policy.js";
 
-export default class LiskovApplicationManifestValidate extends Command {
+export default class LiskovApplicationManifestValidate extends AnalyticsCommand {
   static description = "Strictly validate an authored Application manifest v4 or retained V5 file without publishing it.";
   static examples = [
     "<%= config.bin %> liskov application manifest validate --file .liskov/application-manifest.json",

@@ -1,8 +1,9 @@
 import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+import { AnalyticsCommand } from "../../../../analytics-command.js";
 
 import { runSlipwayAdminRetirementAdjudicateLineage } from "../../../../session.js";
 
-export default class SlipwayAdminRetirementAdjudicateLineage extends Command {
+export default class SlipwayAdminRetirementAdjudicateLineage extends AnalyticsCommand {
   static args = {
     uid: Args.string({ description: "Canonical application UID.", required: true })
   };

@@ -1,8 +1,9 @@
 import { Command, Flags, type Interfaces } from "@oclif/core";
+import { AnalyticsCommand } from "../../../analytics-command.js";
 
 import { runSlipwayOrganizationList } from "../../../session.js";
 
-export default class LiskovOrganizationList extends Command {
+export default class LiskovOrganizationList extends AnalyticsCommand {
   static description = "List organizations available to the current Liskov session.";
   static flags: Interfaces.FlagInput = {
     config: Flags.string({ description: "Path to the local Liskov session file." }),

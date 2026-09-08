@@ -72,6 +72,7 @@ import {
   readLaunchEligibility,
   type LaunchEligibilityRead
 } from "./launch-eligibility.js";
+import { cliAnalyticsHeaders } from "./analytics-context.js";
 
 export const DEFAULT_SLIPWAY_URL = "https://console.liskov.proof.computer";
 const LEGACY_LISKOV_URL = "https://liskov.proof.computer";
@@ -1330,6 +1331,7 @@ async function loginWithMintedSessionToken(input: {
     response = await input.fetchImpl(new URL("/api/session", input.slipwayUrl), {
       method: "GET",
       headers: {
+        ...cliAnalyticsHeaders(),
         accept: "application/json",
         authorization: `Bearer ${input.sessionToken}`
       }
@@ -1406,6 +1408,7 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
     response = await fetchImpl(new URL("/api/cli-login/pending", slipwayUrl), {
       method: "POST",
       headers: {
+        ...cliAnalyticsHeaders(),
         accept: "application/json",
         "content-type": "application/json"
       },
@@ -1481,6 +1484,7 @@ export async function runSlipwayLogin(input: SlipwayLoginInput, options: Slipway
       pollResponse = await fetchImpl(new URL(`/api/cli-login/${encodeURIComponent(pendingLoginId)}/poll`, slipwayUrl), {
         method: "POST",
         headers: {
+          ...cliAnalyticsHeaders(),
           accept: "application/json",
           "content-type": "application/json"
         },
@@ -6637,7 +6641,7 @@ function auditEnvironmentVariables(variables: readonly { key: string; value: str
   }
 }
 
-async function readSlipwaySession(sessionFile: string): Promise<SlipwaySessionFile | undefined> {
+export async function readSlipwaySession(sessionFile: string): Promise<SlipwaySessionFile | undefined> {
   try {
     const parsed = JSON.parse(await readFile(sessionFile, "utf8")) as Partial<SlipwaySessionFile>;
     if (parsed.version !== 1 || typeof parsed.slipwayUrl !== "string" || typeof parsed.sessionToken !== "string") {

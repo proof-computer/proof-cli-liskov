@@ -1,6 +1,7 @@
 import { Command } from "@oclif/core";
+import { AnalyticsCommand } from "../../analytics-command.js";
 
-export default class SlipwayApplication extends Command {
+export default class SlipwayApplication extends AnalyticsCommand {
   static description = "Read Liskov Application state.";
   static strict = false;
   static summary = "Read Liskov Application state.";

@@ -1,6 +1,8 @@
-import { Command, Flags, type Interfaces } from "@oclif/core";
+import { Flags, type Interfaces } from "@oclif/core";
 
 import type { LiskovOrganizationSummary } from "./organization-client.js";
+import { AnalyticsCommand } from "./analytics-command.js";
+import { cliAnalyticsHeaders } from "./analytics-context.js";
 
 export const LISKOV_ORGANIZATION_ENV = "LISKOV_ORGANIZATION";
 export const LISKOV_URL_ENV = "LISKOV_URL";
@@ -16,8 +18,9 @@ export function liskovUrlFlag(): Interfaces.OptionFlag<string | undefined> {
   });
 }
 
-export abstract class OrganizationScopedCommand extends Command {
+export abstract class OrganizationScopedCommand extends AnalyticsCommand {
   static baseFlags: Interfaces.FlagInput = {
+    ...AnalyticsCommand.baseFlags,
     organization: Flags.string({
       description: `Use an exact Liskov organization ID or slug for this command. Defaults to ${LISKOV_ORGANIZATION_ENV}, then the session organization.`,
       env: LISKOV_ORGANIZATION_ENV,
@@ -68,10 +71,12 @@ export function organizationRequestHeaders(
   const selector = organizationSelector(selectorValue);
   return selector === undefined
     ? {
+        ...cliAnalyticsHeaders(),
         accept: "application/json",
         authorization: `Bearer ${sessionToken}`
       }
     : {
+        ...cliAnalyticsHeaders(),
         accept: "application/json",
         authorization: `Liskov-Organization ${sessionToken}`,
         "x-liskov-organization": selector

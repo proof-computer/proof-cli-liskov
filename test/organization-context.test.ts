@@ -45,11 +45,15 @@ test("canonical organization resolution prefers an exact ID over an exact slug c
 test("request organization headers use a fail-closed authorization scheme", () => {
   assert.deepEqual(organizationRequestHeaders("token", undefined), {
     accept: "application/json",
-    authorization: "Bearer token"
+    authorization: "Bearer token",
+    "user-agent": "proof-cli-liskov/unknown",
+    "x-liskov-analytics": "1"
   });
   assert.deepEqual(organizationRequestHeaders("token", " request-org "), {
     accept: "application/json",
     authorization: "Liskov-Organization token",
+    "user-agent": "proof-cli-liskov/unknown",
+    "x-liskov-analytics": "1",
     "x-liskov-organization": "request-org"
   });
 });

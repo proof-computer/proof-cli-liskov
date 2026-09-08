@@ -1,8 +1,9 @@
 import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+import { AnalyticsCommand } from "../../../../analytics-command.js";
 
 import { runSlipwayAdminDeploySpendResolve } from "../../../../session.js";
 
-export default class SlipwayAdminDeploySpendResolve extends Command {
+export default class SlipwayAdminDeploySpendResolve extends AnalyticsCommand {
   static args = {
     reserve: Args.string({ description: "Deploy-spend reserve id.", required: true })
   };

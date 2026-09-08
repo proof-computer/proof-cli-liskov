@@ -1,8 +1,9 @@
 import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+import { AnalyticsCommand } from "../../../../analytics-command.js";
 
 import { runSlipwayAdminDeploySubmitRecovery } from "../../../../session.js";
 
-export default class SlipwayAdminExecutorOperationRecoverDeploySubmit extends Command {
+export default class SlipwayAdminExecutorOperationRecoverDeploySubmit extends AnalyticsCommand {
   static args = {
     operation_id: Args.string({ description: "Canonical deploy_submit executor operation id.", required: true })
   };

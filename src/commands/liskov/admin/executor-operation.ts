@@ -1,6 +1,7 @@
 import { Command } from "@oclif/core";
+import { AnalyticsCommand } from "../../../analytics-command.js";
 
-export default class SlipwayAdminExecutorOperation extends Command {
+export default class SlipwayAdminExecutorOperation extends AnalyticsCommand {
   static description = "Guarded Liskov executor-operation repair commands.";
   static summary = "Guarded executor-operation repair commands.";
 
