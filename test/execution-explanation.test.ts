@@ -28,6 +28,9 @@ interface EffectOverrides {
   observationStatus?: string | null;
   closeoutOutcome?: string | null;
   jobId?: string | null;
+  providerJobIdentity?: string | null;
+  actualSchedule?: { startAtMs: number; endAtMs: number } | null;
+  providerEvidenceCode?: string | null;
   refusal?: { code: string } | null;
 }
 
@@ -44,6 +47,9 @@ function effect(overrides: EffectOverrides = {}): Record<string, unknown> {
     observationStatus: overrides.observationStatus === undefined ? "terminal" : overrides.observationStatus,
     closeoutOutcome: overrides.closeoutOutcome === undefined ? null : overrides.closeoutOutcome,
     jobId: overrides.jobId === undefined ? "155065" : overrides.jobId,
+    providerJobIdentity: overrides.providerJobIdentity === undefined ? "[{\"name\":\"Acurast\"},155065]" : overrides.providerJobIdentity,
+    actualSchedule: overrides.actualSchedule === undefined ? null : overrides.actualSchedule,
+    providerEvidenceCode: overrides.providerEvidenceCode === undefined ? null : overrides.providerEvidenceCode,
     traceId: "policy-trace:sha256:aa",
     lastTraceSequence: 2,
     traceTerminal: false,
@@ -228,6 +234,45 @@ describe("typed-spine execution view", () => {
     assert.equal(spend.lineages[0]?.settlementDisposition, null);
   });
 
+  it("exposes the finalized job identity before terminal observation, even while the candidate stays mutation_armed", () => {
+    const envelope = typedSpineEnvelope({
+      provenance: {
+        stage: "effect_submitted",
+        effect: effect({
+          state: "mutation_armed",
+          observationStatus: null,
+          jobId: "155065",
+          providerJobIdentity: "[{\"name\":\"Acurast\"},155065]",
+          actualSchedule: { startAtMs: 1_788_915_300_000, endAtMs: 1_788_918_900_001 }
+        })
+      }
+    });
+    const view = executionView(parse(envelope));
+    assert.equal(view.effect?.state, "mutation_armed", "the candidate lane's own state is not relabeled");
+    assert.equal(view.effect?.jobId, "155065");
+    assert.equal(view.effect?.providerJobIdentity, "[{\"name\":\"Acurast\"},155065]");
+    assert.deepEqual(view.effect?.actualSchedule, { startAtMs: 1_788_915_300_000, endAtMs: 1_788_918_900_001 });
+    const text = formatExecutionExplanation(parse(envelope));
+    assert.match(text, /job 155065/);
+  });
+
+  it("distinguishes the finalized provider window from any prepared one, and says so explicitly when it is unavailable", () => {
+    const delayed = typedSpineEnvelope({
+      provenance: { effect: effect({ actualSchedule: { startAtMs: 1_788_915_300_000, endAtMs: 1_788_918_900_001 } }) }
+    });
+    const text = formatExecutionExplanation(parse(delayed));
+    assert.match(text, /actual window 2026-.*Z -> 2026-.*Z/);
+
+    const missing = typedSpineEnvelope({
+      provenance: { effect: effect({ providerEvidenceCode: "provider_actual_schedule_missing" }) }
+    });
+    const missingText = formatExecutionExplanation(parse(missing));
+    assert.match(missingText, /actual window not reported: provider_actual_schedule_missing/);
+
+    const noReceipt = typedSpineEnvelope({ provenance: { effect: effect() } });
+    assert.doesNotMatch(formatExecutionExplanation(parse(noReceipt)), /actual window/, "no receipt yet means no actual-window line at all, not a guessed one");
+  });
+
   it("renders unreported facts as 'not reported' rather than a guess", () => {
     const envelope = typedSpineEnvelope({
       provenance: {
@@ -342,6 +387,17 @@ describe("typed-spine execution view", () => {
     assert.ok(paths.includes("execution.effectState"));
     assert.ok(paths.includes("spendCloseout.code"));
     assert.ok(paths.includes("spendCloseout.lineages[0].settlementDisposition"));
+  });
+
+  it("treats a finalized receipt's arrival as a semantic change, even while the state stays mutation_armed", () => {
+    const armedNoReceipt = parse(typedSpineEnvelope({ provenance: { effect: effect({ state: "mutation_armed", jobId: null, providerJobIdentity: null }) } }));
+    const armedWithReceipt = parse(typedSpineEnvelope({
+      provenance: { effect: effect({ state: "mutation_armed", actualSchedule: { startAtMs: 1_788_915_300_000, endAtMs: 1_788_918_900_001 } }) }
+    }));
+    assert.notEqual(executionDigest(armedNoReceipt), executionDigest(armedWithReceipt));
+    const paths = executionChanges(armedNoReceipt, armedWithReceipt).map((change) => change.path);
+    assert.ok(paths.includes("execution.jobId"));
+    assert.ok(paths.includes("execution.actualSchedule.startAtMs"));
   });
 });
 

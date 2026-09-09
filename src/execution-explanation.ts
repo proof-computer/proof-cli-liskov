@@ -66,6 +66,16 @@ export interface ExecutionReceipts {
   closeout: boolean;
 }
 
+/**
+ * The finalized provider window, anchored at submission — distinct from any
+ * authored/prepared window, and never fabricated from a runtime contact
+ * interval (`BKLG-20260908-1diq`).
+ */
+export interface ExecutionActualSchedule {
+  startAtMs: number;
+  endAtMs: number;
+}
+
 export interface ExecutionEffectView {
   operationId: string | null;
   operationRevision: number | null;
@@ -76,6 +86,16 @@ export interface ExecutionEffectView {
   observationStatus: string | null;
   closeoutOutcome: string | null;
   jobId: string | null;
+  /** The provider's whole persisted identity, beside the number in `jobId`. */
+  providerJobIdentity: string | null;
+  /**
+   * The finalized provider's submission-relative schedule, distinct from any
+   * prepared window. `null` while no receipt is persisted, or the receipt
+   * cannot back an exact schedule — `providerEvidenceCode` says which.
+   */
+  actualSchedule: ExecutionActualSchedule | null;
+  /** Stable owner-read code for missing or conflicting provider evidence. */
+  providerEvidenceCode: string | null;
   traceId: string | null;
   refusal: string | null;
 }
@@ -329,6 +349,9 @@ function semanticFacts(explanation: PolicyExplanation): Record<string, unknown> 
       observationStatus: execution.effect?.observationStatus ?? null,
       closeoutOutcome: execution.effect?.closeoutOutcome ?? null,
       jobId: execution.effect?.jobId ?? null,
+      providerJobIdentity: execution.effect?.providerJobIdentity ?? null,
+      actualSchedule: execution.effect?.actualSchedule ?? null,
+      providerEvidenceCode: execution.effect?.providerEvidenceCode ?? null,
       effectRefusal: execution.effect?.refusal ?? null,
       blockerCode: execution.blocker?.code ?? null,
       blockerProvenance: execution.blocker?.provenance ?? null,
@@ -409,9 +432,20 @@ function effectView(value: unknown): ExecutionEffectView | null {
     observationStatus: optionalString(record.observationStatus),
     closeoutOutcome: optionalString(record.closeoutOutcome),
     jobId: optionalString(record.jobId),
+    providerJobIdentity: optionalString(record.providerJobIdentity),
+    actualSchedule: actualScheduleOf(record.actualSchedule),
+    providerEvidenceCode: optionalString(record.providerEvidenceCode),
     traceId: optionalString(record.traceId),
     refusal: refusalCode(record.refusal)
   };
+}
+
+function actualScheduleOf(value: unknown): ExecutionActualSchedule | null {
+  const record = asObject(value);
+  if (!record) return null;
+  const startAtMs = optionalInteger(record.startAtMs);
+  const endAtMs = optionalInteger(record.endAtMs);
+  return startAtMs === null || endAtMs === null ? null : { startAtMs, endAtMs };
 }
 
 function attemptsView(value: unknown): ExecutionAttemptView[] {
@@ -491,6 +525,15 @@ function effectLines(label: string, effect: ExecutionEffectView): string[] {
     effect.nextActionAtMs !== null ? `next action ${new Date(effect.nextActionAtMs).toISOString()}` : undefined
   ].filter((item): item is string => item !== undefined);
   if (facts.length > 0) lines.push(`${indentOf(label)}  ${facts.join("; ")}`);
+  // The finalized provider identity and its actual, submission-relative
+  // window are distinct facts from the candidate state above: a receipt can
+  // land while the effect is still `mutation_armed` (BKLG-20260908-1diq), and
+  // a delayed submission's real window is never the same as any prepared one.
+  if (effect.actualSchedule) {
+    lines.push(`${indentOf(label)}  actual window ${new Date(effect.actualSchedule.startAtMs).toISOString()} -> ${new Date(effect.actualSchedule.endAtMs).toISOString()}`);
+  } else if (effect.providerEvidenceCode) {
+    lines.push(`${indentOf(label)}  actual window not reported: ${effect.providerEvidenceCode}`);
+  }
   if (effect.refusal) lines.push(`${indentOf(label)}  refusal: ${effect.refusal}`);
   return lines;
 }
