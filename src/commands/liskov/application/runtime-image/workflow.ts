@@ -1,8 +1,9 @@
 import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+import { AnalyticsCommand } from "../../../../analytics-command.js";
 
 import { runSlipwayApplicationRuntimeImageWorkflow } from "../../../../session.js";
 
-export default class SlipwayApplicationRuntimeImageWorkflow extends Command {
+export default class SlipwayApplicationRuntimeImageWorkflow extends AnalyticsCommand {
   static args = {
     app_id: Args.string({ description: "Liskov Application id declared by the manifest.", required: true })
   };

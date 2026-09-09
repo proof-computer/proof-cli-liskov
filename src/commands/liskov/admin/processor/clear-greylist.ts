@@ -1,8 +1,9 @@
 import { Args, Command, Flags, type Interfaces } from "@oclif/core";
+import { AnalyticsCommand } from "../../../../analytics-command.js";
 
 import { runSlipwayAdminProcessorClearGreylist } from "../../../../session.js";
 
-export default class SlipwayAdminProcessorClearGreylist extends Command {
+export default class SlipwayAdminProcessorClearGreylist extends AnalyticsCommand {
   static args = {
     processor_id: Args.string({ description: "Processor id to clear from the greylist.", required: true })
   };

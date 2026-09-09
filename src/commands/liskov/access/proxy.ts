@@ -1,4 +1,5 @@
 import { Command, Flags, type Interfaces } from "@oclif/core";
+import { AnalyticsCommand } from "../../../analytics-command.js";
 
 import { ManagedAccessProxyError, runManagedAccessProxy } from "../../../managed-access-proxy.js";
 
@@ -27,7 +28,7 @@ export function accessProxyAdvice(code: string): string {
   }
 }
 
-export default class LiskovAccessProxy extends Command {
+export default class LiskovAccessProxy extends AnalyticsCommand {
   static description = "Internal managed Runtime SSH ProxyCommand transport.";
   static hidden = true;
   static flags: Interfaces.FlagInput = {

@@ -1,6 +1,7 @@
 import { Command } from "@oclif/core";
+import { AnalyticsCommand } from "../../../analytics-command.js";
 
-export default class SlipwayAdminProcessor extends Command {
+export default class SlipwayAdminProcessor extends AnalyticsCommand {
   static description = "Manage Liskov processor greylist state.";
   static examples = [
     "<%= config.bin %> liskov admin processor list --greylisted",

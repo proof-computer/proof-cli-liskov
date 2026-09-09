@@ -1,6 +1,7 @@
 import { Command } from "@oclif/core";
+import { AnalyticsCommand } from "../../analytics-command.js";
 
-export default class LiskovOrganization extends Command {
+export default class LiskovOrganization extends AnalyticsCommand {
   static description = "Select or read Liskov organization and billing state.";
   static strict = false;
   static summary = "Read Liskov organization and billing state.";
