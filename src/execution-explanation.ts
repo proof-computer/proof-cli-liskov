@@ -530,9 +530,9 @@ function effectLines(label: string, effect: ExecutionEffectView): string[] {
   // land while the effect is still `mutation_armed` (BKLG-20260908-1diq), and
   // a delayed submission's real window is never the same as any prepared one.
   if (effect.actualSchedule) {
-    lines.push(`${indentOf(label)}  actual window ${new Date(effect.actualSchedule.startAtMs).toISOString()} -> ${new Date(effect.actualSchedule.endAtMs).toISOString()}`);
+    lines.push(`${indentOf(label)}  registered window ${new Date(effect.actualSchedule.startAtMs).toISOString()} -> ${new Date(effect.actualSchedule.endAtMs).toISOString()}`);
   } else if (effect.providerEvidenceCode) {
-    lines.push(`${indentOf(label)}  actual window not reported: ${effect.providerEvidenceCode}`);
+    lines.push(`${indentOf(label)}  registered window not reported: ${effect.providerEvidenceCode}`);
   }
   if (effect.refusal) lines.push(`${indentOf(label)}  refusal: ${effect.refusal}`);
   return lines;
