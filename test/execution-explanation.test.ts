@@ -261,16 +261,34 @@ describe("typed-spine execution view", () => {
       provenance: { effect: effect({ actualSchedule: { startAtMs: 1_788_915_300_000, endAtMs: 1_788_918_900_001 } }) }
     });
     const text = formatExecutionExplanation(parse(delayed));
-    assert.match(text, /actual window 2026-.*Z -> 2026-.*Z/);
+    assert.match(text, /registered window 2026-.*Z -> 2026-.*Z/);
 
     const missing = typedSpineEnvelope({
       provenance: { effect: effect({ providerEvidenceCode: "provider_actual_schedule_missing" }) }
     });
     const missingText = formatExecutionExplanation(parse(missing));
-    assert.match(missingText, /actual window not reported: provider_actual_schedule_missing/);
+    assert.match(missingText, /registered window not reported: provider_actual_schedule_missing/);
 
     const noReceipt = typedSpineEnvelope({ provenance: { effect: effect() } });
-    assert.doesNotMatch(formatExecutionExplanation(parse(noReceipt)), /actual window/, "no receipt yet means no actual-window line at all, not a guessed one");
+    assert.doesNotMatch(formatExecutionExplanation(parse(noReceipt)), /registered window/, "no receipt yet means no registered-window line at all, not a guessed one");
+  });
+
+  it("prints the standing-app g32 registered window, never the plan as bought (BKLG-20260910-5mfs)", () => {
+    const registeredStart = Date.parse("2026-09-10T14:35:15.000Z");
+    const registeredEnd = Date.parse("2026-09-10T15:35:15.000Z");
+    const delayed = typedSpineEnvelope({
+      provenance: {
+        effect: effect({
+          actualSchedule: { startAtMs: registeredStart, endAtMs: registeredEnd }
+        })
+      }
+    });
+    const text = formatExecutionExplanation(parse(delayed));
+    assert.match(
+      text,
+      /registered window 2026-09-10T14:35:15.000Z -> 2026-09-10T15:35:15.000Z/
+    );
+    assert.doesNotMatch(text, /13:44:54/);
   });
 
   it("renders unreported facts as 'not reported' rather than a guess", () => {
