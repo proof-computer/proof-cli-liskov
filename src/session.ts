@@ -51,12 +51,15 @@ import {
 } from "./policy-explanation.js";
 import {
   executionChanges,
+  executionConvergencePath,
   executionDigest,
   executionStableBlocker,
   executionTerminal,
   formatExecutionChange,
+  formatExecutionConvergence,
   formatExecutionExplanation,
-  formatExecutionStatusLine
+  formatExecutionStatusLine,
+  parseExecutionConvergence
 } from "./execution-explanation.js";
 import {
   APPLICATION_LOGS_HEADER,
@@ -1841,8 +1844,30 @@ export async function runSlipwayApplicationExecutionShow(
     return 1;
   }
   if (input.watch !== true) {
-    // `--json` is the verbatim server envelope, as every read command prints it.
-    writeStructuredOrHuman(options, input.json, first.body, formatExecutionExplanation(parsed.explanation));
+    const convergenceRequest = await authenticatedSlipwayRequest<unknown>({
+      config: input.config,
+      slipwayUrl: input.slipwayUrl,
+      json: input.json,
+      path: executionConvergencePath(input.applicationId),
+      requestErrorCode: "SLIPWAY_APPLICATION_EXECUTION_CONVERGENCE_FAILED",
+      notFoundMessage: "No Liskov CLI session is stored locally.",
+      fetchFailedMessage: "could not read Liskov Application execution convergence",
+      optional: true
+    }, options);
+    const convergence = convergenceRequest.ok
+      ? parseExecutionConvergence(convergenceRequest.body)
+      : parseExecutionConvergence({ refusal: { code: "execution_convergence_owner_unavailable" } });
+    // `--json` keeps the explanation envelope's existing fields and adds the
+    // adjacent t89g document without dropping IDs. Old servers decode as a
+    // typed refusal, never as invented quiet.
+    writeStructuredOrHuman(
+      options,
+      input.json,
+      input.json
+        ? { explanation: first.body, convergence: convergence.ok ? convergence.document : { refusal: { code: convergence.error } } }
+        : first.body,
+      [formatExecutionExplanation(parsed.explanation), formatExecutionConvergence(convergence)].join("\n")
+    );
     return 0;
   }
 

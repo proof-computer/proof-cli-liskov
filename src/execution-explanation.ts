@@ -584,3 +584,160 @@ function optionalString(value: unknown): string | null {
 function optionalInteger(value: unknown): number | null {
   return Number.isSafeInteger(value) ? value as number : null;
 }
+
+export const EXECUTION_CONVERGENCE_SCHEMA = "proof.liskov.execution-convergence.v1";
+export const EXECUTION_CONVERGENCE_BYTE_BUDGET = 48 * 1024;
+
+const CONVERGENCE_REQUIRED = [
+  "schema", "capturedAtMs", "completeness", "intended", "effective", "pending",
+  "selected", "proposed", "occupancy", "oldLiability", "reviewPendingLiability",
+  "lastProgress", "nextDueAtMs", "progress", "stalled"
+] as const;
+
+/** Quiet fixture pinned by d7i4/t89g. 6v4t must accept this corpus unchanged. */
+export const QUIET_CONVERGENCE_CORPUS = {
+  schema: EXECUTION_CONVERGENCE_SCHEMA,
+  capturedAtMs: 10,
+  completeness: "complete",
+  intended: {
+    orgId: "org", applicationId: "app", applicationUid: "uid", status: "active",
+    activePointerVersion: 1, compiledDigest: "digest", memberSlots: ["slot-0"]
+  },
+  effective: {
+    members: [{
+      slotId: "slot-0",
+      newestAttempted: { generation: null, completeness: "complete" },
+      newestSettled: { generation: null, completeness: "complete" }
+    }]
+  },
+  pending: { draining: false, openReserveCount: 0, truncated: false },
+  selected: { label: "unsupported", kind: null, reason: "selected writer waits on 3sx1", mismatchClass: null },
+  proposed: { label: "absent", kind: null, reason: "shadow not supplied this tick", mismatchClass: null },
+  occupancy: [{ slotId: "slot-0", occupancy: "vacant", exposure: "settled" }],
+  oldLiability: {
+    page: { identities: [], hasMore: false, nextCursor: null },
+    money: {
+      unit: null, lineages: [], openReserve: "0", settledDebit: "0",
+      conservativeUnknown: "0", completeness: "complete"
+    },
+    truncated: false
+  },
+  reviewPendingLiability: { identities: [], hasMore: false, nextCursor: null },
+  lastProgress: { atMs: null, completeness: "unsupported" },
+  nextDueAtMs: 50,
+  progress: "quiet",
+  stalled: false
+} as const;
+
+export type ExecutionConvergenceParse =
+  | { ok: true; view: ExecutionConvergenceView; document: unknown }
+  | { ok: false; withheld: boolean; error: string; message: string };
+
+export interface ExecutionConvergenceView {
+  progress: string;
+  stalled: boolean;
+  completeness: string;
+  selectedReason: string;
+  selectedLabel: string;
+  proposedReason: string;
+  proposedLabel: string;
+  mismatchClass: string | null;
+  pendingOpenReserves: number;
+  pendingTruncated: boolean;
+  reviewPendingCount: number;
+}
+
+export function executionConvergencePath(applicationId: string): string {
+  return `/api/applications/${encodeURIComponent(applicationId)}/policy?view=convergence`;
+}
+
+export function parseExecutionConvergence(body: unknown): ExecutionConvergenceParse {
+  const record = asObject(body);
+  if (!record) {
+    return { ok: false, withheld: false, error: "EXECUTION_CONVERGENCE_INVALID", message: "Convergence read must be an object." };
+  }
+  const refusal = asObject(record.refusal);
+  if (refusal && typeof refusal.code === "string") {
+    return {
+      ok: false,
+      withheld: refusal.code === "execution_convergence_unauthorized",
+      error: refusal.code,
+      message: refusal.code === "execution_convergence_unauthorized"
+        ? "Permission withheld. The server did not authorize this convergence read."
+        : `The server refused the convergence read (${refusal.code}).`
+    };
+  }
+  let encoded: string;
+  try {
+    encoded = JSON.stringify(body);
+  } catch {
+    return { ok: false, withheld: false, error: "EXECUTION_CONVERGENCE_INVALID", message: "Convergence read could not be encoded." };
+  }
+  if (encoded.length > EXECUTION_CONVERGENCE_BYTE_BUDGET) {
+    return { ok: false, withheld: false, error: "EXECUTION_CONVERGENCE_OVER_BUDGET", message: "Convergence read exceeded the 48 KiB budget." };
+  }
+  if (record.schema !== EXECUTION_CONVERGENCE_SCHEMA) {
+    return {
+      ok: false,
+      withheld: false,
+      error: "EXECUTION_CONVERGENCE_UNSUPPORTED_SCHEMA",
+      message: `Expected ${EXECUTION_CONVERGENCE_SCHEMA}; this CLI does not interpret ${typeof record.schema === "string" ? record.schema : "an unknown schema"}.`
+    };
+  }
+  for (const field of CONVERGENCE_REQUIRED) {
+    if (!Object.prototype.hasOwnProperty.call(record, field)) {
+      return { ok: false, withheld: false, error: "EXECUTION_CONVERGENCE_INVALID", message: `Convergence read is missing ${field}.` };
+    }
+  }
+  for (const key of Object.keys(record)) {
+    if (!(CONVERGENCE_REQUIRED as readonly string[]).includes(key)) {
+      return { ok: false, withheld: false, error: "EXECUTION_CONVERGENCE_INVALID", message: `Convergence read has unknown field ${key}.` };
+    }
+  }
+  const pending = asObject(record.pending);
+  const selected = asObject(record.selected);
+  const proposed = asObject(record.proposed);
+  const review = asObject(record.reviewPendingLiability);
+  if (!pending || !selected || !proposed || !review) {
+    return { ok: false, withheld: false, error: "EXECUTION_CONVERGENCE_INVALID", message: "Convergence nested facts are unreadable." };
+  }
+  const reviewIdentities = Array.isArray(review.identities) ? review.identities : [];
+  return {
+    ok: true,
+    document: body,
+    view: {
+      progress: String(record.progress),
+      stalled: record.stalled === true,
+      completeness: String(record.completeness),
+      selectedReason: typeof selected.reason === "string" ? selected.reason : "not reported",
+      selectedLabel: typeof selected.label === "string" ? selected.label : "not reported",
+      proposedReason: typeof proposed.reason === "string" ? proposed.reason : "not reported",
+      proposedLabel: typeof proposed.label === "string" ? proposed.label : "not reported",
+      mismatchClass: typeof proposed.mismatchClass === "string" ? proposed.mismatchClass : null,
+      pendingOpenReserves: Number.isSafeInteger(pending.openReserveCount) ? pending.openReserveCount as number : 0,
+      pendingTruncated: pending.truncated === true,
+      reviewPendingCount: reviewIdentities.length
+    }
+  };
+}
+
+export function formatExecutionConvergence(parsed: ExecutionConvergenceParse): string {
+  if (!parsed.ok) {
+    return [`Convergence (${EXECUTION_CONVERGENCE_SCHEMA})`, `  ${parsed.message}`].join("\n");
+  }
+  const view = parsed.view;
+  const lines = [`Convergence (${EXECUTION_CONVERGENCE_SCHEMA})`];
+  lines.push(`  progress: ${view.progress}${view.stalled ? " [stalled]" : ""}`);
+  lines.push(`  completeness: ${view.completeness}${view.pendingTruncated ? " (partial history)" : ""}`);
+  if (view.progress === "quiet") lines.push("  next: No required work. Quiet is not stalled.");
+  if (view.progress === "in_flight") lines.push("  next: Work is in flight inside its due window.");
+  if (view.progress === "unknown") lines.push("  next: Evidence is unknown; this CLI does not infer a phase.");
+  if (view.progress === "ended_unsettled") lines.push("  next: The run has ended and a charge is still open.");
+  if (view.progress === "overdue") lines.push("  next: Required work is overdue.");
+  lines.push(`  pending reserves: ${view.pendingOpenReserves}`);
+  lines.push(`  selected (${view.selectedLabel}): ${view.selectedReason}`);
+  lines.push(`  proposed (${view.proposedLabel}): ${view.proposedReason}`);
+  if (view.mismatchClass) lines.push(`  mismatch: ${view.mismatchClass}`);
+  if (view.reviewPendingCount > 0) lines.push(`  review-pending holds: ${view.reviewPendingCount}`);
+  return lines.join("\n");
+}
