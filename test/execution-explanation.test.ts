@@ -12,8 +12,12 @@ import {
   executionStableBlocker,
   executionTerminal,
   executionView,
+  formatExecutionConvergence,
   formatExecutionExplanation,
   formatExecutionStatusLine,
+  parseExecutionConvergence,
+  QUIET_CONVERGENCE_CORPUS,
+  executionConvergencePath,
   spendView
 } from "../src/execution-explanation.js";
 import { POLICY_EXPLANATION_SCHEMA, parsePolicyExplanation, policyExplanationPath } from "../src/policy-explanation.js";
@@ -419,6 +423,56 @@ describe("typed-spine execution view", () => {
   });
 });
 
+describe("execution convergence decoder (6v4t / t89g corpus)", () => {
+  it("accepts the quiet corpus and pins the seven Console states", () => {
+    const quiet = parseExecutionConvergence(QUIET_CONVERGENCE_CORPUS);
+    assert.equal(quiet.ok, true);
+    if (!quiet.ok) return;
+    assert.equal(quiet.view.progress, "quiet");
+    assert.match(formatExecutionConvergence(quiet), /Quiet is not stalled/);
+
+    const withheld = parseExecutionConvergence({ refusal: { code: "execution_convergence_unauthorized" } });
+    assert.equal(withheld.ok, false);
+    if (withheld.ok) return;
+    assert.equal(withheld.withheld, true);
+
+    const pending = parseExecutionConvergence({
+      ...QUIET_CONVERGENCE_CORPUS,
+      progress: "in_flight",
+      pending: { draining: false, openReserveCount: 1, truncated: false }
+    });
+    assert.equal(pending.ok, true);
+    if (pending.ok) assert.match(formatExecutionConvergence(pending), /in flight/);
+
+    const unknown = parseExecutionConvergence({ ...QUIET_CONVERGENCE_CORPUS, progress: "unknown", completeness: "unknown" });
+    assert.equal(unknown.ok, true);
+    if (unknown.ok) assert.match(formatExecutionConvergence(unknown), /unknown/);
+
+    const ended = parseExecutionConvergence({ ...QUIET_CONVERGENCE_CORPUS, progress: "ended_unsettled" });
+    assert.equal(ended.ok, true);
+    if (ended.ok) assert.match(formatExecutionConvergence(ended), /ended and a charge is still open/);
+
+    const partial = parseExecutionConvergence({
+      ...QUIET_CONVERGENCE_CORPUS,
+      completeness: "incomplete",
+      pending: { draining: false, openReserveCount: 0, truncated: true }
+    });
+    assert.equal(partial.ok, true);
+    if (partial.ok) assert.match(formatExecutionConvergence(partial), /partial history/);
+
+    const disagreement = parseExecutionConvergence({
+      ...QUIET_CONVERGENCE_CORPUS,
+      selected: { label: "selected", kind: null, reason: "incumbent_walk", mismatchClass: null },
+      proposed: { label: "proposed", kind: "renew", reason: "update", mismatchClass: "expected_correction" }
+    });
+    assert.equal(disagreement.ok, true);
+    if (disagreement.ok) {
+      assert.equal(disagreement.view.mismatchClass, "expected_correction");
+      assert.match(formatExecutionConvergence(disagreement), /mismatch: expected_correction/);
+    }
+  });
+});
+
 describe("application execution show", () => {
   it("reads the canonical envelope once and prints the verbatim body with --json", async () => {
     await withSession(async (sessionFile) => {
@@ -433,8 +487,13 @@ describe("application execution show", () => {
         stdout: out.write
       });
       assert.equal(code, 0);
-      assert.deepEqual(requests, [`https://liskov.test${policyExplanationPath("app_1")}`]);
-      assert.deepEqual(JSON.parse(out.text), body, "--json is the verbatim server envelope");
+      assert.deepEqual(requests, [
+        `https://liskov.test${policyExplanationPath("app_1")}`,
+        `https://liskov.test/api/applications/app_1/policy?view=convergence`
+      ]);
+      const printed = JSON.parse(out.text) as { explanation: unknown; convergence: unknown };
+      assert.deepEqual(printed.explanation, body, "existing explanation fields stay on --json");
+      assert.ok(printed.convergence, "adjacent t89g document is present");
       assert.equal(out.text.includes(TOKEN), false);
     });
   });
@@ -452,6 +511,7 @@ describe("application execution show", () => {
       assert.match(out.text, /stage: .*\[effect_observed\]/);
       assert.match(out.text, /job 155065/);
       assert.match(out.text, /lineage v5-reserve:app_1:g1:r6: 0 service_credit_micros; open_reserve/);
+      assert.match(out.text, /Convergence \(proof\.liskov\.execution-convergence\.v1\)/);
       assert.equal(out.text.includes(TOKEN), false);
     });
   });
@@ -615,7 +675,12 @@ describe("shipped execution show command over a real HTTP server", () => {
           assert.equal(out.text.includes(TOKEN), false);
         }
       });
-      assert.deepEqual(requests, [policyExplanationPath("app_1"), policyExplanationPath("app_1")]);
+      assert.deepEqual(requests, [
+        policyExplanationPath("app_1"),
+        executionConvergencePath("app_1"),
+        policyExplanationPath("app_1"),
+        executionConvergencePath("app_1")
+      ]);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
