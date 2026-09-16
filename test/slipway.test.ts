@@ -2147,6 +2147,9 @@ describe("proof-cli Liskov runner", () => {
     }, {
       url: "https://slipway.test/api/applications/alpha/policy?view=explanation",
       authorization: `Bearer ${token}`
+    }, {
+      url: "https://slipway.test/api/applications/alpha/coverage",
+      authorization: `Bearer ${token}`
     }]);
     assert.equal(out.text.includes(token), false);
     const parsed = JSON.parse(out.text) as {

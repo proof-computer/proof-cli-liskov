@@ -7,11 +7,15 @@ import { describe, it } from "node:test";
 
 import LiskovApplicationExecutionShow from "../src/commands/liskov/application/execution/show.js";
 import {
+  APPLICATION_COVERAGE_SCHEMA,
+  applicationCoveragePath,
+  coverageSummaryFrom,
   executionChanges,
   executionDigest,
   executionStableBlocker,
   executionTerminal,
   executionView,
+  formatCoverageStatusLine,
   formatExecutionConvergence,
   formatExecutionExplanation,
   formatExecutionStatusLine,
@@ -684,6 +688,89 @@ describe("shipped execution show command over a real HTTP server", () => {
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
+  });
+});
+
+describe("coverage summary for application status (BKLG-20260915-ohsn)", () => {
+  const sentence = "Continuous · 2 phases, 30m apart · 1h windows";
+  const coverage = (overrides: Record<string, unknown> = {}) => ({
+    ok: true,
+    schema: APPLICATION_COVERAGE_SCHEMA,
+    available: true,
+    summary: sentence,
+    ...overrides
+  });
+
+  it("reads the server sentence and treats absence as silence", () => {
+    assert.equal(coverageSummaryFrom(coverage()), sentence);
+    assert.equal(formatCoverageStatusLine(sentence), `coverage: ${sentence}`);
+    for (const body of [
+      undefined,
+      null,
+      {},
+      { ok: true, schema: APPLICATION_COVERAGE_SCHEMA, available: true },
+      { ok: true, schema: APPLICATION_COVERAGE_SCHEMA, available: true, summary: null },
+      { ok: true, schema: APPLICATION_COVERAGE_SCHEMA, available: true, summary: "" },
+      { ok: true, schema: APPLICATION_COVERAGE_SCHEMA, available: true, summary: "   " },
+      { ok: true, schema: APPLICATION_COVERAGE_SCHEMA, available: true, summary: 12 },
+      { ok: true, schema: APPLICATION_COVERAGE_SCHEMA, available: false, summary: sentence },
+      { ok: true, schema: "other", available: true, summary: sentence },
+      { ok: true, application: { applicationId: "app_1" } }
+    ]) {
+      assert.equal(coverageSummaryFrom(body), undefined);
+    }
+  });
+
+  it("prints the sentence on application status and omits it when Coverage cannot back one", async () => {
+    await withSession(async (sessionFile) => {
+      const out = writer();
+      const requests: string[] = [];
+      const code = await runSlipwayApplicationStatus({ applicationId: "app_1", config: sessionFile, json: true }, {
+        fetchImpl: async (url) => {
+          requests.push(String(url));
+          if (String(url).includes("/coverage")) return Response.json(coverage());
+          if (String(url).includes("view=explanation")) return Response.json(rolloutEnvelope());
+          return Response.json({ ok: true, application: { applicationId: "app_1", status: "active" } });
+        },
+        stdout: out.write
+      });
+      assert.equal(code, 0);
+      assert.deepEqual(requests, [
+        "https://liskov.test/api/applications/app_1",
+        `https://liskov.test${policyExplanationPath("app_1")}`,
+        `https://liskov.test${applicationCoveragePath("app_1")}`
+      ]);
+      const parsed = JSON.parse(out.text) as { coverageSummary?: string };
+      assert.equal(parsed.coverageSummary, sentence);
+    });
+    await withSession(async (sessionFile) => {
+      const out = writer();
+      const code = await runSlipwayApplicationStatus({ applicationId: "app_1", config: sessionFile }, {
+        fetchImpl: async (url) => String(url).includes("/coverage")
+          ? Response.json(coverage())
+          : String(url).includes("view=explanation")
+            ? Response.json(rolloutEnvelope())
+            : Response.json({ ok: true, application: { applicationId: "app_1", status: "active" } }),
+        stdout: out.write
+      });
+      assert.equal(code, 0);
+      assert.match(out.text, new RegExp(`^coverage: ${sentence.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"));
+      assert.doesNotMatch(out.text, /Executions · stable jobs · generations/);
+    });
+    await withSession(async (sessionFile) => {
+      const out = writer();
+      const code = await runSlipwayApplicationStatus({ applicationId: "app_1", config: sessionFile }, {
+        fetchImpl: async (url) => String(url).includes("/coverage")
+          ? new Response("{}", { status: 404 })
+          : String(url).includes("view=explanation")
+            ? Response.json(rolloutEnvelope())
+            : Response.json({ ok: true, application: { applicationId: "app_1", status: "active" } }),
+        stdout: out.write
+      });
+      assert.equal(code, 0);
+      assert.doesNotMatch(out.text, /coverage:/);
+      assert.equal(out.text.split("\n")[0], "app_1: active");
+    });
   });
 });
 

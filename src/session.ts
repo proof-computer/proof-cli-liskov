@@ -50,11 +50,14 @@ import {
   policyExplanationPath
 } from "./policy-explanation.js";
 import {
+  applicationCoveragePath,
+  coverageSummaryFrom,
   executionChanges,
   executionConvergencePath,
   executionDigest,
   executionStableBlocker,
   executionTerminal,
+  formatCoverageStatusLine,
   formatExecutionChange,
   formatExecutionConvergence,
   formatExecutionExplanation,
@@ -1722,12 +1725,30 @@ export async function runSlipwayApplicationStatus(input: SlipwayApplicationStatu
     optional: true
   }, options);
   const attached = attachPolicyExplanation(body, explanationRequest);
+  const coverageRequest = await authenticatedSlipwayRequest<unknown>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: applicationCoveragePath(input.applicationId),
+    requestErrorCode: "SLIPWAY_APPLICATION_COVERAGE_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application coverage",
+    optional: true
+  }, options);
+  const coverageSummary = coverageRequest.ok ? coverageSummaryFrom(coverageRequest.body) : undefined;
+  const statusBody = coverageSummary === undefined
+    ? attached.body
+    : { ...attached.body, coverageSummary };
 
   writeStructuredOrHuman(
     options,
     input.json,
-    attached.body,
-    [formatApplicationStatus(body, input.applicationId), attached.human].filter(Boolean).join("\n")
+    statusBody,
+    [
+      formatApplicationStatus(body, input.applicationId),
+      coverageSummary === undefined ? undefined : formatCoverageStatusLine(coverageSummary),
+      attached.human
+    ].filter(Boolean).join("\n")
   );
   return 0;
 }
