@@ -201,7 +201,8 @@ describe("canonical policy explanation adapter", () => {
       assert.equal(code, 0);
       assert.deepEqual(requests, [
         "https://liskov.test/api/applications/app_1",
-        `https://liskov.test${policyExplanationPath("app_1")}`
+        `https://liskov.test${policyExplanationPath("app_1")}`,
+        "https://liskov.test/api/applications/app_1/coverage"
       ]);
       const parsed = JSON.parse(out.text) as {
         explanation: { schema: string; execution: { outcome: string; code: string } };

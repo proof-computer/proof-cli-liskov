@@ -298,6 +298,33 @@ export function formatExecutionExplanation(explanation: PolicyExplanation): stri
   return lines.join("\n");
 }
 
+export const APPLICATION_COVERAGE_SCHEMA = "proof.liskov.application-coverage.v1";
+
+export function applicationCoveragePath(applicationId: string): string {
+  return `/api/applications/${encodeURIComponent(applicationId)}/coverage`;
+}
+
+/**
+ * The server-authored coverage sentence (`BKLG-20260915-ohsn`). Additive: a
+ * missing, null, empty, or unreadable field is absence, never a refusal and
+ * never a client-built shape line.
+ */
+export function coverageSummaryFrom(body: unknown): string | undefined {
+  if (body === null || typeof body !== "object" || Array.isArray(body)) return undefined;
+  const record = body as Record<string, unknown>;
+  if (record.ok !== true || record.schema !== APPLICATION_COVERAGE_SCHEMA || record.available !== true) {
+    return undefined;
+  }
+  if (typeof record.summary !== "string") return undefined;
+  const summary = record.summary.trim();
+  return summary.length > 0 ? summary : undefined;
+}
+
+/** One compact line for `application status`; omitted when Coverage has no sentence. */
+export function formatCoverageStatusLine(summary: string): string {
+  return `coverage: ${summary}`;
+}
+
 /** One compact line for `application status`; `undefined` when the server reports no typed-spine occurrence. */
 export function formatExecutionStatusLine(explanation: PolicyExplanation): string | undefined {
   const execution = executionView(explanation);
