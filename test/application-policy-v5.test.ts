@@ -137,7 +137,7 @@ describe("retained V5 application-manifest validation", () => {
 
   it("degrades on a future schemaVersion without interpreting nested fields", () => {
     const future = retainedJavascript();
-    future.schemaVersion = 6;
+    future.schemaVersion = 7;
     future.ingress = { http: { mode: "required" } };
     const diagnostics = validateApplicationManifest(future);
     assert.equal(diagnostics.length, 1);
@@ -147,12 +147,12 @@ describe("retained V5 application-manifest validation", () => {
   });
 
   it("admits a synthetic later pair through registry injection without a version branch", () => {
-    const future = { ...retainedJavascript(), schemaVersion: 6, futureContractMarker: "proof" };
+    const future = { ...retainedJavascript(), schemaVersion: 7, futureContractMarker: "proof" };
     setPolicyContractForTesting({
       manifest: {
         publicationPairs: [{
           schema: "proof.liskov.application-manifest",
-          schemaVersion: 6,
+          schemaVersion: 7,
           releaseMode: "source"
         }]
       },
@@ -161,7 +161,7 @@ describe("retained V5 application-manifest validation", () => {
         operation: "validate",
         disposition: "supported",
         valid: true,
-        pair: { schema: "proof.liskov.application-manifest", schemaVersion: 6 },
+        pair: { schema: "proof.liskov.application-manifest", schemaVersion: 7 },
         document: future,
         errors: [],
         capabilityDiagnostics: [],
