@@ -2101,6 +2101,101 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.replacementHold.recommendation, "hold_replacement_spend");
   });
 
+  it("explains the over-cap new-start refusal on publish, resume and Run and keeps its typed fields in JSON", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    try {
+      const token = "slipway_over_cap_secret_token_do_not_print";
+      const sessionFile = await applicationRunSession(directory, token);
+      // liskov-rs `new_start_refusals_have_one_exact_wire_shape` (BKLG-20260921-l075):
+      // publish, resume and run-one answer 403 with the fields at the top level.
+      const reason = "This organization holds 3 application slots and its plan allows 2, so it cannot start new work. Retire applications to release slots or restore a plan that allows them; paused applications keep their slot. Running work is not affected.";
+      const doorBody = { ok: false, error: "organization_over_plan_caps", reason, feature: "max_applications", used: 3, limit: 2 };
+      // Run keeps its route's one body shape: HTTP 200, the fields inside `refusal`.
+      const runBody = applicationRunResponse({
+        ok: false,
+        settledGeneration: 1,
+        availableServiceCreditMicros: null,
+        refusal: { code: "organization_over_plan_caps", detail: reason, feature: "max_applications", used: 3, limit: 2 }
+      });
+      const preflight = jsonResponse({ ok: true, publicationReady: true, authoredDigest: "a".repeat(64) });
+      const publishFetch = async (url: URL | RequestInfo) => String(url).endsWith("/publish/preflight")
+        ? preflight.clone()
+        : jsonResponse(doorBody, 403);
+      const doors: Array<{ name: string; refused: RegExp; run: (json: boolean, out: (line: string) => void) => Promise<number> }> = [{
+        name: "publish",
+        refused: /Liskov did not publish Application proof-docs: the organization holds 3 application slots and its plan allows 2 \(max_applications\)\./u,
+        run: (json, stdout) => runSlipwayApplicationPublish({ applicationRef: "proof-docs", yes: true, json, config: sessionFile }, { fetchImpl: publishFetch, stdout })
+      }, {
+        name: "resume",
+        refused: /Liskov did not resume Application proof-docs: the organization holds 3 application slots and its plan allows 2 \(max_applications\)\./u,
+        run: (json, stdout) => runSlipwayApplicationStatusTransition({ applicationRef: "proof-docs", status: "active", yes: true, json, config: sessionFile }, {
+          fetchImpl: async () => jsonResponse(doorBody, 403),
+          stdout
+        })
+      }, {
+        name: "run",
+        refused: /Liskov did not authorize a run of Application proof-docs: the organization holds 3 application slots and its plan allows 2 \(max_applications\)\./u,
+        run: (json, stdout) => runSlipwayApplicationRun({ applicationRef: "proof-docs", yes: true, json, config: sessionFile }, {
+          fetchImpl: async () => jsonResponse(runBody),
+          stdout
+        })
+      }];
+
+      for (const door of doors) {
+        const human = writer();
+        assert.equal(await door.run(false, human.write), 1, door.name);
+        assert.match(human.text, /^Error \(organization_over_plan_caps\): /u, door.name);
+        assert.match(human.text, door.refused, door.name);
+        assert.match(human.text, /retire at least 1 application \(`proof liskov application retire <app>` previews it\), or add or restore payment for a plan that allows 3 or more\./u, door.name);
+        assert.match(human.text, /Paused applications keep their slot, so pausing frees none\. Work that is already running is not stopped\./u, door.name);
+        // Pause is never offered as a way back, and nothing is called disabled.
+        assert.doesNotMatch(human.text, /application pause|pause (it|an|the|applications)/iu, door.name);
+        assert.doesNotMatch(human.text, /disabled|(has been|was|were) stopped/iu, door.name);
+        // No credential and no raw server body: the prose is replaced, not dumped.
+        assert.equal(human.text.includes(token), false, door.name);
+        assert.equal(human.text.includes(reason), false, door.name);
+        assert.equal(human.text.includes("{"), false, door.name);
+
+        const structured = writer();
+        assert.equal(await door.run(true, structured.write), 1, door.name);
+        assert.equal(structured.text.includes(token), false, door.name);
+        const parsed = JSON.parse(structured.text) as Record<string, unknown>;
+        assert.deepEqual(parsed, door.name === "run" ? runBody : doorBody, door.name);
+        const fields = (door.name === "run" ? parsed.refusal : parsed) as Record<string, unknown>;
+        assert.equal(fields[door.name === "run" ? "code" : "error"], "organization_over_plan_caps", door.name);
+        assert.equal(fields.feature, "max_applications", door.name);
+        assert.equal(fields.used, 3, door.name);
+        assert.equal(fields.limit, 2, door.name);
+      }
+
+      // Counts that do not arrive typed are left out, never read from the prose.
+      const untyped = writer();
+      assert.equal(await runSlipwayApplicationStatusTransition({ applicationRef: "proof-docs", status: "active", yes: true, config: sessionFile }, {
+        fetchImpl: async () => jsonResponse({ ...doorBody, used: "3", limit: null }, 403),
+        stdout: untyped.write
+      }), 1);
+      assert.match(untyped.text, /holds more application slots than its plan allows \(max_applications\)\./u);
+      assert.doesNotMatch(untyped.text, /\b[23]\b/u);
+
+      // Every other publish failure keeps its existing envelope.
+      const other = writer();
+      assert.equal(await runSlipwayApplicationPublish({ applicationRef: "proof-docs", yes: true, json: true, config: sessionFile }, {
+        fetchImpl: async (url: URL | RequestInfo) => String(url).endsWith("/publish/preflight")
+          ? preflight.clone()
+          : jsonResponse({ ok: false, error: "organization_plan_caps_unavailable", reason: "try again" }, 503),
+        stdout: other.write
+      }), 1);
+      assert.deepEqual(JSON.parse(other.text), {
+        ok: false,
+        error: "SLIPWAY_APPLICATION_PUBLISH_FAILED",
+        status: 503,
+        reason: "try again"
+      });
+    } finally {
+      await rmdir(directory, { recursive: true });
+    }
+  });
+
   it("reads Application status with the stored session bearer without printing it", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");

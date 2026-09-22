@@ -2707,6 +2707,7 @@ export async function runSlipwayApplicationStatusTransition(input: SlipwayApplic
   if (body?.ok !== true || !body.application) {
     const ambiguous = body?.error === "ambiguous_application" && Array.isArray(body.candidates);
     const replacementHoldBlocked = body?.error === "application_resume_blocked_by_replacement_hold";
+    const overCap = organizationOverPlanCaps(body, "error");
     const error = request.response.status === 401
       ? "SLIPWAY_SESSION_UNAUTHORIZED"
       : ambiguous
@@ -2714,7 +2715,7 @@ export async function runSlipwayApplicationStatusTransition(input: SlipwayApplic
         : replacementHoldBlocked
           ? "application_resume_blocked_by_replacement_hold"
         : "SLIPWAY_APPLICATION_STATUS_FAILED";
-    const output = replacementHoldBlocked
+    const output = replacementHoldBlocked || overCap !== undefined
       ? body
       : {
           ok: false,
@@ -2730,7 +2731,11 @@ export async function runSlipwayApplicationStatusTransition(input: SlipwayApplic
       ? formatApplicationAmbiguity(input.applicationRef, body!.candidates!)
       : replacementHoldBlocked
         ? formatReplacementHoldBlocked(input.applicationRef, body as SlipwayApplicationStatusTransitionResponse)
-        : `Error (${error}): Liskov could not update Application ${input.applicationRef} status.`);
+        : overCap !== undefined
+          ? formatOrganizationOverPlanCaps(input.yes === true
+            ? `Liskov did not ${input.status === "active" ? "resume" : "update"} Application ${input.applicationRef}`
+            : `Liskov would refuse to ${input.status === "active" ? "resume" : "update"} Application ${input.applicationRef}`, overCap)
+          : `Error (${error}): Liskov could not update Application ${input.applicationRef} status.`);
     return 1;
   }
 
@@ -2790,11 +2795,16 @@ export async function runSlipwayApplicationRun(input: SlipwayApplicationRunInput
   // canonical machine reading and the Console renders the same field.
   const refusalCode = typeof body?.refusal?.code === "string" ? body.refusal.code : undefined;
   if (refusalCode !== undefined) {
-    writeStructuredOrHuman(options, input.json, body, formatApplicationRunRefusal(
-      input.applicationRef,
-      refusalCode,
-      typeof body?.refusal?.detail === "string" ? body.refusal.detail : undefined
-    ));
+    const overCap = organizationOverPlanCaps(body?.refusal, "code");
+    writeStructuredOrHuman(options, input.json, body, overCap !== undefined
+      ? formatOrganizationOverPlanCaps(input.yes === true
+        ? `Liskov did not authorize a run of Application ${input.applicationRef}`
+        : `Liskov would refuse a run of Application ${input.applicationRef}`, overCap)
+      : formatApplicationRunRefusal(
+        input.applicationRef,
+        refusalCode,
+        typeof body?.refusal?.detail === "string" ? body.refusal.detail : undefined
+      ));
     return 1;
   }
 
@@ -3154,6 +3164,7 @@ export async function runSlipwayApplicationPublish(input: SlipwayApplicationPubl
     body: publishBody,
     errorCode: "SLIPWAY_APPLICATION_PUBLISH_FAILED",
     fetchFailedMessage: "could not publish Liskov Application",
+    overCapRefused: `Liskov did not publish Application ${input.applicationRef}`,
     human: (body) => {
       const policy = objectRecord(objectRecord(body).policy);
       const version = stringValue(policy.policyVersionId) ?? stringValue(policy.versionId);
@@ -3274,6 +3285,9 @@ export async function runSlipwayApplicationPolicyPublish(
     },
     errorCode: "SLIPWAY_APPLICATION_POLICY_PUBLISH_FAILED",
     fetchFailedMessage: "could not publish registered V5 policy",
+    overCapRefused: input.dryRun
+      ? `Liskov would refuse to publish a policy for Application ${input.applicationRef}`
+      : `Liskov did not publish a policy for Application ${input.applicationRef}`,
     human: (body) => {
       const policy = objectRecord(objectRecord(body).policyVersion);
       const version = stringValue(policy.policyVersionId) ?? "registered V5 policy";
@@ -6191,6 +6205,8 @@ async function runSlipwayJsonCommand(
     fetchFailedMessage: string;
     requestFailureDetails?: Record<string, unknown>;
     human: (body: unknown) => string;
+    /** What an `organization_over_plan_caps` refusal did not start, for its human line. */
+    overCapRefused?: string;
   },
   options: SlipwayCliOptions
 ): Promise<number> {
@@ -6213,6 +6229,7 @@ async function runSlipwayJsonCommand(
     errorCode: input.errorCode,
     json: input.json,
     human: input.human,
+    overCapRefused: input.overCapRefused,
     options
   });
 }
@@ -6223,9 +6240,20 @@ function writeCommandResponse(input: {
   errorCode: string;
   json?: boolean;
   human: (body: unknown) => string;
+  overCapRefused?: string;
   options: SlipwayCliOptions;
 }): number {
   if (!input.response.ok || input.body?.ok === false) {
+    // The over-cap refusal keeps its own envelope: its code and exact
+    // `feature`, `used` and `limit` are what a caller acts on.
+    const overCap = organizationOverPlanCaps(input.body, "error");
+    if (overCap !== undefined) {
+      writeStructuredOrHuman(input.options, input.json, input.body, formatOrganizationOverPlanCaps(
+        input.overCapRefused ?? "Liskov did not start new work",
+        overCap
+      ));
+      return 1;
+    }
     const error = input.response.status === 401
       ? "SLIPWAY_SESSION_UNAUTHORIZED"
       : input.body?.error === "invalid_organization_selector" || input.body?.error === "not_a_member"
@@ -7803,6 +7831,60 @@ function formatApplicationRunRefusal(applicationRef: string, code: string, detai
   // vocabulary is not append-guaranteed, and a stale client must not hide one.
   lines.push(known === undefined ? `Server refusal code: ${code}.` : known.remedy(applicationRef));
   return lines.join("\n");
+}
+
+/**
+ * ADR-0116 §5 as the owner bounded it (Q-20260920-my73, option B): an
+ * organization over its plan caps may start nothing new, and work already
+ * running carries on. Publish, resume and run-one answer HTTP 403 with this
+ * code and `{feature, used, limit}` at the top level; Run answers its own
+ * one-body shape with the same fields inside `refusal`. `--json` emits either
+ * body unchanged.
+ */
+const ORGANIZATION_OVER_PLAN_CAPS = "organization_over_plan_caps";
+
+interface OrganizationOverPlanCaps {
+  feature?: string;
+  used?: number;
+  limit?: number;
+}
+
+/**
+ * The refusal's typed fields, or `undefined` for any other code. A count is
+ * read only as a non-negative integer and never recovered from the server's
+ * prose, so a malformed field is left out rather than guessed.
+ */
+function organizationOverPlanCaps(value: unknown, codeField: "error" | "code"): OrganizationOverPlanCaps | undefined {
+  const record = objectRecord(value);
+  if (record[codeField] !== ORGANIZATION_OVER_PLAN_CAPS) return undefined;
+  const count = (field: unknown) => typeof field === "number" && Number.isSafeInteger(field) && field >= 0 ? field : undefined;
+  return { feature: stringValue(record.feature), used: count(record.used), limit: count(record.limit) };
+}
+
+/**
+ * Says what was not started, by how much the organization is over, and the two
+ * ways back: retire applications, or add or restore payment for a plan that
+ * allows them. A paused application keeps its slot, so pausing is named only to
+ * rule it out. Nothing here says an application stopped: only new starts are
+ * refused.
+ */
+function formatOrganizationOverPlanCaps(refused: string, over: OrganizationOverPlanCaps): string {
+  const counted = over.used !== undefined && over.limit !== undefined;
+  const feature = over.feature ?? "a plan cap";
+  if (over.feature !== undefined && over.feature !== "max_applications") {
+    return [
+      `Error (${ORGANIZATION_OVER_PLAN_CAPS}): ${refused}: the organization is over its plan's ${feature} cap${counted ? ` (${over.used} used, ${over.limit} allowed)` : ""}.`,
+      "Bring usage within the cap, or add or restore payment for a plan that allows it. Work that is already running is not stopped."
+    ].join("\n");
+  }
+  const excess = counted ? over.used! - over.limit! : undefined;
+  return [
+    counted
+      ? `Error (${ORGANIZATION_OVER_PLAN_CAPS}): ${refused}: the organization holds ${over.used} application slots and its plan allows ${over.limit} (max_applications).`
+      : `Error (${ORGANIZATION_OVER_PLAN_CAPS}): ${refused}: the organization holds more application slots than its plan allows (max_applications).`,
+    `To start new work, retire ${excess !== undefined && excess > 0 ? `at least ${excess} ${excess === 1 ? "application" : "applications"}` : "applications you no longer need"} (\`proof liskov application retire <app>\` previews it), or add or restore payment for a plan that allows ${counted ? `${over.used} or more` : "them"}.`,
+    "Paused applications keep their slot, so pausing frees none. Work that is already running is not stopped."
+  ].join("\n");
 }
 
 /**
