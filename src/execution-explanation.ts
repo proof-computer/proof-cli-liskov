@@ -325,6 +325,185 @@ export function formatCoverageStatusLine(summary: string): string {
   return `coverage: ${summary}`;
 }
 
+export type ApplicationScheduleMode = "continuous" | "interval" | "once";
+
+/**
+ * Coverage's additive `schedule` block (`liskov-rs` `ApplicationSchedule`,
+ * `BKLG-20260908-tu90`). `nextDueAtMs` is the boundary the schedule owner
+ * persisted and nothing else: the executor's deadline on the convergence
+ * document is never a stand-in for it.
+ */
+export interface ApplicationSchedule {
+  mode: ApplicationScheduleMode;
+  overlap: boolean | null;
+  nextDueAtMs: number | null;
+  gridOriginAtMs: number | null;
+}
+
+/** The schedule facts one Coverage read carries, judged against that read alone. */
+export interface CoverageScheduleRead {
+  /** The decoded block, or `null` when the read served none or it did not decode. */
+  schedule: ApplicationSchedule | null;
+  /** The server's `generatedAtMs`; the local clock is never the reference. */
+  readAtMs: number;
+  /** At least one stable job is live, per the same read's `counts.liveSlots`. */
+  serving: boolean;
+  /** The read came from the typed execution spine rather than a legacy V4 projection. */
+  typed: boolean;
+}
+
+const SCHEDULE_MODES: readonly string[] = ["continuous", "interval", "once"];
+
+/**
+ * Decode the block without making it a gate on anything else. An old server
+ * omits it; a malformed block loses only these four facts, never the command.
+ */
+export function decodeApplicationSchedule(value: unknown): ApplicationSchedule | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.mode !== "string" || !SCHEDULE_MODES.includes(record.mode)) return null;
+  const overlap = record.overlap === null ? null : typeof record.overlap === "boolean" ? record.overlap : undefined;
+  const nextDueAtMs = nullableWhole(record.nextDueAtMs);
+  const gridOriginAtMs = nullableWhole(record.gridOriginAtMs);
+  if (overlap === undefined || nextDueAtMs === undefined || gridOriginAtMs === undefined) return null;
+  return { mode: record.mode as ApplicationScheduleMode, overlap, nextDueAtMs, gridOriginAtMs };
+}
+
+function nullableWhole(value: unknown): number | null | undefined {
+  if (value === null) return null;
+  return typeof value === "number" && Number.isSafeInteger(value) ? value : undefined;
+}
+
+/**
+ * The schedule half of a Coverage body, or `undefined` when the body is not an
+ * available `proof.liskov.application-coverage.v1` read with its own clock and
+ * live count. An absent or unreadable read stays quiet; it is never a refusal.
+ */
+export function coverageScheduleFrom(body: unknown): CoverageScheduleRead | undefined {
+  if (body === null || typeof body !== "object" || Array.isArray(body)) return undefined;
+  const record = body as Record<string, unknown>;
+  if (record.ok !== true || record.schema !== APPLICATION_COVERAGE_SCHEMA || record.available !== true) return undefined;
+  const readAtMs = record.generatedAtMs;
+  const counts = record.counts !== null && typeof record.counts === "object" ? record.counts as Record<string, unknown> : {};
+  const liveSlots = counts.liveSlots;
+  if (typeof readAtMs !== "number" || !Number.isSafeInteger(readAtMs)) return undefined;
+  if (typeof liveSlots !== "number" || !Number.isSafeInteger(liveSlots) || liveSlots < 0) return undefined;
+  const provenance = record.provenance !== null && typeof record.provenance === "object"
+    ? record.provenance as Record<string, unknown>
+    : {};
+  return {
+    schedule: decodeApplicationSchedule(record.schedule),
+    readAtMs,
+    serving: liveSlots > 0,
+    typed: provenance.source === "typed_execution"
+  };
+}
+
+/**
+ * What the pinned interval schedule says, as one value. The readings and their
+ * names match the Console's (`liskov-ui` `applicationSchedule.ts`,
+ * `BKLG-20260908-vmc5`) so the two clients can be proven to agree.
+ *
+ * `noNext` is the owner's absent boundary: the authored `until` was reached, or
+ * the schedule is armed with nothing decided yet. The wire does not separate
+ * the two, so neither does this. `notReported` is different: no block at all.
+ */
+export type IntervalScheduleReading =
+  | { kind: "notInterval" }
+  | { kind: "notReported" }
+  | { kind: "stopped" }
+  | { kind: "next"; dueAtMs: number }
+  | { kind: "dueWhileServing"; dueAtMs: number }
+  | { kind: "due"; dueAtMs: number }
+  | { kind: "noNext" };
+
+export interface IntervalScheduleContext {
+  /** The instant the boundary is compared against: the read's `generatedAtMs`. */
+  readAtMs: number;
+  /** The operator asked this application to stop: retired, paused, disabled or a draft. */
+  stopped: boolean;
+  /** At least one stable job is live, per the same read's counts. */
+  serving: boolean;
+}
+
+export function readIntervalSchedule(
+  schedule: ApplicationSchedule | null,
+  context: IntervalScheduleContext
+): IntervalScheduleReading {
+  if (schedule === null) return { kind: "notReported" };
+  if (schedule.mode !== "interval") return { kind: "notInterval" };
+  if (context.stopped) return { kind: "stopped" };
+  const dueAtMs = schedule.nextDueAtMs;
+  // A pinned zero is a boundary at the epoch, not a missing one.
+  if (dueAtMs === null) return { kind: "noNext" };
+  if (dueAtMs > context.readAtMs) return { kind: "next", dueAtMs };
+  return { kind: context.serving ? "dueWhileServing" : "due", dueAtMs };
+}
+
+const STOPPED_POSTURE_REASONS: readonly string[] = [
+  "application_paused",
+  "application_disabled",
+  "application_deleted",
+  "application_retired",
+  "application_draft",
+  "application_retirement_active"
+];
+
+/**
+ * Whether the operator asked this application to stop, from the server's own
+ * words on the application read: `lifecycleState`, else the canonical posture
+ * reason, else the stored status an older server reports. `undefined` when the
+ * body is not a readable application, so a failed read stays unknown.
+ */
+export function applicationStoppedFrom(body: unknown): boolean | undefined {
+  if (body === null || typeof body !== "object" || Array.isArray(body)) return undefined;
+  const record = body as Record<string, unknown>;
+  const application = record.application;
+  if (record.ok !== true || application === null || typeof application !== "object" || Array.isArray(application)) {
+    return undefined;
+  }
+  const row = application as Record<string, unknown>;
+  const lifecycleState = typeof row.lifecycleState === "string" ? row.lifecycleState.toLowerCase() : "";
+  if (lifecycleState === "retiring" || lifecycleState === "retired") return true;
+  const posture = [record.applicationPosture, row.applicationPosture]
+    .find((value) => value !== null && typeof value === "object" && typeof (value as Record<string, unknown>).reason === "string");
+  if (posture) return STOPPED_POSTURE_REASONS.includes((posture as Record<string, string>).reason);
+  const status = typeof row.status === "string" ? row.status.toLowerCase() : "";
+  return ["paused", "disabled", "deleted", "draft"].includes(status);
+}
+
+/**
+ * The schedule line for `execution show`, or `undefined` when the read has no
+ * say: a continuous or once schedule, a legacy V4 read, an old server or a
+ * failed read. Every instant is the owner's pinned boundary; none is computed.
+ * `stoppedKnown` is false when the application read failed, so a boundary is
+ * printed with the caveat that a pause would not show.
+ */
+export function formatIntervalSchedule(
+  reading: IntervalScheduleReading,
+  options: { typed: boolean; stoppedKnown: boolean }
+): string | undefined {
+  const caveat = options.stoppedKnown ? "" : "\n  the application's state was not read, so a pause would not show here";
+  switch (reading.kind) {
+    case "notInterval":
+      return undefined;
+    case "notReported":
+      return options.typed
+        ? "schedule: next run not reported; this read served no schedule, so no next run is shown"
+        : undefined;
+    case "stopped":
+      return "schedule: no next run while stopped";
+    case "noNext":
+      return "schedule: no next run is scheduled; the schedule reported no further boundary";
+    case "next":
+      return `schedule: next run at ${new Date(reading.dueAtMs).toISOString()}${caveat}`;
+    case "due":
+      return `schedule: run due at ${new Date(reading.dueAtMs).toISOString()}; no run has started yet${caveat}`;
+    case "dueWhileServing":
+      return `schedule: run due at ${new Date(reading.dueAtMs).toISOString()}; a run is still active${caveat}`;
+  }
+}
+
 /** One compact line for `application status`; `undefined` when the server reports no typed-spine occurrence. */
 export function formatExecutionStatusLine(explanation: PolicyExplanation): string | undefined {
   const execution = executionView(explanation);

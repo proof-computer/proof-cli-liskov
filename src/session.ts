@@ -51,6 +51,8 @@ import {
 } from "./policy-explanation.js";
 import {
   applicationCoveragePath,
+  applicationStoppedFrom,
+  coverageScheduleFrom,
   coverageSummaryFrom,
   executionChanges,
   executionConvergencePath,
@@ -62,7 +64,9 @@ import {
   formatExecutionConvergence,
   formatExecutionExplanation,
   formatExecutionStatusLine,
-  parseExecutionConvergence
+  formatIntervalSchedule,
+  parseExecutionConvergence,
+  readIntervalSchedule
 } from "./execution-explanation.js";
 import {
   APPLICATION_LOGS_HEADER,
@@ -1878,16 +1882,58 @@ export async function runSlipwayApplicationExecutionShow(
     const convergence = convergenceRequest.ok
       ? parseExecutionConvergence(convergenceRequest.body)
       : parseExecutionConvergence({ refusal: { code: "execution_convergence_owner_unavailable" } });
+    // The pinned interval schedule is Coverage's (`BKLG-20260908-xxtj`). A
+    // failed, absent or legacy read is the quiet absent reading and never
+    // fails the command; only an interval schedule asks whether the operator
+    // stopped the application, because only it would otherwise promise a run.
+    const coverageRequest = await authenticatedSlipwayRequest<unknown>({
+      config: input.config,
+      slipwayUrl: input.slipwayUrl,
+      json: input.json,
+      path: applicationCoveragePath(input.applicationId),
+      requestErrorCode: "SLIPWAY_APPLICATION_COVERAGE_FAILED",
+      notFoundMessage: "No Liskov CLI session is stored locally.",
+      fetchFailedMessage: "could not read Liskov Application coverage",
+      optional: true
+    }, options);
+    const coverage = coverageRequest.ok ? coverageScheduleFrom(coverageRequest.body) : undefined;
+    let stopped: boolean | undefined;
+    if (coverage?.schedule?.mode === "interval") {
+      const applicationRequest = await authenticatedSlipwayRequest<unknown>({
+        config: input.config,
+        slipwayUrl: input.slipwayUrl,
+        json: input.json,
+        path: `/api/applications/${encodeURIComponent(input.applicationId)}`,
+        requestErrorCode: "SLIPWAY_APPLICATION_STATUS_FAILED",
+        notFoundMessage: "No Liskov CLI session is stored locally.",
+        fetchFailedMessage: "could not read Liskov Application status",
+        optional: true
+      }, options);
+      stopped = applicationRequest.ok ? applicationStoppedFrom(applicationRequest.body) : undefined;
+    }
+    const scheduleLine = coverage === undefined
+      ? undefined
+      : formatIntervalSchedule(
+        readIntervalSchedule(coverage.schedule, { readAtMs: coverage.readAtMs, stopped: stopped === true, serving: coverage.serving }),
+        { typed: coverage.typed, stoppedKnown: stopped !== undefined }
+      );
     // `--json` keeps the explanation envelope's existing fields and adds the
-    // adjacent t89g document without dropping IDs. Old servers decode as a
-    // typed refusal, never as invented quiet.
+    // adjacent t89g document and the decoded schedule block without dropping
+    // IDs. Old servers decode as a typed refusal or a null schedule, never as
+    // invented quiet.
     writeStructuredOrHuman(
       options,
       input.json,
       input.json
-        ? { explanation: first.body, convergence: convergence.ok ? convergence.document : { refusal: { code: convergence.error } } }
+        ? {
+          explanation: first.body,
+          convergence: convergence.ok ? convergence.document : { refusal: { code: convergence.error } },
+          schedule: coverage?.schedule ?? null
+        }
         : first.body,
-      [formatExecutionExplanation(parsed.explanation), formatExecutionConvergence(convergence)].join("\n")
+      [formatExecutionExplanation(parsed.explanation), scheduleLine, formatExecutionConvergence(convergence)]
+        .filter((line): line is string => line !== undefined)
+        .join("\n")
     );
     return 0;
   }

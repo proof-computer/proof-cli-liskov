@@ -9,7 +9,10 @@ import LiskovApplicationExecutionShow from "../src/commands/liskov/application/e
 import {
   APPLICATION_COVERAGE_SCHEMA,
   applicationCoveragePath,
+  applicationStoppedFrom,
+  coverageScheduleFrom,
   coverageSummaryFrom,
+  decodeApplicationSchedule,
   executionChanges,
   executionDigest,
   executionStableBlocker,
@@ -19,10 +22,13 @@ import {
   formatExecutionConvergence,
   formatExecutionExplanation,
   formatExecutionStatusLine,
+  formatIntervalSchedule,
   parseExecutionConvergence,
   QUIET_CONVERGENCE_CORPUS,
   executionConvergencePath,
-  spendView
+  readIntervalSchedule,
+  spendView,
+  type ApplicationSchedule
 } from "../src/execution-explanation.js";
 import { POLICY_EXPLANATION_SCHEMA, parsePolicyExplanation, policyExplanationPath } from "../src/policy-explanation.js";
 import { runSlipwayApplicationExecutionShow, runSlipwayApplicationStatus, saveSlipwaySession } from "../src/index.js";
@@ -493,11 +499,13 @@ describe("application execution show", () => {
       assert.equal(code, 0);
       assert.deepEqual(requests, [
         `https://liskov.test${policyExplanationPath("app_1")}`,
-        `https://liskov.test/api/applications/app_1/policy?view=convergence`
+        `https://liskov.test/api/applications/app_1/policy?view=convergence`,
+        `https://liskov.test${applicationCoveragePath("app_1")}`
       ]);
-      const printed = JSON.parse(out.text) as { explanation: unknown; convergence: unknown };
+      const printed = JSON.parse(out.text) as { explanation: unknown; convergence: unknown; schedule: unknown };
       assert.deepEqual(printed.explanation, body, "existing explanation fields stay on --json");
       assert.ok(printed.convergence, "adjacent t89g document is present");
+      assert.equal(printed.schedule, null, "an unreadable Coverage read is a null schedule, not a failure");
       assert.equal(out.text.includes(TOKEN), false);
     });
   });
@@ -682,8 +690,10 @@ describe("shipped execution show command over a real HTTP server", () => {
       assert.deepEqual(requests, [
         policyExplanationPath("app_1"),
         executionConvergencePath("app_1"),
+        applicationCoveragePath("app_1"),
         policyExplanationPath("app_1"),
-        executionConvergencePath("app_1")
+        executionConvergencePath("app_1"),
+        applicationCoveragePath("app_1")
       ]);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -797,6 +807,251 @@ describe("application status carries the execution line", () => {
       });
       assert.equal(code, 0);
       assert.doesNotMatch(out.text, /stage/, "a V4 application gains no execution line");
+    });
+  });
+});
+
+/**
+ * The pinned interval schedule (`BKLG-20260908-xxtj`). The readings mirror the
+ * Console's (`liskov-ui` `6dea483`, `BKLG-20260908-vmc5`) so BKLG-20260908-7vsf
+ * can prove the two clients agree. Every boundary comes off the fixture wire;
+ * nothing here multiplies an `everyMs`, because a test that did the client's
+ * arithmetic would not catch the client doing it.
+ */
+describe("pinned interval schedule (BKLG-20260908-xxtj)", () => {
+  const HOUR = 3_600_000;
+  const READ_AT = 1_790_000_000_000;
+
+  function schedule(overrides: Record<string, unknown> = {}): ApplicationSchedule {
+    const decoded = decodeApplicationSchedule({ mode: "interval", overlap: null, nextDueAtMs: READ_AT + HOUR, gridOriginAtMs: 0, ...overrides });
+    assert.ok(decoded, "fixture schedule did not decode");
+    return decoded;
+  }
+
+  const at = (readAtMs: number, extra: { stopped?: boolean; serving?: boolean } = {}) => ({
+    readAtMs,
+    stopped: extra.stopped ?? false,
+    serving: extra.serving ?? false
+  });
+
+  /** An available Coverage read in the owner's `application-coverage.v1` shape. */
+  const coverageRead = (overrides: Record<string, unknown> = {}, liveSlots = 0) => ({
+    ok: true,
+    schema: APPLICATION_COVERAGE_SCHEMA,
+    available: true,
+    generatedAtMs: READ_AT,
+    provenance: { source: "typed_execution", completeness: "complete", incompleteReason: null },
+    counts: {
+      desiredSlots: 1,
+      liveSlots,
+      distribution: { ready: liveSlots, renewing: 0, recovering: 0, starting: 0, degraded: 0, held: 0, missing: 1 - liveSlots }
+    },
+    executions: [],
+    nextExecution: null,
+    ...overrides
+  });
+
+  const application = (fields: Record<string, unknown> = {}) => ({
+    ok: true,
+    application: { applicationId: "app_1", status: "active", ...fields }
+  });
+
+  /** Serves each read by its path; the convergence document carries an executor deadline that must never render. */
+  async function show(
+    coverage: unknown,
+    app: unknown = application(),
+    json = false
+  ): Promise<{ code: number; text: string; requests: string[] }> {
+    let result = { code: -1, text: "", requests: [] as string[] };
+    await withSession(async (sessionFile) => {
+      const requests: string[] = [];
+      const out = writer();
+      const code = await runSlipwayApplicationExecutionShow({ applicationId: "app_1", config: sessionFile, json }, {
+        fetchImpl: async (url) => {
+          const target = String(url);
+          requests.push(target.replace("https://liskov.test", ""));
+          if (target.includes("view=explanation")) return Response.json(typedSpineEnvelope());
+          if (target.includes("view=convergence")) return Response.json({ ...QUIET_CONVERGENCE_CORPUS, nextDueAtMs: READ_AT + 60_000 });
+          if (target.endsWith("/coverage")) {
+            return coverage instanceof Response ? coverage : Response.json(coverage);
+          }
+          return app instanceof Response ? app : Response.json(app);
+        },
+        stdout: out.write
+      });
+      result = { code, text: out.text, requests };
+    });
+    return result;
+  }
+
+  const iso = (ms: number) => new Date(ms).toISOString();
+  const EXECUTOR_DEADLINE = iso(READ_AT + 60_000);
+
+  describe("the reading", () => {
+    it("hourly-next: reports each pinned boundary as served and never recomputes one", () => {
+      assert.deepEqual(readIntervalSchedule(schedule({ nextDueAtMs: READ_AT + HOUR }), at(READ_AT)), { kind: "next", dueAtMs: READ_AT + HOUR });
+      assert.deepEqual(
+        readIntervalSchedule(schedule({ nextDueAtMs: READ_AT + 2 * HOUR }), at(READ_AT + HOUR + 1)),
+        { kind: "next", dueAtMs: READ_AT + 2 * HOUR }
+      );
+    });
+
+    it("treats a boundary at the read instant as reached, not as still coming", () => {
+      assert.equal(readIntervalSchedule(schedule({ nextDueAtMs: READ_AT }), at(READ_AT)).kind, "due");
+    });
+
+    it("skipped-active: separates a passed boundary with a run still serving from an idle one", () => {
+      assert.deepEqual(
+        readIntervalSchedule(schedule({ nextDueAtMs: READ_AT - 1_000 }), at(READ_AT, { serving: true })),
+        { kind: "dueWhileServing", dueAtMs: READ_AT - 1_000 }
+      );
+      assert.deepEqual(
+        readIntervalSchedule(schedule({ nextDueAtMs: READ_AT - 1_000 }), at(READ_AT)),
+        { kind: "due", dueAtMs: READ_AT - 1_000 }
+      );
+    });
+
+    it("paused: promises no run for a stopped application, whatever is pinned", () => {
+      assert.deepEqual(readIntervalSchedule(schedule(), at(READ_AT, { stopped: true })), { kind: "stopped" });
+    });
+
+    it("terminal-until: an absent boundary is none pinned, not an ending", () => {
+      assert.deepEqual(readIntervalSchedule(schedule({ nextDueAtMs: null }), at(READ_AT)), { kind: "noNext" });
+      const line = formatIntervalSchedule({ kind: "noNext" }, { typed: true, stoppedKnown: true });
+      assert.equal(line, "schedule: no next run is scheduled; the schedule reported no further boundary");
+      assert.doesNotMatch(line ?? "", /ended|complete|finished/i);
+    });
+
+    it("stale/missing: separates a missing block from a block with nothing pinned", () => {
+      assert.deepEqual(readIntervalSchedule(null, at(READ_AT)), { kind: "notReported" });
+      assert.notEqual(readIntervalSchedule(schedule({ nextDueAtMs: null }), at(READ_AT)).kind, "notReported");
+      assert.equal(decodeApplicationSchedule({ mode: "interval", overlap: null, nextDueAtMs: 1.5, gridOriginAtMs: 0 }), null);
+      assert.equal(decodeApplicationSchedule({ mode: "cron", overlap: null, nextDueAtMs: 1, gridOriginAtMs: 0 }), null);
+      assert.equal(decodeApplicationSchedule(undefined), null);
+    });
+
+    it("preserves a pinned zero instead of collapsing it into absent", () => {
+      assert.deepEqual(readIntervalSchedule(schedule({ nextDueAtMs: 0 }), at(-1)), { kind: "next", dueAtMs: 0 });
+      assert.deepEqual(readIntervalSchedule(schedule({ nextDueAtMs: 0 }), at(1)), { kind: "due", dueAtMs: 0 });
+    });
+
+    it("says nothing about a continuous or once schedule", () => {
+      for (const mode of ["continuous", "once"]) {
+        const reading = readIntervalSchedule(schedule({ mode, nextDueAtMs: READ_AT + 9_000 }), at(READ_AT));
+        assert.deepEqual(reading, { kind: "notInterval" });
+        assert.equal(formatIntervalSchedule(reading, { typed: true, stoppedKnown: true }), undefined);
+      }
+    });
+
+    it("judges the boundary against the read's own clock and counts, never the local clock", () => {
+      const read = coverageScheduleFrom(coverageRead({ schedule: { mode: "interval", overlap: null, nextDueAtMs: READ_AT + HOUR, gridOriginAtMs: 0 } }, 1));
+      assert.deepEqual(read, {
+        schedule: { mode: "interval", overlap: null, nextDueAtMs: READ_AT + HOUR, gridOriginAtMs: 0 },
+        readAtMs: READ_AT,
+        serving: true,
+        typed: true
+      });
+      assert.equal(coverageScheduleFrom(coverageRead({ available: false })), undefined);
+      assert.equal(coverageScheduleFrom(coverageRead({ generatedAtMs: "now" })), undefined);
+      assert.equal(coverageScheduleFrom({ ok: false, error: "not_found" }), undefined);
+      assert.equal(coverageScheduleFrom(coverageRead({ provenance: { source: "legacy_v4" } }))?.typed, false);
+    });
+
+    it("reads stopped from the server's lifecycle, posture or stored status, and unknown when unreadable", () => {
+      assert.equal(applicationStoppedFrom(application()), false);
+      assert.equal(applicationStoppedFrom(application({ status: "paused" })), true);
+      assert.equal(applicationStoppedFrom(application({ lifecycleState: "retiring" })), true);
+      assert.equal(applicationStoppedFrom({ ...application({ status: "active" }), applicationPosture: { reason: "application_paused" } }), true);
+      assert.equal(applicationStoppedFrom({ ...application({ status: "paused" }), applicationPosture: { reason: "application_active" } }), false);
+      assert.equal(applicationStoppedFrom({ ok: false, error: "not_found" }), undefined);
+      assert.equal(applicationStoppedFrom(undefined), undefined);
+    });
+  });
+
+  describe("execution show", () => {
+    it("hourly-next: prints the owner's boundary, not the executor's deadline", async () => {
+      const result = await show(coverageRead({ schedule: { mode: "interval", overlap: null, nextDueAtMs: READ_AT + HOUR, gridOriginAtMs: 0 } }));
+      assert.equal(result.code, 0);
+      assert.match(result.text, new RegExp(`^schedule: next run at ${iso(READ_AT + HOUR)}$`, "m"));
+      assert.equal(result.text.includes(EXECUTOR_DEADLINE), false, "the convergence nextDueAtMs never renders as the next run");
+      assert.doesNotMatch(result.text, /state was not read/);
+      assert.deepEqual(result.requests, [
+        policyExplanationPath("app_1"),
+        executionConvergencePath("app_1"),
+        applicationCoveragePath("app_1"),
+        "/api/applications/app_1"
+      ]);
+    });
+
+    it("skipped-active: a passed boundary with a job serving says a run is still active", async () => {
+      const result = await show(coverageRead({ schedule: { mode: "interval", overlap: null, nextDueAtMs: READ_AT - 1_000, gridOriginAtMs: 0 } }, 1));
+      assert.equal(result.code, 0);
+      assert.match(result.text, new RegExp(`^schedule: run due at ${iso(READ_AT - 1_000)}; a run is still active$`, "m"));
+      assert.doesNotMatch(result.text, /next run at/);
+    });
+
+    it("due-idle: a passed boundary with nothing serving says no run has started yet", async () => {
+      const result = await show(coverageRead({ schedule: { mode: "interval", overlap: null, nextDueAtMs: READ_AT - 1_000, gridOriginAtMs: 0 } }));
+      assert.match(result.text, /^schedule: run due at .*; no run has started yet$/m);
+    });
+
+    it("paused: promises nothing for a paused interval application", async () => {
+      const result = await show(
+        coverageRead({ schedule: { mode: "interval", overlap: null, nextDueAtMs: READ_AT + HOUR, gridOriginAtMs: 0 } }),
+        application({ status: "paused" })
+      );
+      assert.equal(result.code, 0);
+      assert.match(result.text, /^schedule: no next run while stopped$/m);
+      assert.equal(result.text.includes(iso(READ_AT + HOUR)), false, "the pinned instant is not a promise beside stopped");
+    });
+
+    it("terminal-until: reports no further boundary without claiming the schedule ended", async () => {
+      const result = await show(coverageRead({ schedule: { mode: "interval", overlap: null, nextDueAtMs: null, gridOriginAtMs: 0 } }));
+      assert.match(result.text, /^schedule: no next run is scheduled; the schedule reported no further boundary$/m);
+    });
+
+    it("stale/missing: a typed read with no block says so; legacy, old-server and failed reads stay quiet", async () => {
+      const typed = await show(coverageRead());
+      assert.match(typed.text, /^schedule: next run not reported; this read served no schedule, so no next run is shown$/m);
+      assert.equal(typed.requests.includes("/api/applications/app_1"), false, "no schedule, no lifecycle read");
+
+      const legacy = await show(coverageRead({ provenance: { source: "legacy_v4", completeness: "complete", incompleteReason: null } }));
+      const oldServer = await show(Response.json({ ok: false, error: "not_found" }, { status: 404 }));
+      const failed = await show(Response.json({ ok: false, error: "internal" }, { status: 500 }));
+      for (const result of [legacy, oldServer, failed]) {
+        assert.equal(result.code, 0, "an absent schedule never fails the command");
+        assert.doesNotMatch(result.text, /^schedule:/m);
+        assert.match(result.text, /execution: satisfied \[occurrence_in_progress\]/);
+      }
+    });
+
+    it("keeps a boundary but says a pause would not show when the application read fails", async () => {
+      const result = await show(
+        coverageRead({ schedule: { mode: "interval", overlap: null, nextDueAtMs: READ_AT + HOUR, gridOriginAtMs: 0 } }),
+        Response.json({ ok: false, error: "internal" }, { status: 500 })
+      );
+      assert.equal(result.code, 0);
+      assert.match(result.text, /^schedule: next run at .*\n {2}the application's state was not read, so a pause would not show here$/m);
+    });
+
+    it("--json adds the decoded block beside the explanation and convergence and drops nothing", async () => {
+      const block = { mode: "interval", overlap: null, nextDueAtMs: READ_AT + HOUR, gridOriginAtMs: 0 };
+      const result = await show(coverageRead({ schedule: block }), application(), true);
+      assert.equal(result.code, 0);
+      const printed = JSON.parse(result.text) as Record<string, unknown>;
+      assert.deepEqual(Object.keys(printed).sort(), ["convergence", "explanation", "schedule"]);
+      assert.deepEqual(printed.explanation, typedSpineEnvelope());
+      assert.deepEqual(printed.schedule, block);
+      assert.equal(result.text.includes(TOKEN), false);
+
+      const absent = JSON.parse((await show(coverageRead(), application(), true)).text) as Record<string, unknown>;
+      assert.equal(absent.schedule, null);
+    });
+
+    it("says nothing and reads no lifecycle for a continuous schedule", async () => {
+      const result = await show(coverageRead({ schedule: { mode: "continuous", overlap: false, nextDueAtMs: READ_AT + 60_000, gridOriginAtMs: 0 } }));
+      assert.doesNotMatch(result.text, /^schedule:/m);
+      assert.equal(result.requests.includes("/api/applications/app_1"), false);
     });
   });
 });
