@@ -3332,6 +3332,1663 @@
       }
     },
     {
+      "name": "v6/benchmark-cargo",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-benchmark-cargo`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: benchmark-cargo\n\nmetadata:\n  description: Run a Node.js-under-PRoot benchmark program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, benchmark]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "502cb6891c739ebfd54f40bc129a63938b4922dee5804d3b090585d7d93492e2",
+        "releaseIntentDigest": "f6f56524006887081d7dacabd20774bb31eb8d79aeef48efe5796c6af046cc77"
+      }
+    },
+    {
+      "name": "v6/materialize/benchmark-cargo",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-benchmark-cargo`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: benchmark-cargo\n\nmetadata:\n  description: Run a Node.js-under-PRoot benchmark program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, benchmark]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/benchmark-cargo",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "502cb6891c739ebfd54f40bc129a63938b4922dee5804d3b090585d7d93492e2",
+        "releaseIntentDigest": "f6f56524006887081d7dacabd20774bb31eb8d79aeef48efe5796c6af046cc77",
+        "policyDigest": "1325f5176abf7f892ac70c0938f33f6ad8c2dd6579f03fc463f067797d7d4296"
+      }
+    },
+    {
+      "name": "v6/benchmark-cargo-native",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-benchmark-cargo-native`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: benchmark-cargo-native\n\nmetadata:\n  description: Run a native Rust-under-PRoot benchmark program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, benchmark]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "c23f0113b6616450eeba80264a7751bfc1de1edf4aa70cbbd055bc86e761d726",
+        "releaseIntentDigest": "0cee7c98d33cd30d57768d3c2e7dd3d875e7efb2c23d9df078a6af222aca4bad"
+      }
+    },
+    {
+      "name": "v6/materialize/benchmark-cargo-native",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-benchmark-cargo-native`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: benchmark-cargo-native\n\nmetadata:\n  description: Run a native Rust-under-PRoot benchmark program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, benchmark]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/benchmark-cargo-native",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "c23f0113b6616450eeba80264a7751bfc1de1edf4aa70cbbd055bc86e761d726",
+        "releaseIntentDigest": "0cee7c98d33cd30d57768d3c2e7dd3d875e7efb2c23d9df078a6af222aca4bad",
+        "policyDigest": "80e7a73127652e5ff8682e008764845947abb4c615fd1eac8caa4ed2cefb9ec6"
+      }
+    },
+    {
+      "name": "v6/benchmark-js",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## Retained V5 example input; the fpxa manifest is generated and activation-gated.\n##\n## Port of Acurast `apps/app-benchmarks/app-benchmark-nodejs`.\n##\n## The upstream benchmark study compares the same workload across runtimes.\n## Re-running it on Liskov is worth doing because Liskov adds a first-contact\n## helper and a curated image to every Cargo path, and nobody has measured that\n## overhead.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: benchmark-js\n\nmetadata:\n  description: Benchmark a fixed workload in the native JavaScript runtime.\n  labels: [liskov, example, javascript, benchmark]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"50000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "42444a791f6ac1f41c9676025d78605b53d379f167992b912df78ad6bed1dba8",
+        "releaseIntentDigest": "701f841d1c63ca9c7163517aca5f1853434eb421bf2d2ef6d2eb170a33573c19"
+      }
+    },
+    {
+      "name": "v6/materialize/benchmark-js",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## Retained V5 example input; the fpxa manifest is generated and activation-gated.\n##\n## Port of Acurast `apps/app-benchmarks/app-benchmark-nodejs`.\n##\n## The upstream benchmark study compares the same workload across runtimes.\n## Re-running it on Liskov is worth doing because Liskov adds a first-contact\n## helper and a curated image to every Cargo path, and nobody has measured that\n## overhead.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: benchmark-js\n\nmetadata:\n  description: Benchmark a fixed workload in the native JavaScript runtime.\n  labels: [liskov, example, javascript, benchmark]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"50000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "ipfs_bundle",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/benchmark-js",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "42444a791f6ac1f41c9676025d78605b53d379f167992b912df78ad6bed1dba8",
+        "releaseIntentDigest": "701f841d1c63ca9c7163517aca5f1853434eb421bf2d2ef6d2eb170a33573c19",
+        "policyDigest": "8e7cbbb39a6acda0a2840ac44e8b28f3eab72971a6605ed008440a644e7d6954"
+      }
+    },
+    {
+      "name": "v6/cargo-cpp",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-cpp`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-cpp\n\nmetadata:\n  description: Run a C++ program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, cpp]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "29dde1b6fc36ae85b36eeb5cbabf6b2b3c5bab5a2f8ed8953dd745c81cfdafa0",
+        "releaseIntentDigest": "27b534bdd2358aa3599632ef86ded4a7246c686f22a4905aa0a0c701a7bb9cfa"
+      }
+    },
+    {
+      "name": "v6/materialize/cargo-cpp",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-cpp`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-cpp\n\nmetadata:\n  description: Run a C++ program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, cpp]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cargo-cpp",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "29dde1b6fc36ae85b36eeb5cbabf6b2b3c5bab5a2f8ed8953dd745c81cfdafa0",
+        "releaseIntentDigest": "27b534bdd2358aa3599632ef86ded4a7246c686f22a4905aa0a0c701a7bb9cfa",
+        "policyDigest": "8418aa391bffad2cc4c12d8bed3d109cb88ec2232957806df65ef80e9a3f697c"
+      }
+    },
+    {
+      "name": "v6/cargo-csharp",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-csharp`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-csharp\n\nmetadata:\n  description: Run a C# program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, csharp]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "547d36dd4ff473a4311b03be4e60ed7b6f132009f72cf9311a5bfeded2708931",
+        "releaseIntentDigest": "712a634036214456cf858d19d37fe6a9259f16617f49a67b97bb88cfc2e17925"
+      }
+    },
+    {
+      "name": "v6/materialize/cargo-csharp",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-csharp`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-csharp\n\nmetadata:\n  description: Run a C# program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, csharp]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cargo-csharp",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "547d36dd4ff473a4311b03be4e60ed7b6f132009f72cf9311a5bfeded2708931",
+        "releaseIntentDigest": "712a634036214456cf858d19d37fe6a9259f16617f49a67b97bb88cfc2e17925",
+        "policyDigest": "f8eb61c576e50aaed18943bdb02a8d4464d4f30cfb9b4ee1c89f475aa5de1199"
+      }
+    },
+    {
+      "name": "v6/cargo-go",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-go`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-go\n\nmetadata:\n  description: Run a Go program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, go]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "fc77fe282eb33f9222d0d8aa85f3898a2d4737d7934faf082d060d45969d7be7",
+        "releaseIntentDigest": "bf06550b7a1708e860e8bf6e9bf3c9d0181419de5e66ee04238780fd9ff5249c"
+      }
+    },
+    {
+      "name": "v6/materialize/cargo-go",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-go`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-go\n\nmetadata:\n  description: Run a Go program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, go]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cargo-go",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "fc77fe282eb33f9222d0d8aa85f3898a2d4737d7934faf082d060d45969d7be7",
+        "releaseIntentDigest": "bf06550b7a1708e860e8bf6e9bf3c9d0181419de5e66ee04238780fd9ff5249c",
+        "policyDigest": "9ac71302f47236a8429993f0957ef140e45c59406f1f32ba6f9a59169147c90e"
+      }
+    },
+    {
+      "name": "v6/cargo-hello",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo\n\nmetadata:\n  description: Run a shell program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, shell]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  # Upstream is `interval`. Blocked on BKLG-20260730-e627, which waits for the\n  # complete V5 occurrence contract rather than creating a second schedule\n  # authority.\n  mode: interval\n  every: 1h\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n    # REQUIRED because execution is recurring (Q-20260810-v2xn). A per-job cap\n    # alone bounds one occurrence; an `interval` application runs forever, and\n    # the org guard is not a fallback \u2014 `SpendGuards.budget_cap` defaults to\n    # `None`, meaning no cap.\n    rate:\n      amount: \"5000000\"\n      window: 30d\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "1a9289993527584ec6789dc77f16ff7a116c009837f95136e4ec91d014e29cfc",
+        "releaseIntentDigest": "1392441be3a6945b81c2ae9a33e7a89e2d8764babb9fbb03dce3588c31913c26"
+      }
+    },
+    {
+      "name": "v6/materialize/cargo-hello",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo\n\nmetadata:\n  description: Run a shell program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, shell]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  # Upstream is `interval`. Blocked on BKLG-20260730-e627, which waits for the\n  # complete V5 occurrence contract rather than creating a second schedule\n  # authority.\n  mode: interval\n  every: 1h\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n    # REQUIRED because execution is recurring (Q-20260810-v2xn). A per-job cap\n    # alone bounds one occurrence; an `interval` application runs forever, and\n    # the org guard is not a fallback \u2014 `SpendGuards.budget_cap` defaults to\n    # `None`, meaning no cap.\n    rate:\n      amount: \"5000000\"\n      window: 30d\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cargo-hello",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "1a9289993527584ec6789dc77f16ff7a116c009837f95136e4ec91d014e29cfc",
+        "releaseIntentDigest": "1392441be3a6945b81c2ae9a33e7a89e2d8764babb9fbb03dce3588c31913c26",
+        "policyDigest": "c1cbd2a7e641beefe9d955086df36a1938c325072a5adeca2e1c82f02d311950"
+      }
+    },
+    {
+      "name": "v6/cargo-java",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-java`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-java\n\nmetadata:\n  description: Run a Java program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, java]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "18151d3089c84509617f8778e35bfe8b9e11f64cbe6735b036dad10cffe45ec0",
+        "releaseIntentDigest": "35fd079461559233df9e69b4b53a6e4ae2fce609be918d9ce47e25e83a9a2854"
+      }
+    },
+    {
+      "name": "v6/materialize/cargo-java",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-java`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-java\n\nmetadata:\n  description: Run a Java program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, java]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cargo-java",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "18151d3089c84509617f8778e35bfe8b9e11f64cbe6735b036dad10cffe45ec0",
+        "releaseIntentDigest": "35fd079461559233df9e69b4b53a6e4ae2fce609be918d9ce47e25e83a9a2854",
+        "policyDigest": "28cab9c2f598098b26b02812ac56d5045101f99ad72de419c5727cd1c8055c3b"
+      }
+    },
+    {
+      "name": "v6/cargo-nodejs",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-nodejs`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-nodejs\n\nmetadata:\n  description: Run a Node.js program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, nodejs]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "f1ad643e8cb701b10ec75056dad5fc60078264b9fe9971b3b74ffd56a4ff0eee",
+        "releaseIntentDigest": "4ce4b7b56148246f8a9fbfc73f6ae8476c4fb1aeb1ae07bfb47b297609021eef"
+      }
+    },
+    {
+      "name": "v6/materialize/cargo-nodejs",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-nodejs`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-nodejs\n\nmetadata:\n  description: Run a Node.js program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, nodejs]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cargo-nodejs",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "f1ad643e8cb701b10ec75056dad5fc60078264b9fe9971b3b74ffd56a4ff0eee",
+        "releaseIntentDigest": "4ce4b7b56148246f8a9fbfc73f6ae8476c4fb1aeb1ae07bfb47b297609021eef",
+        "policyDigest": "ea0ca9c82f0ac8084114552a40c2a043782863c07b5ce118a8a23457a3424341"
+      }
+    },
+    {
+      "name": "v6/cargo-php",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-php`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-php\n\nmetadata:\n  description: Run a PHP program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, php]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "68c6a31bbcbb026b5bae7f23a8b025241e8bfd2b25a310fd70a5fbc61dfefa64",
+        "releaseIntentDigest": "b6b56c181ca666aec42830f5ae09d1c7c6b619e67e28ded3f24867db18dca74f"
+      }
+    },
+    {
+      "name": "v6/materialize/cargo-php",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-php`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-php\n\nmetadata:\n  description: Run a PHP program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, php]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cargo-php",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "68c6a31bbcbb026b5bae7f23a8b025241e8bfd2b25a310fd70a5fbc61dfefa64",
+        "releaseIntentDigest": "b6b56c181ca666aec42830f5ae09d1c7c6b619e67e28ded3f24867db18dca74f",
+        "policyDigest": "0482ddb39537def51246f68b53321a3ffd8f8dc696478854a85ed8e220358900"
+      }
+    },
+    {
+      "name": "v6/cargo-python",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-python`, and the representative draft for the\n## whole eleven-example language matrix.\n##\n## Its application logic is trivial on purpose. Everything interesting is the\n## runtime contract: findings #1 (image selection), #2 (dependency install),\n## #3 (what \"the process\" is), #13 (the script is the wrong layer).\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-python\n\nmetadata:\n  description: Run a Python program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, python]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n\n  # PROPOSED \u2014 finding #1. Upstream pins a Termux proot-distro tarball URL and\n  # sha256; Liskov will not accept that (ADR-0041 owns the supply chain), but\n  # V4's raw `imageDigest` makes every manifest hard-code a digest that rots on\n  # each image revision. A catalogue name plus a version floor, resolved to an\n  # exact digest at publication, is what this schema proposes.\n  image:\n    name: debian-trixie\n    version: \"0.1\"\n\n  entrypoint:\n    # V5 carries no multi-line shell body. The script is a repository file built\n    # into the image and invoked explicitly; no consumer reparses a command\n    # string. Under finding #13 this whole file should eventually disappear\n    # into a declared install phase.\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\n\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "bb50b630cc31772581a4e60b85f4d4cdf6874fb1a182eb5b8521fa39671b7ee0",
+        "releaseIntentDigest": "e00968ab2dd7bc45b6fb65f890d0bb56d9e5ea905eefac513f59f1e69368c9f6"
+      }
+    },
+    {
+      "name": "v6/materialize/cargo-python",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-python`, and the representative draft for the\n## whole eleven-example language matrix.\n##\n## Its application logic is trivial on purpose. Everything interesting is the\n## runtime contract: findings #1 (image selection), #2 (dependency install),\n## #3 (what \"the process\" is), #13 (the script is the wrong layer).\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-python\n\nmetadata:\n  description: Run a Python program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, python]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n\n  # PROPOSED \u2014 finding #1. Upstream pins a Termux proot-distro tarball URL and\n  # sha256; Liskov will not accept that (ADR-0041 owns the supply chain), but\n  # V4's raw `imageDigest` makes every manifest hard-code a digest that rots on\n  # each image revision. A catalogue name plus a version floor, resolved to an\n  # exact digest at publication, is what this schema proposes.\n  image:\n    name: debian-trixie\n    version: \"0.1\"\n\n  entrypoint:\n    # V5 carries no multi-line shell body. The script is a repository file built\n    # into the image and invoked explicitly; no consumer reparses a command\n    # string. Under finding #13 this whole file should eventually disappear\n    # into a declared install phase.\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\n\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cargo-python",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "bb50b630cc31772581a4e60b85f4d4cdf6874fb1a182eb5b8521fa39671b7ee0",
+        "releaseIntentDigest": "e00968ab2dd7bc45b6fb65f890d0bb56d9e5ea905eefac513f59f1e69368c9f6",
+        "policyDigest": "e3df407e4fb0c1e4965ce27fc0600a41ca2632b3b0d34e85cc9c1321b7a67b85"
+      }
+    },
+    {
+      "name": "v6/cargo-ruby",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-ruby`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-ruby\n\nmetadata:\n  description: Run a Ruby program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, ruby]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "350a6fc419a63383476dea10e3aae58bf9a8f1273d3eab9f265ce7eb1b41b1f6",
+        "releaseIntentDigest": "64c6c8f468e3b6f14d4934cd55e60602ccdb4512ff8c7758171cf2d6c26229e6"
+      }
+    },
+    {
+      "name": "v6/materialize/cargo-ruby",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-ruby`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-ruby\n\nmetadata:\n  description: Run a Ruby program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, ruby]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cargo-ruby",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "350a6fc419a63383476dea10e3aae58bf9a8f1273d3eab9f265ce7eb1b41b1f6",
+        "releaseIntentDigest": "64c6c8f468e3b6f14d4934cd55e60602ccdb4512ff8c7758171cf2d6c26229e6",
+        "policyDigest": "70152bc7646890fb71c9d195f3d03183cff4f782bfeabdc5a3bd27f6044c718c"
+      }
+    },
+    {
+      "name": "v6/cargo-rust",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-rust`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-rust\n\nmetadata:\n  description: Run a Rust program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, rust]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "3554626f2be91dcb0e9c1b4caf9db5bc820e68defb3d58dd720463e639de3cea",
+        "releaseIntentDigest": "334b48f8d378046233ca96152631af9c733f5d594ececea9a89d83d72b7100dc"
+      }
+    },
+    {
+      "name": "v6/materialize/cargo-rust",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-rust`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-rust\n\nmetadata:\n  description: Run a Rust program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, rust]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cargo-rust",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "3554626f2be91dcb0e9c1b4caf9db5bc820e68defb3d58dd720463e639de3cea",
+        "releaseIntentDigest": "334b48f8d378046233ca96152631af9c733f5d594ececea9a89d83d72b7100dc",
+        "policyDigest": "f89a065343c7d2420ec59d099f243072e0ec61b8494b12e96e1fee38be5c0ee6"
+      }
+    },
+    {
+      "name": "v6/cargo-ssh",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-ssh`: an interactive shell into a processor.\n##\n## Earlier revisions of this draft deliberately kept `acurast_tunnel` after\n## ADR-0059 \u00a76, because it was the one port whose purpose was to show SSH riding\n## the tunnel. ADR-0082 \u00a73.d defers every SSH provider except `liskov_managed`\n## out of V5, so that demonstration has no schema left to stand on and this\n## draft follows the mapping rule the rest of the catalogue already used. What\n## it shows now is the mandatory \u00a72.f arm on its own: authenticated operator\n## access with no ingress beside it, costing zero tunnel connections, so\n## ownership of the two-connection budget is unambiguous by construction rather\n## than by argument.\n##\n## The tunnel-backed variant is future-version evidence; see\n## `applications/README.md`.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-ssh\n\nmetadata:\n  description: Open an interactive shell into a processor over authenticated Runtime SSH.\n  labels: [liskov, example, cargo, access, ssh]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: continuous\n\ndeployment:\n  schedule:\n    duration: 1h\n  spend:\n    unit: service_credit_micros\n    perJob: \"600000\"\n    rate:\n      amount: \"15000000\"\n      window: 1d\n\naccess:\n  # ADR-0045: authenticated operator access is NOT public ingress. V5 moves\n  # Runtime SSH out of V4's `ingress.ssh` into its own section. Absence means\n  # disabled \u2014 there is no `mode`, no `optional` arm, and no redundant disabled\n  # object.\n  ssh:\n    provider:\n      kind: liskov_managed\n\n  # Upstream also offers ngrok and pinggy arms selected by SSH_TUNNEL. Those\n  # are deliberately NOT ported: a user-supplied third-party tunnel token has\n  # no integration record, no audit trail, and no revocation path.\n\nconfiguration:\n  secrets:\n    - secretId: cargo-ssh-password\n      required: true\n      destination:\n        kind: environment\n        name: SSH_PASSWORD\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "973bbfbe6e2a24793b8a8e01fd141dd5e31ad69babca09983caab3642f721320",
+        "releaseIntentDigest": "cb4fe2955d5460ae164edadc2bf76f08d4bccef5a2fa371eb37de9a0e95592a5"
+      }
+    },
+    {
+      "name": "v6/materialize/cargo-ssh",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-ssh`: an interactive shell into a processor.\n##\n## Earlier revisions of this draft deliberately kept `acurast_tunnel` after\n## ADR-0059 \u00a76, because it was the one port whose purpose was to show SSH riding\n## the tunnel. ADR-0082 \u00a73.d defers every SSH provider except `liskov_managed`\n## out of V5, so that demonstration has no schema left to stand on and this\n## draft follows the mapping rule the rest of the catalogue already used. What\n## it shows now is the mandatory \u00a72.f arm on its own: authenticated operator\n## access with no ingress beside it, costing zero tunnel connections, so\n## ownership of the two-connection budget is unambiguous by construction rather\n## than by argument.\n##\n## The tunnel-backed variant is future-version evidence; see\n## `applications/README.md`.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-ssh\n\nmetadata:\n  description: Open an interactive shell into a processor over authenticated Runtime SSH.\n  labels: [liskov, example, cargo, access, ssh]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: continuous\n\ndeployment:\n  schedule:\n    duration: 1h\n  spend:\n    unit: service_credit_micros\n    perJob: \"600000\"\n    rate:\n      amount: \"15000000\"\n      window: 1d\n\naccess:\n  # ADR-0045: authenticated operator access is NOT public ingress. V5 moves\n  # Runtime SSH out of V4's `ingress.ssh` into its own section. Absence means\n  # disabled \u2014 there is no `mode`, no `optional` arm, and no redundant disabled\n  # object.\n  ssh:\n    provider:\n      kind: liskov_managed\n\n  # Upstream also offers ngrok and pinggy arms selected by SSH_TUNNEL. Those\n  # are deliberately NOT ported: a user-supplied third-party tunnel token has\n  # no integration record, no audit trail, and no revocation path.\n\nconfiguration:\n  secrets:\n    - secretId: cargo-ssh-password\n      required: true\n      destination:\n        kind: environment\n        name: SSH_PASSWORD\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cargo-ssh",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "973bbfbe6e2a24793b8a8e01fd141dd5e31ad69babca09983caab3642f721320",
+        "releaseIntentDigest": "cb4fe2955d5460ae164edadc2bf76f08d4bccef5a2fa371eb37de9a0e95592a5",
+        "policyDigest": "11bd763a665084ddb7e63309e83de9c140fb91a983310cd5ea6d1ccdd4ff35ca"
+      }
+    },
+    {
+      "name": "v6/cargo-zig",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-zig`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-zig\n\nmetadata:\n  description: Run a Zig program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, zig]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "a7af45cdbf81041d2ec5b323b033ab0303535a34cfe73c2f688f1d095f66cb10",
+        "releaseIntentDigest": "166eae305f986fcdddc292a03cc84ad6fd4f523ad7c2d57a949a6778959e641f"
+      }
+    },
+    {
+      "name": "v6/materialize/cargo-zig",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-cargo-zig`. One of the eleven-example language\n## matrix; see ../cargo-python/README.md for the shared analysis. These drafts\n## are deliberately near-identical: everything that differs is a package name,\n## and everything that matters is platform work in start.sh. That is finding\n## #13's evidence, not an accident.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: cargo-zig\n\nmetadata:\n  description: Run a Zig program under the Cargo/PRoot runtime.\n  labels: [liskov, example, cargo, language-matrix, zig]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10m\n  spend:\n    unit: service_credit_micros\n    perJob: \"200000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cargo-zig",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "a7af45cdbf81041d2ec5b323b033ab0303535a34cfe73c2f688f1d095f66cb10",
+        "releaseIntentDigest": "166eae305f986fcdddc292a03cc84ad6fd4f523ad7c2d57a949a6778959e641f",
+        "policyDigest": "8c9e721d79f3ffe9b5a04583ab0841a888799312dd93892a66913c6c4e027a6f"
+      }
+    },
+    {
+      "name": "v6/clickhouse",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DEFERRED FROM V5 \u2014 future-version evidence (ADR-0082 \u00a73.c, \u00a73.d).\n## The thin V5 exact pair does not accept public ingress (`/ingress`),\n## integration declarations (`/integrations`) or an SSH provider other than\n## `liskov_managed`, which this draft authors.\n## It is kept as design evidence for the version that reintroduces those\n## blocks, and is NOT part of the retained V5 reference corpus vendored\n## into liskov-rs. See applications/README.md.\n##\n## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n## USES NO PROPOSED EXTENSIONS \u2014 because its data does not live on the machine.\n##\n## Liskov-only reference application. No Acurast upstream equivalent.\n##\n## Single-node ClickHouse with S3-backed MergeTree storage.\n##\n## THE MOST MARGINAL APPLICATION IN THIS CATALOGUE, and drafted anyway because\n## the reason it is marginal is instructive and its durability shape is one no\n## other draft has.\n##\n## Marginal, in ClickHouse's own words: the recommended memory is \"32 GB or\n## more\", and while \"you can use ClickHouse in a system with a small amount of\n## RAM (as low as 2 GB)\", those setups \"require additional tuning and can only\n## ingest at a low rate\". This draft therefore ships the documented low-memory\n## tuning rather than pretending a handset is a server, and an author should\n## read \"low ingest rate\" as a property of the deployment, not a warning to\n## dismiss.\n##\n## Instructive, because ClickHouse offers a FOURTH answer to the cold-start\n## problem. `rqlite` restores from object storage; `typesense` relies on quorum;\n## `meilisearch` relies on the platform. ClickHouse can put the MergeTree\n## storage layer itself on S3, so the data never lives on the machine that is\n## about to be replaced \u2014 which makes it nearly stateless in the same way\n## `postgrest` is, without giving up being a database.\n##\n## \u26a0\ufe0f AND THE TWO MITIGATIONS CONFLICT. ClickHouse's own low-memory guidance\n## warns that \"S3 or Kafka integrations on low-memory machines ... require\n## significant memory for buffers\". So the fix for statelessness costs the\n## memory the fix for a small machine was saving. That tension is real, is not\n## resolvable by configuration, and is the honest finding here. Finding #25.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: clickhouse\n\nmetadata:\n  description: A single-node ClickHouse with S3-backed storage, tuned for a small machine.\n  labels: [liskov, reference, cargo, service, analytics, database, olap]\n\nintegrations:\n  tailscale: int_00000000000000000000000000000000\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    # start.sh writes the low-memory overrides listed below before starting the\n    # server. They are not defaults and ClickHouse will not infer them from the\n    # machine it finds itself on.\n    executable: /bin/sh\n    args: [\"/app/start.sh\"]\nexecution:\n  mode: continuous\n\ndeployment:\n  # One. A ClickHouse cluster needs ClickHouse Keeper \u2014 a separate Raft service\n  # \u2014 and running a coordination cluster to coordinate a database on machines\n  # that cannot comfortably hold the database is not a trade worth drafting.\n\n  schedule:\n    duration: 6h\n\n  placement:\n    minimums:\n      # Enforced on-chain via RequiredMinMetrics, fail-closed. Liskov adds\n      # 1.1x selection headroom on top, so the effective floor is higher.\n      # Reaches ~41% of the recently-committed fleet\n      # (docs/raw/2026-08-12-acurast-metric-pool-scan.md).\n      # `memory` is TOTAL device RAM; `storage` is AVAILABLE space.\n      memory: 4GiB\n      storage: 8GiB\n\n  lifecycle:\n    # THE ONLY `lifecycle` BLOCK IN THE CATALOGUE, and that is the point.\n    # Every other field defaults, so what remains here is purely the deviation.\n    #\n    # \u26a0\ufe0f Two ClickHouse servers must never address the same S3 path concurrently \u2014\n    # MergeTree over S3 is not designed for two writers, and an overlapping\n    # successor is exactly two writers. So the predecessor stops FIRST and the\n    # deployment accepts a gap, inverting the platform default.\n    update:\n      existingJobs:\n        mode: run_until_scheduled_end\n\n  spend:\n    unit: service_credit_micros\n    perJob: \"3000000\"\n    rate:\n      amount: \"15000000\"\n      window: 1d\n\ningress:\n  http:\n    # 8123 is the HTTP interface, PRIVATE (ADR-0060). The native protocol on\n    # 9000 is faster and is not published here \u2014 but note the reason has\n    # changed: on a private endpoint there is no TLS to unwrap and no connection\n    # budget to spend, so publishing 9000 as `ingress.tcp` over the same tailnet\n    # would now be straightforward. It is left out to keep the example to one\n    # surface.\n    - name: http\n      localPort: 8123\n      health:\n        live:\n          http: /ping\n        ready:\n          http: /replicas_status\n      endpoints:\n        - name: private\n          provider:\n            kind: tailscale\n\naccess:\n  ssh:\n    provider:\n      kind: tailscale\n\nconfiguration:\n  variables:\n    - name: CLICKHOUSE_VERSION\n      source: literal\n      value: \"24.8\"\n    # The documented low-memory tuning, made visible in policy rather than\n    # buried in a config file: mark cache floor, single query thread, small\n    # blocks, and the log tables off. Every one of these is a real throughput\n    # cost and an author should see them before choosing this datastore.\n    - name: CH_MARK_CACHE_SIZE\n      source: literal\n      value: \"536870912\"\n    - name: CH_MAX_THREADS\n      source: literal\n      value: \"1\"\n    - name: CH_MAX_BLOCK_SIZE\n      source: literal\n      value: \"8192\"\n    - name: CH_DISABLE_LOG_TABLES\n      source: literal\n      value: \"1\"\n    - name: CH_S3_ENDPOINT\n      source: literal\n      value: https://fly.storage.tigris.dev/clickhouse-example\n  secrets:\n    # \u26a0\ufe0f ClickHouse's default user has no password, and its table functions can\n    # reach the filesystem. Private reachability is the outer boundary; this\n    # password is the inner one, and an analytics database should have both.\n    - secretId: clickhouse-default-password\n      required: true\n      destination:\n        kind: environment\n        name: CLICKHOUSE_PASSWORD\n    - secretId: clickhouse-s3-credentials\n      required: true\n      destination:\n        kind: file\n        path: /etc/clickhouse-server/s3-credentials.xml\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n# =====================================================================\n# NO `state` BLOCK \u2014 for a different reason than `rqlite`.\n#\n# rqlite has no state block because it backs itself up and restores itself.\n# ClickHouse has none because, with an S3-backed disk, THE DATA WAS NEVER ON\n# THE MACHINE. There is no volume worth snapshotting: the local disk holds a\n# cache and some metadata, and a replacement job attaches the same S3 path and\n# carries on.\n#\n# That is the strongest form of the finding `postgrest` makes: the applications\n# that suit this platform are the ones whose durable state lives somewhere the\n# platform is not. Where an application can be configured into that shape \u2014\n# and ClickHouse can \u2014 it should be, in preference to asking `state` to make a\n# disappearing disk look permanent.\n# =====================================================================\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "d41d4b64913d7516dfdc8c9af9ec47c25ddb0fa293ec1e175c2a4c1b3e6641b3",
+        "releaseIntentDigest": "f70e8ad743e2e1466557ec87dca9fd63e132874c72d97680f043497334431175"
+      }
+    },
+    {
+      "name": "v6/env-vars",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-env-vars`. The V5 configuration surface: a closed\n## literal-vs-managed source union with no `managed` boolean, and secrets with\n## explicit destinations.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: env-vars\n\nmetadata:\n  description: Read literal configuration, an application-managed value, and a secret.\n  labels: [liskov, example, javascript, configuration]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  # Upstream is `interval`. Blocked on BKLG-20260730-e627, which waits for the\n  # complete V5 occurrence contract rather than creating a second schedule\n  # authority.\n  mode: interval\n  every: 1h\n\ndeployment:\n  schedule:\n    duration: 30s\n  spend:\n    unit: service_credit_micros\n    perJob: \"20000\"\n    # REQUIRED because execution is recurring (Q-20260810-v2xn). A per-job cap\n    # alone bounds one occurrence; an `interval` application runs forever, and\n    # the org guard is not a fallback \u2014 `SpendGuards.budget_cap` defaults to\n    # `None`, meaning no cap.\n    rate:\n      amount: \"500000\"\n      window: 30d\n\nconfiguration:\n  variables:\n    # Literal: authored, digested, visible, immutable without republishing.\n    - name: GREETING\n      source: literal\n      value: hello\n    # Application-managed: the policy declares the name and requiredness; the\n    # value lives in the Application's value store and changes without a new\n    # policy version. `default` is valid only on this arm \u2014 it is the fallback\n    # for a mutable out-of-policy value, not a digested constant.\n    #\n    # Note what is ABSENT: `delivery`. In V4 this is where finding #7 bites \u2014\n    # only the `slipway` arm resolves and the unresolved `acurast` arm is the\n    # default. This schema's answer is to remove the choice from authoring\n    # entirely and let the platform pick the mechanism.\n    - name: REPORT_LABEL\n      source: managed\n      required: false\n      default: nightly\n  secrets:\n    # Rides the ADR-0014 Lockbox path, which is complete and in production.\n    - secretId: my-secret-env-var\n      required: true\n      destination:\n        kind: environment\n        name: MY_SECRET_ENV_VAR\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "8383269aa8a829cb846347b557227e22e5de21672dfbcf54c4f74cc768a5b045",
+        "releaseIntentDigest": "7c6a2d74054a0d7c491e1895d7c051fd67639bb4985b9405113fce7e5ec497a2"
+      }
+    },
+    {
+      "name": "v6/materialize/env-vars",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-env-vars`. The V5 configuration surface: a closed\n## literal-vs-managed source union with no `managed` boolean, and secrets with\n## explicit destinations.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: env-vars\n\nmetadata:\n  description: Read literal configuration, an application-managed value, and a secret.\n  labels: [liskov, example, javascript, configuration]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  # Upstream is `interval`. Blocked on BKLG-20260730-e627, which waits for the\n  # complete V5 occurrence contract rather than creating a second schedule\n  # authority.\n  mode: interval\n  every: 1h\n\ndeployment:\n  schedule:\n    duration: 30s\n  spend:\n    unit: service_credit_micros\n    perJob: \"20000\"\n    # REQUIRED because execution is recurring (Q-20260810-v2xn). A per-job cap\n    # alone bounds one occurrence; an `interval` application runs forever, and\n    # the org guard is not a fallback \u2014 `SpendGuards.budget_cap` defaults to\n    # `None`, meaning no cap.\n    rate:\n      amount: \"500000\"\n      window: 30d\n\nconfiguration:\n  variables:\n    # Literal: authored, digested, visible, immutable without republishing.\n    - name: GREETING\n      source: literal\n      value: hello\n    # Application-managed: the policy declares the name and requiredness; the\n    # value lives in the Application's value store and changes without a new\n    # policy version. `default` is valid only on this arm \u2014 it is the fallback\n    # for a mutable out-of-policy value, not a digested constant.\n    #\n    # Note what is ABSENT: `delivery`. In V4 this is where finding #7 bites \u2014\n    # only the `slipway` arm resolves and the unresolved `acurast` arm is the\n    # default. This schema's answer is to remove the choice from authoring\n    # entirely and let the platform pick the mechanism.\n    - name: REPORT_LABEL\n      source: managed\n      required: false\n      default: nightly\n  secrets:\n    # Rides the ADR-0014 Lockbox path, which is complete and in production.\n    - secretId: my-secret-env-var\n      required: true\n      destination:\n        kind: environment\n        name: MY_SECRET_ENV_VAR\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "ipfs_bundle",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/env-vars",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "8383269aa8a829cb846347b557227e22e5de21672dfbcf54c4f74cc768a5b045",
+        "releaseIntentDigest": "7c6a2d74054a0d7c491e1895d7c051fd67639bb4985b9405113fce7e5ec497a2",
+        "policyDigest": "d20625551338072668cde2cb8836a0093ab5e97f3fef6dcf3b117641c613f32d"
+      }
+    },
+    {
+      "name": "v6/external-deps",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## Retained V5 example input; the fpxa manifest is generated and activation-gated.\n##\n## Port of Acurast `apps/app-external-deps`.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: external-deps\n\nmetadata:\n  description: Bundle and use an external npm dependency.\n  labels: [liskov, example, javascript, batch]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 30s\n  spend:\n    unit: service_credit_micros\n    perJob: \"50000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "23a536c1601d8d69c7c06e7349a542de6165872a62c46d31fbeb6cf4e268eac4",
+        "releaseIntentDigest": "62f7f16b226f851e917ec0a482f73120ef52c2f81cacea9004c692143b425068"
+      }
+    },
+    {
+      "name": "v6/materialize/external-deps",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## Retained V5 example input; the fpxa manifest is generated and activation-gated.\n##\n## Port of Acurast `apps/app-external-deps`.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: external-deps\n\nmetadata:\n  description: Bundle and use an external npm dependency.\n  labels: [liskov, example, javascript, batch]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 30s\n  spend:\n    unit: service_credit_micros\n    perJob: \"50000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "ipfs_bundle",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/external-deps",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "23a536c1601d8d69c7c06e7349a542de6165872a62c46d31fbeb6cf4e268eac4",
+        "releaseIntentDigest": "62f7f16b226f851e917ec0a482f73120ef52c2f81cacea9004c692143b425068",
+        "policyDigest": "818d999181a0e0c25e2a65331fd9e91fe92a9f1a3104f7d0d3a55eeb492c207c"
+      }
+    },
+    {
+      "name": "v6/fetch",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## Retained V5 example input; fpxa production JSON is generated by scripts/manifests.mjs.\n## A source binding and separately approved standing grant are required to run it.\n##\n## Port of Acurast `apps/app-fetch`: GET data from one API, POST it to another.\n## The simplest possible V5 application, and the baseline every other draft is\n## measured against \u2014 one JavaScript job, once, no ingress, no state.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: fetch\n\nmetadata:\n  description: Fetch data from an API and post it to another API.\n  labels: [liskov, example, javascript, batch]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    # Relative to the immutable artifact root (`dist/`), which the trusted\n    # source integration owns \u2014 not relative to the repository.\n    file: bundle.js\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    # Upstream: maxExecutionTimeInMs 30000. No startAt / maxAllowedStartDelay \u2014\n    # the platform's `standard` launch-timing profile owns both.\n    duration: 30s\n  spend:\n    unit: service_credit_micros\n    perJob: \"50000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "009bcf03f3840adeb270fb0e5d55eb5d7ef41d5d680521a65bc6f681b48dd4bf",
+        "releaseIntentDigest": "350a372954ce0269e1c8406343509d2fb9a740e561a6db5e746ef951210c88c2"
+      }
+    },
+    {
+      "name": "v6/materialize/fetch",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## Retained V5 example input; fpxa production JSON is generated by scripts/manifests.mjs.\n## A source binding and separately approved standing grant are required to run it.\n##\n## Port of Acurast `apps/app-fetch`: GET data from one API, POST it to another.\n## The simplest possible V5 application, and the baseline every other draft is\n## measured against \u2014 one JavaScript job, once, no ingress, no state.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: fetch\n\nmetadata:\n  description: Fetch data from an API and post it to another API.\n  labels: [liskov, example, javascript, batch]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    # Relative to the immutable artifact root (`dist/`), which the trusted\n    # source integration owns \u2014 not relative to the repository.\n    file: bundle.js\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    # Upstream: maxExecutionTimeInMs 30000. No startAt / maxAllowedStartDelay \u2014\n    # the platform's `standard` launch-timing profile owns both.\n    duration: 30s\n  spend:\n    unit: service_credit_micros\n    perJob: \"50000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "ipfs_bundle",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/fetch",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "009bcf03f3840adeb270fb0e5d55eb5d7ef41d5d680521a65bc6f681b48dd4bf",
+        "releaseIntentDigest": "350a372954ce0269e1c8406343509d2fb9a740e561a6db5e746ef951210c88c2",
+        "policyDigest": "c4f484743cf4bdd30110289b79d8a79cc18867b3481d46edc1d665efbbf9d0db"
+      }
+    },
+    {
+      "name": "v6/heic-to-png",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-heic-to-png`.\n##\n## \u26a0\ufe0f Finding #8. The converted image is application OUTPUT, and V5 has no\n## surface for output \u2014 only managed logs. Upstream POSTs the result out. A\n## truthful port needs either the object data plane (EPIC-20260806-q7mz) or an\n## application-output contract; managed logging is neither.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: heic-to-png\n\nmetadata:\n  description: Convert HEIC images to PNG.\n  labels: [liskov, example, javascript, batch]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 1h\n  spend:\n    unit: service_credit_micros\n    perJob: \"50000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "6e167de29c56a74e959d2f84afc9eb56156666b282f19fdce846979490e3ede0",
+        "releaseIntentDigest": "bde8b16d875d7cf9417a50e67d753abda3426666f6e3a4a6b151710982eae6f5"
+      }
+    },
+    {
+      "name": "v6/materialize/heic-to-png",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-heic-to-png`.\n##\n## \u26a0\ufe0f Finding #8. The converted image is application OUTPUT, and V5 has no\n## surface for output \u2014 only managed logs. Upstream POSTs the result out. A\n## truthful port needs either the object data plane (EPIC-20260806-q7mz) or an\n## application-output contract; managed logging is neither.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: heic-to-png\n\nmetadata:\n  description: Convert HEIC images to PNG.\n  labels: [liskov, example, javascript, batch]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 1h\n  spend:\n    unit: service_credit_micros\n    perJob: \"50000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "ipfs_bundle",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/heic-to-png",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "6e167de29c56a74e959d2f84afc9eb56156666b282f19fdce846979490e3ede0",
+        "releaseIntentDigest": "bde8b16d875d7cf9417a50e67d753abda3426666f6e3a4a6b151710982eae6f5",
+        "policyDigest": "8555caebfb50a5cd0e33262a98c0d5654056b24d0bb0d3b516233449db254301"
+      }
+    },
+    {
+      "name": "v6/p2p",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-p2p`: connect to a processor over a P2P network.\n##\n## Like `tunnel-js`, this example exists ONLY because there is no job-to-job\n## network (finding #10). It is the second independent piece of evidence that\n## application authors are building their own overlay to work around a platform\n## gap. Keep both.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: p2p\n\nmetadata:\n  description: Reach a job over a peer-to-peer overlay built in application code.\n  labels: [liskov, example, javascript, service, cohort]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: continuous\n\ndeployment:\n  schedule:\n    duration: 1h\n  spend:\n    unit: service_credit_micros\n    perJob: \"600000\"\n    rate:\n      amount: \"15000000\"\n      window: 1d\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "da1ad800c0dc33258c4c3c8eda2208e7d663991312dbd522c9cee888136b3155",
+        "releaseIntentDigest": "76cea2b286103abf0a17addd06679f9454083b672de94e3c5837bcfd3e67e044"
+      }
+    },
+    {
+      "name": "v6/materialize/p2p",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-p2p`: connect to a processor over a P2P network.\n##\n## Like `tunnel-js`, this example exists ONLY because there is no job-to-job\n## network (finding #10). It is the second independent piece of evidence that\n## application authors are building their own overlay to work around a platform\n## gap. Keep both.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: p2p\n\nmetadata:\n  description: Reach a job over a peer-to-peer overlay built in application code.\n  labels: [liskov, example, javascript, service, cohort]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: continuous\n\ndeployment:\n  schedule:\n    duration: 1h\n  spend:\n    unit: service_credit_micros\n    perJob: \"600000\"\n    rate:\n      amount: \"15000000\"\n      window: 1d\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "ipfs_bundle",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/p2p",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "da1ad800c0dc33258c4c3c8eda2208e7d663991312dbd522c9cee888136b3155",
+        "releaseIntentDigest": "76cea2b286103abf0a17addd06679f9454083b672de94e3c5837bcfd3e67e044",
+        "policyDigest": "bc8332c9ab6324cd296ed78b699b3898fdb344f5186fb32551c88323f4b2843f"
+      }
+    },
+    {
+      "name": "v6/puppeteer",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-puppeteer`: scrape the web from many processors at\n## once. Upstream runs 64 replicas; this is the catalogue's real test of V5 job\n## count and phasing.\n##\n## Upstream's other reason for running on Acurast is source diversity, which\n## earlier revisions expressed as `placement.spread` on `wan_ip` and `country`.\n## ADR-0082 \u00a73.e defers the whole diversity vocabulary out of V5, and the\n## production capability surface has never had `topology_constraints` enabled,\n## so that block promised something no author could obtain. Following the\n## porting rule, this states the substitution rather than reproducing it: the\n## port keeps the parallelism and drops the diversity claim. Restoring it is\n## future-version work; see `applications/README.md`.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: puppeteer\n\nmetadata:\n  description: Scrape the web with Puppeteer from many independent processors.\n  labels: [liskov, example, javascript, batch, parallel]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: once\n\ndeployment:\n  # Upstream numberOfReplicas: 64. Total desired simultaneous job capacity \u2014\n  # Liskov derives slot identity, membership, and offsets. The author never\n  # names a slot.\n  jobs: 64\n\n  schedule:\n    duration: 1m\n    phasing:\n      # All 64 at once: this is a scrape, not a rolling service. Stated\n      # explicitly because the same field is what shard-worker sets to\n      # evenly_spaced, where it becomes the rolling-renewal mechanism.\n      mode: simultaneous\n\n  spend:\n    unit: service_credit_micros\n    perJob: \"100000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "ce82de8475fd698613ac12332a81c95d2eca1cf46b2756b6a4afc1da5320cc21",
+        "releaseIntentDigest": "e068b7a1f1e64bc67e0d391052c4ef33b9b9cbbc21ec19c85947c74bfa0e6dea"
+      }
+    },
+    {
+      "name": "v6/materialize/puppeteer",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-puppeteer`: scrape the web from many processors at\n## once. Upstream runs 64 replicas; this is the catalogue's real test of V5 job\n## count and phasing.\n##\n## Upstream's other reason for running on Acurast is source diversity, which\n## earlier revisions expressed as `placement.spread` on `wan_ip` and `country`.\n## ADR-0082 \u00a73.e defers the whole diversity vocabulary out of V5, and the\n## production capability surface has never had `topology_constraints` enabled,\n## so that block promised something no author could obtain. Following the\n## porting rule, this states the substitution rather than reproducing it: the\n## port keeps the parallelism and drops the diversity claim. Restoring it is\n## future-version work; see `applications/README.md`.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: puppeteer\n\nmetadata:\n  description: Scrape the web with Puppeteer from many independent processors.\n  labels: [liskov, example, javascript, batch, parallel]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: once\n\ndeployment:\n  # Upstream numberOfReplicas: 64. Total desired simultaneous job capacity \u2014\n  # Liskov derives slot identity, membership, and offsets. The author never\n  # names a slot.\n  jobs: 64\n\n  schedule:\n    duration: 1m\n    phasing:\n      # All 64 at once: this is a scrape, not a rolling service. Stated\n      # explicitly because the same field is what shard-worker sets to\n      # evenly_spaced, where it becomes the rolling-renewal mechanism.\n      mode: simultaneous\n\n  spend:\n    unit: service_credit_micros\n    perJob: \"100000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "ipfs_bundle",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/puppeteer",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "ce82de8475fd698613ac12332a81c95d2eca1cf46b2756b6a4afc1da5320cc21",
+        "releaseIntentDigest": "e068b7a1f1e64bc67e0d391052c4ef33b9b9cbbc21ec19c85947c74bfa0e6dea",
+        "policyDigest": "771c3b171c265b8b1c1aa43ba36f37d59f20e24261d9d6053a23dccaac0bd860"
+      }
+    },
+    {
+      "name": "v6/shard-worker",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Reference application, not an Acurast catalogue port. It exists because the\n## catalogue expresses rolling renewal only through clustered database services\n## (cockroachdb-ha, postgres, rqlite), and every one of those also needs public\n## ingress and durable state. That coupling made `evenly_spaced` phasing look\n## like a property of stateful clusters, when it is really a property of any\n## multi-job deployment that must not retire its whole fleet at one instant.\n##\n## A sharded queue worker is the smallest honest carrier: three jobs, each\n## pulling its own shard of an external work queue, reaching nothing inbound.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: shard-worker\n\nmetadata:\n  description: Drain a partitioned work queue from three independently renewing jobs.\n  labels: [liskov, reference, javascript, batch, parallel]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: continuous\n\ndeployment:\n  # Three shards. Liskov derives slot identity and membership; the worker reads\n  # its shard index from the platform-supplied job metadata, never from policy.\n  jobs: 3\n\n  schedule:\n    duration: 6h\n    phasing:\n      # One job per phase across a six-hour window staggers renewal by two\n      # hours, so exactly one shard is ever at its boundary. `simultaneous`\n      # would retire all three together, on a schedule.\n      mode: evenly_spaced\n      jobsPerPhase: 1\n\n  lifecycle:\n    update:\n      existingJobs:\n        # A shard is an exclusive lease on a queue partition: two jobs must\n        # never hold the same one. The predecessor serves out its paid window\n        # and accepts the gap rather than overlapping with its successor.\n        mode: run_until_scheduled_end\n\n  spend:\n    unit: service_credit_micros\n    perJob: \"3600000\"\n    rate:\n      amount: \"45000000\"\n      window: 1d\n\nconfiguration:\n  secrets:\n    - secretId: shard-worker-queue-token\n      required: true\n      destination:\n        kind: environment\n        name: QUEUE_TOKEN\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "f2f296fc27dbfbf47851e24d5503f2baa0d6df38e45e7652c2ef4b9107f6bdbd",
+        "releaseIntentDigest": "033f8dc37db56fd59d871472d469ca21bf6963e305f4753d5ab7445172f6f98e"
+      }
+    },
+    {
+      "name": "v6/materialize/shard-worker",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Reference application, not an Acurast catalogue port. It exists because the\n## catalogue expresses rolling renewal only through clustered database services\n## (cockroachdb-ha, postgres, rqlite), and every one of those also needs public\n## ingress and durable state. That coupling made `evenly_spaced` phasing look\n## like a property of stateful clusters, when it is really a property of any\n## multi-job deployment that must not retire its whole fleet at one instant.\n##\n## A sharded queue worker is the smallest honest carrier: three jobs, each\n## pulling its own shard of an external work queue, reaching nothing inbound.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: shard-worker\n\nmetadata:\n  description: Drain a partitioned work queue from three independently renewing jobs.\n  labels: [liskov, reference, javascript, batch, parallel]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: continuous\n\ndeployment:\n  # Three shards. Liskov derives slot identity and membership; the worker reads\n  # its shard index from the platform-supplied job metadata, never from policy.\n  jobs: 3\n\n  schedule:\n    duration: 6h\n    phasing:\n      # One job per phase across a six-hour window staggers renewal by two\n      # hours, so exactly one shard is ever at its boundary. `simultaneous`\n      # would retire all three together, on a schedule.\n      mode: evenly_spaced\n      jobsPerPhase: 1\n\n  lifecycle:\n    update:\n      existingJobs:\n        # A shard is an exclusive lease on a queue partition: two jobs must\n        # never hold the same one. The predecessor serves out its paid window\n        # and accepts the gap rather than overlapping with its successor.\n        mode: run_until_scheduled_end\n\n  spend:\n    unit: service_credit_micros\n    perJob: \"3600000\"\n    rate:\n      amount: \"45000000\"\n      window: 1d\n\nconfiguration:\n  secrets:\n    - secretId: shard-worker-queue-token\n      required: true\n      destination:\n        kind: environment\n        name: QUEUE_TOKEN\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "ipfs_bundle",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/shard-worker",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "f2f296fc27dbfbf47851e24d5503f2baa0d6df38e45e7652c2ef4b9107f6bdbd",
+        "releaseIntentDigest": "033f8dc37db56fd59d871472d469ca21bf6963e305f4753d5ab7445172f6f98e",
+        "policyDigest": "e9b3989bc1911a09f863b6287e9186784213c421a87c6907d8751e4f6da53b54"
+      }
+    },
+    {
+      "name": "v6/telegram-bot",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-telegram-bot`.\n##\n## Upstream declares maxExecutionTimeInMs of 3,600,000,000 \u2014 roughly 1,000\n## hours. That is not a one-shot; it is a service with the timeout set to\n## \"forever\" because Acurast has no other way to say it (finding #6).\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: telegram-bot\n\nmetadata:\n  description: Run a Telegram bot that responds to messages.\n  labels: [liskov, example, javascript, service]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: continuous\n\ndeployment:\n  schedule:\n    duration: 1h\n  spend:\n    unit: service_credit_micros\n    perJob: \"600000\"\n    rate:\n      amount: \"15000000\"\n      window: 1d\n\nconfiguration:\n  secrets:\n    # The bot token rides the ADR-0014 Lockbox path, which works today.\n    - secretId: telegram-bot-token\n      required: true\n      destination:\n        kind: environment\n        name: TELEGRAM_BOT_TOKEN\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "76e2c8dbfc3941d7c66f42a6630d15320c4bf2a8e69b0afaf6052c1ebdf6ef75",
+        "releaseIntentDigest": "ed93cbe9b4db66bbabe7ac73aefed52bab2308c6199ee9c222798849080b3172"
+      }
+    },
+    {
+      "name": "v6/materialize/telegram-bot",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-telegram-bot`.\n##\n## Upstream declares maxExecutionTimeInMs of 3,600,000,000 \u2014 roughly 1,000\n## hours. That is not a one-shot; it is a service with the timeout set to\n## \"forever\" because Acurast has no other way to say it (finding #6).\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: telegram-bot\n\nmetadata:\n  description: Run a Telegram bot that responds to messages.\n  labels: [liskov, example, javascript, service]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: continuous\n\ndeployment:\n  schedule:\n    duration: 1h\n  spend:\n    unit: service_credit_micros\n    perJob: \"600000\"\n    rate:\n      amount: \"15000000\"\n      window: 1d\n\nconfiguration:\n  secrets:\n    # The bot token rides the ADR-0014 Lockbox path, which works today.\n    - secretId: telegram-bot-token\n      required: true\n      destination:\n        kind: environment\n        name: TELEGRAM_BOT_TOKEN\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "ipfs_bundle",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/telegram-bot",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "76e2c8dbfc3941d7c66f42a6630d15320c4bf2a8e69b0afaf6052c1ebdf6ef75",
+        "releaseIntentDigest": "ed93cbe9b4db66bbabe7ac73aefed52bab2308c6199ee9c222798849080b3172",
+        "policyDigest": "2ecd01445c72ec7d1cc654c8fce01ac92259c1a4b2f2abba3af8c323ecda259d"
+      }
+    },
+    {
+      "name": "v6/video-transcode",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Reference application, not an Acurast catalogue port. It exists because the\n## catalogue authors `placement.minimums` and file-destination secrets only on\n## services that also publish ingress (clickhouse, cargo-hermes, wordpress) or\n## keep durable state. Neither field has anything to do with either: a batch job\n## can need a large device and a credentials file while reaching nothing inbound\n## and keeping nothing across renewals.\n##\n## Transcoding is the clearest carrier \u2014 the work is CPU- and storage-bound, the\n## input and output live in object storage, and the credentials for that store\n## are a file because the SDK that reads them wants a path, not an environment\n## variable.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: video-transcode\n\nmetadata:\n  description: Transcode a queued video on a large processor and upload the result.\n  labels: [liskov, reference, cargo, batch, media]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/transcode.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 30m\n\n  placement:\n    minimums:\n      # Enforced on-chain via RequiredMinMetrics, fail-closed. Liskov adds 1.1x\n      # selection headroom on top, so the effective floor is higher. `memory` is\n      # TOTAL device RAM; `storage` is AVAILABLE space, and a 4K source plus its\n      # intermediate frames is the reason this one is large.\n      memory: 4GiB\n      storage: 32GiB\n\n  spend:\n    unit: service_credit_micros\n    perJob: \"1800000\"\n\nconfiguration:\n  variables:\n    - source: literal\n      name: TRANSCODE_PRESET\n      value: h264-1080p\n\n  secrets:\n    - secretId: video-transcode-object-store-credentials\n      required: true\n      destination:\n        # A file, not an environment variable: the object-store SDK this image\n        # ships reads a credentials path. The file destination never collides\n        # with a variable name, which is why it needs no collision rule.\n        kind: file\n        path: /etc/liskov/object-store-credentials.json\n    - secretId: video-transcode-callback-token\n      required: true\n      destination:\n        kind: environment\n        name: CALLBACK_TOKEN\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "130c7b4ff4ffe5e0476c611776a95ec39938a46ee8aff3b9b0eaa4cc8efc8fd4",
+        "releaseIntentDigest": "1caa4d14cdface88dc15625f16a4f3321915c9169eb3595b9a875d4fa0ee664b"
+      }
+    },
+    {
+      "name": "v6/materialize/video-transcode",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Reference application, not an Acurast catalogue port. It exists because the\n## catalogue authors `placement.minimums` and file-destination secrets only on\n## services that also publish ingress (clickhouse, cargo-hermes, wordpress) or\n## keep durable state. Neither field has anything to do with either: a batch job\n## can need a large device and a credentials file while reaching nothing inbound\n## and keeping nothing across renewals.\n##\n## Transcoding is the clearest carrier \u2014 the work is CPU- and storage-bound, the\n## input and output live in object storage, and the credentials for that store\n## are a file because the SDK that reads them wants a path, not an environment\n## variable.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: video-transcode\n\nmetadata:\n  description: Transcode a queued video on a large processor and upload the result.\n  labels: [liskov, reference, cargo, batch, media]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image: # PROPOSED \u2014 finding #1\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [\"/app/transcode.sh\"]\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 30m\n\n  placement:\n    minimums:\n      # Enforced on-chain via RequiredMinMetrics, fail-closed. Liskov adds 1.1x\n      # selection headroom on top, so the effective floor is higher. `memory` is\n      # TOTAL device RAM; `storage` is AVAILABLE space, and a 4K source plus its\n      # intermediate frames is the reason this one is large.\n      memory: 4GiB\n      storage: 32GiB\n\n  spend:\n    unit: service_credit_micros\n    perJob: \"1800000\"\n\nconfiguration:\n  variables:\n    - source: literal\n      name: TRANSCODE_PRESET\n      value: h264-1080p\n\n  secrets:\n    - secretId: video-transcode-object-store-credentials\n      required: true\n      destination:\n        # A file, not an environment variable: the object-store SDK this image\n        # ships reads a credentials path. The file destination never collides\n        # with a variable name, which is why it needs no collision rule.\n        kind: file\n        path: /etc/liskov/object-store-credentials.json\n    - secretId: video-transcode-callback-token\n      required: true\n      destination:\n        kind: environment\n        name: CALLBACK_TOKEN\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/video-transcode",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "130c7b4ff4ffe5e0476c611776a95ec39938a46ee8aff3b9b0eaa4cc8efc8fd4",
+        "releaseIntentDigest": "1caa4d14cdface88dc15625f16a4f3321915c9169eb3595b9a875d4fa0ee664b",
+        "policyDigest": "19f255030566e335c9916ad98c27546989bbf13addebacff2d2054a9b50ee589"
+      }
+    },
+    {
+      "name": "v6/wasm",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## Retained V5 example input; the fpxa manifest is generated and activation-gated.\n##\n## Port of Acurast `apps/app-wasm`.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: wasm\n\nmetadata:\n  description: Instantiate and call a WebAssembly module.\n  labels: [liskov, example, javascript, batch, wasm]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10s\n  spend:\n    unit: service_credit_micros\n    perJob: \"50000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "665b2036d9f5ea93ff6e566961f5769dc254ae6ee1c9bfa645224e4cfb4017d7",
+        "releaseIntentDigest": "9fec86a3571360d7e73c085839dc98f43a58cf23440072938e7176963c4a52dd"
+      }
+    },
+    {
+      "name": "v6/materialize/wasm",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## Retained V5 example input; the fpxa manifest is generated and activation-gated.\n##\n## Port of Acurast `apps/app-wasm`.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: wasm\n\nmetadata:\n  description: Instantiate and call a WebAssembly module.\n  labels: [liskov, example, javascript, batch, wasm]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 10s\n  spend:\n    unit: service_credit_micros\n    perJob: \"50000\"\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "ipfs_bundle",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/wasm",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "665b2036d9f5ea93ff6e566961f5769dc254ae6ee1c9bfa645224e4cfb4017d7",
+        "releaseIntentDigest": "9fec86a3571360d7e73c085839dc98f43a58cf23440072938e7176963c4a52dd",
+        "policyDigest": "efccee83fcd480b11b48e3c7225aa89f27ebaf1d108290096fe997eded70a7b5"
+      }
+    },
+    {
       "name": "v4/golden",
       "request": {
         "schema": "proof.liskov.policy-client-request.v1",
@@ -3608,6 +5265,336 @@
       "expectedPointer": "/runtime"
     },
     {
+      "name": "v6/invalid/allow-and-exclude-share-an-id",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: manager [\"42\"] is both allowed and excluded\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/exclude\n# One id may not appear in both lists for the same dimension: allowing and\n# excluding the same manager is a contradiction that would otherwise resolve\n# by whichever rule the allocator happened to apply last.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-allow-exclude-contest\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    allow: [{by: manager, values: [\"42\", \"84\"]}]\n    exclude: [{by: manager, values: [\"42\"]}]\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/exclude"
+    },
+    {
+      "name": "v6/invalid/cohort-is-deferred",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown field `cohort`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /cohort\n# ADR-0082 \u00a73.b defers cohort identity and peer networking. The served metadata\n# endpoint has no producer in thin V5, so a policy that asked for peer access\n# would compile a promise nothing answers \u2014 it is refused at authoring instead.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-cohort-is-deferred\nrelease: {mode: source}\nruntime:\n  kind: native_image\n  image: {name: debian-trixie, version: \"0.1\"}\n  entrypoint: {executable: /bin/sh, args: [/app/start.sh]}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 6h}\n  spend:\n    unit: service_credit_micros\n    perJob: \"1200000\"\n    rate: {amount: \"30000000\", window: 1d}\n\ncohort:\n  peers:\n    access: metadata_service\n\nstate:\n  mode: off\n\nobservability:\n  logs: {enabled: true}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/cohort"
+    },
+    {
+      "name": "v6/invalid/duplicate-allow-dimension",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: more than one allow rule for\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/allow\n# At most one allow rule per dimension, so there is no hidden merge\n# precedence between two lists an allocator would have to reconcile.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-duplicate-allow-dimension\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    allow: [{by: manager, values: [\"42\"]}, {by: manager, values: [\"84\"]}]\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/allow"
+    },
+    {
+      "name": "v6/invalid/duplicate-key",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: duplicate key\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /\n#\n# YAML permits duplicate mapping keys and most loaders silently keep the LAST.\n# In a manifest that means one of two blocks quietly wins, and the discarded one\n# leaves no trace: no error, no warning, nothing downstream can see it.\n#\n# This is not hypothetical. `meilisearch` carried two `placement` blocks and the\n# reference validator reported `ok` for weeks -- PyYAML kept the second, so the\n# first block's `spread` rules (wan_ip and operator diversity, on a three-job\n# search cluster) were discarded at load time and never reached the schema.\n# Found 2026-08-12 by the Rust port, whose loader rejects duplicates by\n# construction.\n#\n# The rule is enforced at INGESTION, not by a schema keyword, because by the\n# time a document is a dict the duplicate is already gone.\n\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: duplicate-key\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  entrypoint:\n    file: index.js\n\nexecution:\n  mode: once\n\ndeployment:\n  schedule:\n    duration: 30m\n\n  spend:\n    unit: service_credit_micros\n    perJob: \"1000000\"\n\n  spend:\n    unit: service_credit_micros\n    perJob: \"999999999\"\n\nstate:\n  mode: off\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/"
+    },
+    {
+      "name": "v6/invalid/endpoint-protection-is-derived-not-authored",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown field `protection`, expected `name` or `provider`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/http/0/endpoints/0/protection\n# On a private provider protection derives to `network_gated` \u2014 reach implies\n# the gate (ADR-0060). Authoring it would be the ADR-0057 \u00a72 contradiction\n# trap, a second statement of a fact the platform already knows, so a V6\n# endpoint has no `protection` field at all.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-endpoint-protection-authored\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {tailscale: int_0123456789abcdef0123456789abcdef}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints: [{name: private, provider: {kind: tailscale}, protection: application_managed}]\nstate: {mode: off}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/ingress/http/0/endpoints/0/protection"
+    },
+    {
+      "name": "v6/invalid/endpoint-provider-beyond-tailscale-is-deferred",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown variant `acurast_tunnel`, expected `tailscale`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/http/0/endpoints/0/provider/kind\n# V6 authors one endpoint provider, the private one. The public providers\n# (`acurast_tunnel`, `cloudflare_tunnel`), their protection matrix and the\n# tunnel-connection budget return with public ingress (EPIC-20260907-ir5d),\n# and a document naming one is refused at the provider's own pointer rather\n# than reinterpreted as private.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-endpoint-provider-deferred\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {tailscale: int_0123456789abcdef0123456789abcdef}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints: [{name: public, provider: {kind: acurast_tunnel}}]\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/http/0/endpoints/0/provider/kind"
+    },
+    {
+      "name": "v6/invalid/env-name-collision",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: is claimed by\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /configuration\n# A variable and a secret destination cannot claim the same environment name.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-collision\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: app.js}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 1h}\n  spend: {unit: service_credit_micros, perJob: \"1\"}\nconfiguration:\n  variables:\n    - {name: API_KEY, source: literal, value: x}\n  secrets:\n    - secretId: api-key\n      destination: {kind: environment, name: API_KEY}\n\nstate:\n  mode: off\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/configuration"
+    },
+    {
+      "name": "v6/invalid/execution-until-is-not-an-arm",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: matched no variant of the union\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /execution/mode\n# ADR-0052 \u00a73, accepted 2026-08-10 and frozen in slipway-application-policy.\n# `until` is a termination CONDITION, not a recurrence shape \u2014 as a fourth arm,\n# \"interval until T\" becomes inexpressible. It is an optional bound on the two\n# recurring arms instead. Of the 37 original drafts none authored it, so\n# collapsing four arms to three cost the corpus nothing.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-until-arm\nrelease: {mode: source}\nruntime:\n  kind: native_image\n  image: {catalog: liskov-runtime-images, name: debian-trixie, version: \"0.1\"}\n  entrypoint: {executable: /bin/sh, args: [/app/start.sh]}\nexecution:\n  mode: until\n  until: \"2027-01-01T00:00:00Z\"\ndeployment:\n  schedule: {duration: 1h}\n  spend: {unit: service_credit_micros, perJob: \"1\"}\n\nstate:\n  mode: off\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/execution/mode"
+    },
+    {
+      "name": "v6/invalid/filter-dimension-beyond-manager-is-deferred",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown variant `country`, expected `manager`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/allow/0/by\n# Own-fleet targeting filters by the customer's own manager id, and nothing\n# else: `operator` was withdrawn before publication because on chain the\n# owning account is the manager (BKLG-20260907-547n).\n# Geography (`country`, `region`) reads a server-observed WAN IP that exists\n# only for processors Liskov has already contacted, and returns with\n# EPIC-20260907-7hzo; `wan_ip` is never filterable at all.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-filter-dimension-deferred\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    allow: [{by: country, values: [DE]}]\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/allow/0/by"
+    },
+    {
+      "name": "v6/invalid/filter-dimension-operator-is-withdrawn",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown variant `operator`, expected `manager`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/allow/0/by\n# `operator` was authored into the V6 delta on the assumption that a processor's\n# owning account was a separate fact from its manager id. It is not: on chain\n# the owning account *is* the manager, `AcurastProcessorManager` has no operator\n# entity, and the registry minted no operator fact \u2014 so the arm could never have\n# resolved. Withdrawn before publication rather than shipped inert, which\n# ADR-0082 4 forbids (BKLG-20260907-547n).\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-filter-dimension-operator\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    allow: [{by: operator, values: [\"4242\"]}]\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/allow/0/by"
+    },
+    {
+      "name": "v6/invalid/health-on-javascript",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: health is not available on the javascript runtime\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/api/health\n# Probing needs an out-of-process supervisor, which only the Cargo helper\n# provides. On the JavaScript runtime nothing would read a probe, so\n# declaring one is refused rather than silently ignored.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-health-on-javascript\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {tailscale: int_0123456789abcdef0123456789abcdef}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      health: {live: {tcp: 8080}}\n      endpoints: [{name: private, provider: {kind: tailscale}}]\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/api/health"
+    },
+    {
+      "name": "v6/invalid/hooks-are-deferred",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown field `hooks`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /hooks\n# ADR-0082 \u00a73.b defers lifecycle hooks. No V5 policy can declare one, so the\n# compiled hooks domain is never applicable and no hook runner is promised.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-hooks-are-deferred\nrelease: {mode: source}\nruntime:\n  kind: native_image\n  image: {name: debian-trixie, version: \"0.1\"}\n  entrypoint: {executable: /bin/sh, args: [/app/start.sh]}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 6h}\n  spend:\n    unit: service_credit_micros\n    perJob: \"1200000\"\n    rate: {amount: \"30000000\", window: 1d}\n\nhooks:\n  drain:\n    exec: [/app/drain.sh]\n\nstate:\n  mode: off\n\nobservability:\n  logs: {enabled: true}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/hooks"
+    },
+    {
+      "name": "v6/invalid/ingress-tcp-is-deferred",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown field `tcp`, expected `http`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/tcp\n# A raw stream cannot be multiplexed behind one attachment the way HTTP can,\n# and its provider matrix is public ingress's. V6 publishes HTTP services only;\n# `ingress.tcp` returns with EPIC-20260907-ir5d.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-ingress-tcp-deferred\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {tailscale: int_0123456789abcdef0123456789abcdef}\ningress:\n  tcp:\n    - name: wire\n      localPort: 9000\n      endpoints: [{name: private, provider: {kind: tailscale}}]\nstate: {mode: off}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/ingress/tcp"
+    },
+    {
+      "name": "v6/invalid/integration-id-shape",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: an integration id must match\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /integrations/tailscale\n# An integration reference is exactly the minted shape, `int_` plus 32 hex\n# nibbles. A free-form string here would be resolved against the directory\n# and fail at publication instead of at authoring.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-integration-id-shape\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {tailscale: my-tailnet}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/integrations/tailscale"
+    },
+    {
+      "name": "v6/invalid/manager-processor-selection-is-removed",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: matched no variant of the union\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/processorSelection/mode\n# ADR-0074 makes manager identity a hard allow/exclude filter. It is not a\n# processor source; only exact processor IDs remain under processorSelection.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-manager-selection\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: app.js}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 1h}\n  placement:\n    processorSelection: {mode: manager, managerId: \"42\"}\n  spend: {unit: service_credit_micros, perJob: \"1\"}\n\nstate:\n  mode: off\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/processorSelection/mode"
+    },
+    {
+      "name": "v6/invalid/minimums-empty-block",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: needs at least 1\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/minimums\n# An empty `minimums` states nothing. It reads like a constraint and is not one,\n# which is worse than its absence \u2014 the author believes they have narrowed\n# placement and they have not. Omit the block instead.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-empty-minimums\nrelease: {mode: source}\nruntime:\n  kind: native_image\n  image: {name: debian-trixie, version: \"0.1\"}\n  entrypoint: {executable: /bin/sh, args: [/app/start.sh]}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 6h}\n  placement:\n    minimums: {}\n  spend:\n    unit: service_credit_micros\n    perJob: \"1200000\"\n    rate: {amount: \"30000000\", window: 1d}\n\nstate:\n  mode: off\n\nobservability:\n  logs: {enabled: true}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/minimums"
+    },
+    {
+      "name": "v6/invalid/minimums-unitless-size",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: got int\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/minimums/memory\n# BKLG-20260811-pqpa. `memory: 4096` is not a size. Reading it as MiB rather\n# than bytes is a guess, and the two differ by a factor of a million \u2014 the same\n# reasoning ADR-0057 \u00a71 applied to durations. One unit-bearing term, always.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-unitless-minimum\nrelease: {mode: source}\nruntime:\n  kind: native_image\n  image: {name: debian-trixie, version: \"0.1\"}\n  entrypoint: {executable: /bin/sh, args: [/app/start.sh]}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 6h}\n  placement:\n    minimums:\n      memory: 4096\n  spend:\n    unit: service_credit_micros\n    perJob: \"1200000\"\n    rate: {amount: \"30000000\", window: 1d}\n\nstate:\n  mode: off\n\nobservability:\n  logs: {enabled: true}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/minimums/memory"
+    },
+    {
+      "name": "v6/invalid/phasing-does-not-divide",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: does not divide\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/schedule/phasing/jobsPerPhase\n# jobsPerPhase must divide jobs exactly \u2014 Liskov never rounds or leaves\n# a short final phase (BKLG-20260803-5j9i).\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-phasing\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: app.js}}\nexecution: {mode: continuous}\ndeployment:\n  jobs: 5\n  schedule:\n    duration: 1h\n    phasing: {mode: evenly_spaced, jobsPerPhase: 2}\n  spend: {unit: service_credit_micros, perJob: \"1\", rate: {amount: \"1\"}}\n\nstate:\n  mode: off\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/schedule/phasing/jobsPerPhase"
+    },
+    {
+      "name": "v6/invalid/placement-evidence-is-platform-owned",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown property 'evidence'\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/evidence\n# ADR-0076 makes processor intelligence mandatory platform behavior. Customers\n# cannot select, relax, or disable the internal evidence profile.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-placement-evidence\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: app.js}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 1h}\n  placement:\n    evidence: {profile: proof.liskov.recent-placement.v1}\n  spend: {unit: service_credit_micros, perJob: \"1\"}\nstate:\n  mode: off\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/deployment/placement/evidence"
+    },
+    {
+      "name": "v6/invalid/placement-spread-is-deferred",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown field `spread`, expected one of `minimums`, `processorSelection`, `allow`, `exclude`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/spread\n# V6 reintroduces `allow` and `exclude` (own-fleet targeting) and nothing else\n# of ADR-0082 \u00a73.e: `placement` is closed to exactly `minimums`,\n# `processorSelection`, `allow` and `exclude`. Spread and distribution wait for\n# the joint allocator (EPIC-20260906-6eld), and the same closure refuses both,\n# so this one fixture pins that vocabulary.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-placement-spread-is-deferred\nrelease: {mode: source}\nruntime:\n  kind: native_image\n  image: {name: debian-trixie, version: \"0.1\"}\n  entrypoint: {executable: /bin/sh, args: [/app/start.sh]}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 6h}\n  placement:\n    spread:\n      - by: country\n        minimumDistinct: 3\n        strength: required\n  spend:\n    unit: service_credit_micros\n    perJob: \"1200000\"\n    rate: {amount: \"30000000\", window: 1d}\n\nstate:\n  mode: off\n\nobservability:\n  logs: {enabled: true}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/deployment/placement/spread"
+    },
+    {
+      "name": "v6/invalid/private-endpoint-on-javascript",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: tailscale ingress is native_image only\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/api/private/provider\n# Joining a tailnet needs the Cargo helper's connector; the JavaScript runtime\n# has none. Same reasoning as managed SSH, which V5 already pins as\n# native_image only.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-private-endpoint-on-javascript\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {tailscale: int_0123456789abcdef0123456789abcdef}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints: [{name: private, provider: {kind: tailscale}}]\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/api/private/provider"
+    },
+    {
+      "name": "v6/invalid/recurring-without-a-spend-rate",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: deployment.spend.rate is required\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/spend/rate\n# Q-20260810-v2xn. A recurring application with only a per-job cap has no bound\n# on total spend. The org guard is NOT a fallback: SpendGuards.budget_cap is\n# Option<String> defaulting to None \u2014 \"None means no cap\" \u2014 and its enforcement\n# is advisory until the USD-credit ledger lands. So today nothing bounds total\n# spend at any level, which is why the rate is required here rather than nice.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-unbounded-recurring\nrelease: {mode: source}\nruntime:\n  kind: native_image\n  image: {catalog: liskov-runtime-images, name: debian-trixie, version: \"0.1\"}\n  entrypoint: {executable: /bin/sh, args: [/app/start.sh]}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 1h}\n  spend: {unit: service_credit_micros, perJob: \"1000\"}\n\nstate:\n  mode: off\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/spend/rate"
+    },
+    {
+      "name": "v6/invalid/renewal-on-a-one-shot",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: valid only for continuous execution\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/lifecycle/renewal\n# Renewal must not define once or interval cadence.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-renewal\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: app.js}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 1h}\n  lifecycle:\n    renewal: {leadTime: {mode: automatic}}\n  spend: {unit: service_credit_micros, perJob: \"1\"}\n\nstate:\n  mode: off\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/lifecycle/renewal"
+    },
+    {
+      "name": "v6/invalid/retry-budget-is-deleted",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown property 'recovery'\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/recovery\n# ADR-0050 deletes the retry/replace/generation budget vocabulary. maxRetries: 0\n# turning a processor hiccup into a park is the exact foot-gun it removes.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-recovery\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: app.js}}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 1h}\n  lifecycle:\n    recovery: {launch: {maxRetries: 0}}\n  spend: {unit: service_credit_micros, perJob: \"1\", rate: {amount: \"1\"}}\n\nstate:\n  mode: off\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/deployment/lifecycle/recovery"
+    },
+    {
+      "name": "v6/invalid/ssh-provider-acurast-tunnel-is-deferred",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown variant `acurast_tunnel`, expected `liskov_managed` or `tailscale`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /access/ssh/provider/kind\n# V6 carries the managed arm and the customer-owned Tailscale arm (ADR-0040).\n# The Acurast-tunnel arm consumes one of the deployment's two tunnel\n# connections and belongs with public ingress; it is refused at its own\n# pointer, never reinterpreted as managed access.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-ssh-provider-acurast-tunnel\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\naccess: {ssh: {provider: {kind: acurast_tunnel}}}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/access/ssh/provider/kind"
+    },
+    {
+      "name": "v6/invalid/state-beyond-off-is-deferred",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown variant `platform_managed`, expected `off`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /state/mode\n# ADR-0082 \u00a73.b defers durable state, snapshot/restore and state custody.\n# `off` survives as the single arm and `/state` stays REQUIRED at the root, so\n# opting out is an explicit readback rather than an absent block \u2014 and asking\n# for a deferred mode is a parse failure, never a silent coercion to `off`.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-state-beyond-off-is-deferred\nrelease: {mode: source}\nruntime:\n  kind: native_image\n  image: {name: debian-trixie, version: \"0.1\"}\n  entrypoint: {executable: /bin/sh, args: [/app/start.sh]}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 6h}\n  spend:\n    unit: service_credit_micros\n    perJob: \"1200000\"\n    rate: {amount: \"30000000\", window: 1d}\n\nstate:\n  mode: platform_managed\n\nobservability:\n  logs: {enabled: true}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/state/mode"
+    },
+    {
+      "name": "v6/invalid/undeclared-integration",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: names provider `tailscale` but no `integrations.tailscale` is declared and no integrationId overrides it\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/api/private/provider\n# Every site that names a provider must resolve to an integration: declared\n# once under `integrations` and referenced by kind, or overridden at the site.\n# Stating the id at every site is the \"stated twice\" trap; stating it nowhere\n# is an endpoint with no tailnet to join.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-undeclared-integration\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints: [{name: private, provider: {kind: tailscale}}]\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/api/private/provider"
+    },
+    {
+      "name": "v6/invalid/unitless-duration",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: does not match\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/schedule/duration\n# One unit-bearing duration grammar. Millisecond integers are not authored.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-duration\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: app.js}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: \"900000\"}\n  spend: {unit: service_credit_micros, perJob: \"1\"}\n\nstate:\n  mode: off\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/schedule/duration"
+    },
+    {
+      "name": "v6/invalid/unknown-field",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown property 'maxGenerations'\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/maxGenerations\n# runtime.maxGenerations is not a V5 customer concept \u2014 it moved to `execution`.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-unknown\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: app.js}, maxGenerations: 1}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 1h}\n  spend: {unit: service_credit_micros, perJob: \"1\"}\n\nstate:\n  mode: off\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/runtime/maxGenerations"
+    },
+    {
+      "name": "v6/invalid/unknown-image-catalogue",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: matched no variant of the union\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /runtime/image/catalog\n# ADR-0057 \u00a75, applied to the image catalogue. `catalog` is a PATTERN with a\n# server-side membership check, not a closed enum \u2014 a closed enum would make\n# every customer catalogue a schema revision. The pattern catches malformed\n# names here; the SERVER rejects a well-formed name that is not a real\n# catalogue, failing closed and naming the field.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-image-catalogue\nrelease: {mode: source}\nruntime:\n  kind: native_image\n  image: {catalog: \"Not A Catalogue\", name: debian-trixie, version: \"0.1\"}\n  entrypoint: {executable: /bin/sh, args: [/app/start.sh]}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 1h}\n  spend: {unit: service_credit_micros, perJob: \"1\"}\n\nstate:\n  mode: off\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/runtime"
+    },
+    {
       "name": "v4/duration-below-acurast-minimum",
       "request": {
         "schema": "proof.liskov.policy-client-request.v1",
@@ -3635,7 +5622,7 @@
       "schema": "proof.liskov.policy-client-request.v1",
       "operation": "validate",
       "encoding": "json",
-      "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 6, \"opaqueFutureBody\": {\"mustNotBeRead\": true}}"
+      "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 7, \"opaqueFutureBody\": {\"mustNotBeRead\": true}}"
     }
   }
 }
