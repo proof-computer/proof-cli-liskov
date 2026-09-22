@@ -7,7 +7,7 @@ export default class SlipwayApplicationLockboxGrantList extends OrganizationScop
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true })
   };
-  static description = "List Liskov Application Lockbox grants.";
+  static description = "List Liskov Application secret grants.";
   static examples = [
     "<%= config.bin %> liskov application lockbox grant list proof-docs --json"
   ];
@@ -17,7 +17,7 @@ export default class SlipwayApplicationLockboxGrantList extends OrganizationScop
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
     "slipway-url": Flags.string({ description: "Liskov service URL." })
   };
-  static summary = "List Liskov Application Lockbox grants.";
+  static summary = "List Liskov Application secret grants.";
 
   async run(): Promise<void> {
     const { args, flags } = await this.parse(SlipwayApplicationLockboxGrantList);

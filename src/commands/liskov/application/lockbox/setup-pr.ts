@@ -7,7 +7,7 @@ export default class SlipwayApplicationLockboxSetupPr extends OrganizationScoped
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true })
   };
-  static description = "Create or update the Liskov Lockbox setup pull request.";
+  static description = "Create or update the Liskov secret-upload setup pull request.";
   static examples = [
     "<%= config.bin %> liskov application lockbox setup-pr proof-docs --yes",
     "<%= config.bin %> liskov application lockbox setup-pr proof-docs --base-ref release --json --yes"
@@ -18,9 +18,9 @@ export default class SlipwayApplicationLockboxSetupPr extends OrganizationScoped
     help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
     "slipway-url": Flags.string({ description: "Liskov service URL." }),
-    yes: Flags.boolean({ char: "y", description: "Confirm the Lockbox setup PR mutation." })
+    yes: Flags.boolean({ char: "y", description: "Confirm the secret-upload setup PR mutation." })
   };
-  static summary = "Create the Lockbox setup pull request.";
+  static summary = "Create the secret-upload setup pull request.";
 
   async run(): Promise<void> {
     const { args, flags } = await this.parse(SlipwayApplicationLockboxSetupPr);

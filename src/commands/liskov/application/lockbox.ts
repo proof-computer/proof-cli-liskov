@@ -1,9 +1,9 @@
 import { OrganizationScopedCommand } from "../../../organization-context.js";
 
 export default class SlipwayApplicationLockbox extends OrganizationScopedCommand {
-  static description = "Read Liskov Application Lockbox state.";
+  static description = "Read Liskov Application secret-grant state.";
   static strict = false;
-  static summary = "Read Liskov Application Lockbox state.";
+  static summary = "Read Liskov Application secret-grant state.";
 
   async run(): Promise<void> {
     this.parsed = true;
@@ -21,7 +21,7 @@ export default class SlipwayApplicationLockbox extends OrganizationScopedCommand
 }
 
 function printSlipwayApplicationLockboxHelp(bin: string): void {
-  console.log(`Liskov Application Lockbox commands.
+  console.log(`Liskov Application secret-grant commands.
 
 USAGE
   $ ${bin} liskov application lockbox <command> [options]
@@ -35,7 +35,7 @@ COMMANDS
   grant-status APPLICATION_ID
 
 DESCRIPTION
-  Lockbox commands use the local proof liskov session created by
+  Secret-grant commands use the local proof liskov session created by
   \`${bin} liskov login\`. The grant-status command remains a compatibility
   alias for grant status.`);
 }

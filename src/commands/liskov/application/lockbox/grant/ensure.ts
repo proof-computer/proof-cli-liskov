@@ -7,7 +7,7 @@ export default class SlipwayApplicationLockboxGrantEnsure extends OrganizationSc
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true })
   };
-  static description = "Ensure a production Lockbox grant for a Liskov Application.";
+  static description = "Ensure a production secret grant for a Liskov Application.";
   static examples = [
     "<%= config.bin %> liskov application lockbox grant ensure proof-docs --yes --json"
   ];
@@ -16,9 +16,9 @@ export default class SlipwayApplicationLockboxGrantEnsure extends OrganizationSc
     help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
     "slipway-url": Flags.string({ description: "Liskov service URL." }),
-    yes: Flags.boolean({ char: "y", description: "Confirm the Lockbox grant mutation." })
+    yes: Flags.boolean({ char: "y", description: "Confirm the secret grant mutation." })
   };
-  static summary = "Ensure a Lockbox grant.";
+  static summary = "Ensure a secret grant.";
 
   async run(): Promise<void> {
     const { args, flags } = await this.parse(SlipwayApplicationLockboxGrantEnsure);

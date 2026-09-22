@@ -6,9 +6,9 @@ import { runSlipwayApplicationLockboxGrantVerify } from "../../../../../session.
 export default class SlipwayApplicationLockboxGrantVerify extends OrganizationScopedCommand {
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true }),
-    grant_id: Args.string({ description: "Lockbox grant id.", required: true })
+    grant_id: Args.string({ description: "Secret grant id.", required: true })
   };
-  static description = "Verify a production Lockbox grant for a Liskov Application.";
+  static description = "Verify a production secret grant for a Liskov Application.";
   static examples = [
     "<%= config.bin %> liskov application lockbox grant verify proof-docs lockbox-job-grant:abc --yes --json"
   ];
@@ -17,9 +17,9 @@ export default class SlipwayApplicationLockboxGrantVerify extends OrganizationSc
     help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
     "slipway-url": Flags.string({ description: "Liskov service URL." }),
-    yes: Flags.boolean({ char: "y", description: "Confirm the Lockbox grant verification mutation." })
+    yes: Flags.boolean({ char: "y", description: "Confirm the secret grant verification mutation." })
   };
-  static summary = "Verify a Lockbox grant.";
+  static summary = "Verify a secret grant.";
 
   async run(): Promise<void> {
     const { args, flags } = await this.parse(SlipwayApplicationLockboxGrantVerify);

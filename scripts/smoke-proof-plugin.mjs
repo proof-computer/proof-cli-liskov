@@ -137,15 +137,15 @@ try {
   assertIncludes(applicationPlansHelp.stdout, "APPLICATION_ID");
 
   const applicationLockboxHelp = run(process.execPath, [proofDevBin, "liskov", "application", "lockbox", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationLockboxHelp.stdout, "Read Liskov Application Lockbox state");
+  assertIncludes(applicationLockboxHelp.stdout, "Read Liskov Application secret-grant state");
   assertIncludes(applicationLockboxHelp.stdout, "grant-status");
 
   const applicationLockboxGrantStatusHelp = run(process.execPath, [proofDevBin, "liskov", "application", "lockbox", "grant-status", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationLockboxGrantStatusHelp.stdout, "Read Liskov Application Lockbox grant status");
+  assertIncludes(applicationLockboxGrantStatusHelp.stdout, "Read Liskov Application secret grant status");
   assertIncludes(applicationLockboxGrantStatusHelp.stdout, "APPLICATION_ID");
 
   const applicationLockboxGrantStatusNativeHelp = run(process.execPath, [proofDevBin, "liskov", "application", "lockbox", "grant", "status", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(applicationLockboxGrantStatusNativeHelp.stdout, "Read Liskov Application Lockbox grant status");
+  assertIncludes(applicationLockboxGrantStatusNativeHelp.stdout, "Read Liskov Application secret grant status");
   assertIncludes(applicationLockboxGrantStatusNativeHelp.stdout, "APP_REF");
 
   const applicationDeploymentImportHelp = run(process.execPath, [proofDevBin, "liskov", "application", "deployment", "import", "--help"], { cwd: proofCliRoot, env });

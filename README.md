@@ -24,6 +24,8 @@ proof liskov application list --organization org-123
 LISKOV_ORGANIZATION=team-slug proof liskov application status proof-docs
 proof liskov application status proof-docs
 proof liskov application plans proof-docs --json
+proof liskov application secrets proof-docs
+proof liskov application secrets proof-docs --json
 proof liskov application logs proof-docs --limit 100
 proof liskov application logs proof-docs --deployment dep-123 --job job-123 --origin runtime-ssh --json
 proof liskov application logs proof-docs --follow
@@ -47,11 +49,6 @@ proof liskov application retirement-census --remediation-class operator_adjudica
 proof liskov application devtools view-key proof-docs 66059 --json
 proof liskov application runtime-image workflow proof-docs --manifest .liskov/proof-docs.json
 proof liskov application deployment import proof-docs --sequence 701 --origin 5... --yes
-proof liskov application lockbox setup-pr proof-docs --yes
-proof liskov application lockbox dispatch proof-docs --yes
-proof liskov application lockbox grant ensure proof-docs --yes
-proof liskov application lockbox grant status proof-docs --json
-proof liskov application lockbox grant-status proof-docs --json
 proof liskov runtime-ssh integration list org-123
 proof liskov runtime-ssh integration create org-123 --name "Production tailnet" --tailnet example.com --tag tag:liskov-runtime --oauth-client-id CLIENT_ID
 proof liskov runtime-ssh integration validate org-123 int_123
@@ -131,6 +128,9 @@ Pages are bounded (`--limit`, default 25, maximum 100) and walked with
 which emits one canonical page unchanged. The command starts no retirement and
 resolves no review.
 
+`application secrets` reads the managed secrets an Application's active
+policy requires and whether each is present; values are never shown.
+
 Application logging is opt-in through Manifest V4
 `observability.logs.enabled`. Liskov provisions and reads it as a managed
 capability; `application logs` is read-only and its `--json` output is the core
@@ -159,10 +159,10 @@ uses the read-only deletion-preview endpoint and sends no mutation body. With
 `--yes`, it sends a guarded DELETE that requires a reason and, when needed,
 explicit live-resource acknowledgement. Tombstoning removes the Application
 from normal management/read surfaces but does not stop Acurast jobs, revoke
-Lockbox grants, drain routes, or spend.
+secret grants, drain routes, or spend.
 
 Pause and resume stop or restart only new Liskov planning/executor work; they
-do not stop existing Acurast jobs, revoke Lockbox grants, drain routes, or
+do not stop existing Acurast jobs, revoke secret grants, drain routes, or
 spend.
 
 Run asks a settled `once` Application to run once more. It authorizes exactly
@@ -269,6 +269,21 @@ The active Application policy must allow the repository/ref under
 `runtimeImageAutomation.github`; if it pins `workflowRef`, set it to the
 generated caller path, such as
 `<owner>/<repo>/.github/workflows/liskov-runtime-image.yml@refs/heads/<branch>`.
+
+## Advanced: secret-grant plumbing
+
+`application secrets` is the customer path for managed secrets. The
+`application lockbox` commands below are lower-level secret-grant plumbing that
+builders rarely need; they stay runnable under their existing command ids, but
+ordinary help no longer lists them.
+
+```sh
+proof liskov application lockbox setup-pr proof-docs --yes
+proof liskov application lockbox dispatch proof-docs --yes
+proof liskov application lockbox grant ensure proof-docs --yes
+proof liskov application lockbox grant status proof-docs --json
+proof liskov application lockbox grant-status proof-docs --json
+```
 
 ## Development
 

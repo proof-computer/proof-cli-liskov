@@ -52,21 +52,16 @@ COMMANDS
   plans APPLICATION_ID
   action-plan APP_REF
   action-plan retry APP_REF --decision-id ID --reason TEXT --yes
+  secrets APP_REF [--json]
   logs APP_REF [--limit N] [--deployment ID] [--job ID] [--origin all|customer|runtime-ssh|runtime_ssh] [--event GLOB] [--follow] [--from-start] [--ndjson] [--json]
   devtools view-key APP_REF DEPLOYMENT_ID
   runtime-image workflow APP_ID --manifest PATH [--output PATH]
   deployment import APP_REF --sequence N --origin ADDRESS --yes
-  lockbox setup-pr APP_REF --yes
-  lockbox dispatch APP_REF --yes
-  lockbox grant ensure APP_REF --yes
-  lockbox grant verify APP_REF GRANT_ID --yes
-  lockbox grant status APP_REF
-  lockbox grant-status APPLICATION_ID
 
 DESCRIPTION
   Application commands use the local proof liskov session created by
   \`${bin} liskov login\`. Pause stops new planning/executor work without
-  stopping Acurast jobs, revoking Lockbox grants, or draining routes. Retire
+  stopping Acurast jobs, revoking secret grants, or draining routes. Retire
   pauses immediately, waits for chain schedules and bounded financial closeout,
   then writes an immutable zero-gate receipt. Run authorizes one more occurrence
   for a settled once Application, against its current published revision; it

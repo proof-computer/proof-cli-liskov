@@ -4098,18 +4098,18 @@ export async function runSlipwayApplicationLockboxGrantList(input: SlipwayApplic
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/lockbox/grants`,
     requestErrorCode: "SLIPWAY_APPLICATION_LOCKBOX_GRANT_LIST_FAILED",
     notFoundMessage: "No Liskov CLI session is stored locally.",
-    fetchFailedMessage: "could not read Liskov Application lockbox grants"
+    fetchFailedMessage: "could not read Liskov Application secret grants"
   }, options);
   if (!request.ok) return request.exitCode;
   const body = request.body;
   if (body?.ok !== true) {
     const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_LOCKBOX_GRANT_LIST_FAILED";
-    writeStructuredOrHuman(options, input.json, { ok: false, error, status: request.response.status, reason: body?.reason ?? body?.error, applicationRef: input.applicationRef, slipwayUrl: request.slipwayUrl, sessionFile: request.sessionFile }, `Error (${error}): Liskov could not read lockbox grants for Application ${input.applicationRef}.`);
+    writeStructuredOrHuman(options, input.json, { ok: false, error, status: request.response.status, reason: body?.reason ?? body?.error, applicationRef: input.applicationRef, slipwayUrl: request.slipwayUrl, sessionFile: request.sessionFile }, `Error (${error}): Liskov could not read secret grants for Application ${input.applicationRef}.`);
     return 1;
   }
   const grants = body.grants;
   const count = typeof body.count === "number" ? body.count : Array.isArray(grants) ? grants.length : 0;
-  writeStructuredOrHuman(options, input.json, body, `${count} lockbox grant(s) for ${input.applicationRef}.`);
+  writeStructuredOrHuman(options, input.json, body, `${count} secret grant(s) for ${input.applicationRef}.`);
   return 0;
 }
 
@@ -4723,7 +4723,7 @@ export async function runSlipwayApplicationLockboxGrantStatus(input: SlipwayAppl
     path: `/api/applications/${encodeURIComponent(input.applicationId)}/lockbox/grant-status`,
     requestErrorCode: "SLIPWAY_APPLICATION_LOCKBOX_GRANT_STATUS_FAILED",
     notFoundMessage: "No Liskov CLI session is stored locally.",
-    fetchFailedMessage: "could not read Liskov Application Lockbox grant status"
+    fetchFailedMessage: "could not read Liskov Application secret grant status"
   }, options);
   if (!request.ok) return request.exitCode;
 
@@ -4738,7 +4738,7 @@ export async function runSlipwayApplicationLockboxGrantStatus(input: SlipwayAppl
       applicationId: input.applicationId,
       slipwayUrl: request.slipwayUrl,
       sessionFile: request.sessionFile
-    }, `Error (${error}): Liskov could not read Lockbox grant status for Application ${input.applicationId}.`);
+    }, `Error (${error}): Liskov could not read secret grant status for Application ${input.applicationId}.`);
     return 1;
   }
 
@@ -4791,7 +4791,7 @@ export async function runSlipwayApplicationDeploymentImport(input: SlipwayApplic
 }
 
 export async function runSlipwayApplicationLockboxSetupPr(input: SlipwayApplicationLockboxSetupPrInput, options: SlipwayCliOptions = {}): Promise<number> {
-  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_LOCKBOX_SETUP_PR_CONFIRMATION_REQUIRED", "Lockbox setup PR");
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_LOCKBOX_SETUP_PR_CONFIRMATION_REQUIRED", "Secret-upload setup PR");
   return runSlipwayJsonCommand({
     config: input.config,
     slipwayUrl: input.slipwayUrl,
@@ -4800,17 +4800,17 @@ export async function runSlipwayApplicationLockboxSetupPr(input: SlipwayApplicat
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/lockbox/workflow-pr`,
     body: { baseRef: input.baseRef },
     errorCode: "SLIPWAY_APPLICATION_LOCKBOX_SETUP_PR_FAILED",
-    fetchFailedMessage: "could not create Liskov Lockbox setup PR",
+    fetchFailedMessage: "could not create Liskov secret-upload setup PR",
     human: (body) => {
       const setup = objectRecord(objectRecord(body).setup);
       const pullRequest = objectRecord(setup.pullRequest);
-      return `Lockbox setup PR ${stringValue(pullRequest.url) ?? stringValue(setup.status) ?? "ready"} for ${input.applicationRef}.`;
+      return `Secret-upload setup PR ${stringValue(pullRequest.url) ?? stringValue(setup.status) ?? "ready"} for ${input.applicationRef}.`;
     }
   }, options);
 }
 
 export async function runSlipwayApplicationLockboxDispatch(input: SlipwayApplicationLockboxDispatchInput, options: SlipwayCliOptions = {}): Promise<number> {
-  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_LOCKBOX_DISPATCH_CONFIRMATION_REQUIRED", "Lockbox workflow dispatch");
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_LOCKBOX_DISPATCH_CONFIRMATION_REQUIRED", "Secret-upload workflow dispatch");
   return runSlipwayJsonCommand({
     config: input.config,
     slipwayUrl: input.slipwayUrl,
@@ -4819,16 +4819,16 @@ export async function runSlipwayApplicationLockboxDispatch(input: SlipwayApplica
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/lockbox/workflow-dispatch`,
     body: { ref: input.ref },
     errorCode: "SLIPWAY_APPLICATION_LOCKBOX_DISPATCH_FAILED",
-    fetchFailedMessage: "could not dispatch Liskov Lockbox workflow",
+    fetchFailedMessage: "could not dispatch Liskov secret-upload workflow",
     human: (body) => {
       const dispatch = objectRecord(objectRecord(body).dispatch);
-      return `Lockbox dispatch ${stringValue(dispatch.dispatchId) ?? "submitted"} ${stringValue(dispatch.status) ?? "ready"} for ${input.applicationRef}.`;
+      return `Secret-upload workflow dispatch ${stringValue(dispatch.dispatchId) ?? "submitted"} ${stringValue(dispatch.status) ?? "ready"} for ${input.applicationRef}.`;
     }
   }, options);
 }
 
 export async function runSlipwayApplicationLockboxGrantEnsure(input: SlipwayApplicationLockboxGrantEnsureInput, options: SlipwayCliOptions = {}): Promise<number> {
-  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_LOCKBOX_GRANT_ENSURE_CONFIRMATION_REQUIRED", "Lockbox grant ensure");
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_LOCKBOX_GRANT_ENSURE_CONFIRMATION_REQUIRED", "Secret grant ensure");
   return runSlipwayJsonCommand({
     config: input.config,
     slipwayUrl: input.slipwayUrl,
@@ -4837,16 +4837,16 @@ export async function runSlipwayApplicationLockboxGrantEnsure(input: SlipwayAppl
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/lockbox/grants`,
     body: {},
     errorCode: "SLIPWAY_APPLICATION_LOCKBOX_GRANT_ENSURE_FAILED",
-    fetchFailedMessage: "could not ensure Liskov Lockbox grant",
+    fetchFailedMessage: "could not ensure Liskov secret grant",
     human: (body) => {
       const grant = objectRecord(objectRecord(body).grant);
-      return `Lockbox grant ${stringValue(grant.grantId) ?? "recorded"} ${stringValue(grant.status) ?? "ready"} for ${input.applicationRef}.`;
+      return `Secret grant ${stringValue(grant.grantId) ?? "recorded"} ${stringValue(grant.status) ?? "ready"} for ${input.applicationRef}.`;
     }
   }, options);
 }
 
 export async function runSlipwayApplicationLockboxGrantVerify(input: SlipwayApplicationLockboxGrantVerifyInput, options: SlipwayCliOptions = {}): Promise<number> {
-  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_LOCKBOX_GRANT_VERIFY_CONFIRMATION_REQUIRED", "Lockbox grant verify");
+  if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_APPLICATION_LOCKBOX_GRANT_VERIFY_CONFIRMATION_REQUIRED", "Secret grant verify");
   return runSlipwayJsonCommand({
     config: input.config,
     slipwayUrl: input.slipwayUrl,
@@ -4855,10 +4855,10 @@ export async function runSlipwayApplicationLockboxGrantVerify(input: SlipwayAppl
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/lockbox/grants/${encodeURIComponent(input.grantId)}/verify`,
     body: {},
     errorCode: "SLIPWAY_APPLICATION_LOCKBOX_GRANT_VERIFY_FAILED",
-    fetchFailedMessage: "could not verify Liskov Lockbox grant",
+    fetchFailedMessage: "could not verify Liskov secret grant",
     human: (body) => {
       const grant = objectRecord(objectRecord(body).grant);
-      return `Lockbox grant ${stringValue(grant.grantId) ?? input.grantId} ${stringValue(grant.status) ?? "verified"} for ${input.applicationRef}.`;
+      return `Secret grant ${stringValue(grant.grantId) ?? input.grantId} ${stringValue(grant.status) ?? "verified"} for ${input.applicationRef}.`;
     }
   }, options);
 }
@@ -8010,7 +8010,7 @@ function formatLockboxGrantStatus(body: SlipwayApplicationLockboxGrantStatusResp
   const accepted = statuses.reduce((sum, item) => sum + (typeof item.requests?.acceptedCount === "number" ? item.requests.acceptedCount : 0), 0);
   const requestErrors = statuses.filter((item) => typeof item.requestSummaryError === "string" && item.requestSummaryError.length > 0).length;
   const errorSummary = requestErrors > 0 ? `, ${requestErrors} request summary error(s)` : "";
-  return `Lockbox grant status for ${applicationId}: ${statuses.length} grant(s), ${accepted} accepted job request(s)${errorSummary}.`;
+  return `Secret grant status for ${applicationId}: ${statuses.length} grant(s), ${accepted} accepted job request(s)${errorSummary}.`;
 }
 
 function formatSessionIdentity(session: PublicSlipwaySession): string {
