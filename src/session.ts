@@ -730,6 +730,13 @@ export interface SlipwayCustodyPairInput {
   json?: boolean;
 }
 
+export interface SlipwayCustodySignerStatusInput {
+  applicationRef: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayCustodyEnvironmentUploadInput {
   applicationRef: string;
   secretsFile: string;
@@ -958,7 +965,19 @@ interface PublicSelfCustodySigner {
   pendingRequestCount?: number;
   offlineTtlMs?: number;
   offlineDeadlineAtMs?: number | null;
+  lastConnectedAtMs?: number | null;
+  lastDisconnectedAtMs?: number | null;
   message?: string;
+  [key: string]: unknown;
+}
+
+interface SlipwayCustodySignerStatusResponse {
+  ok?: boolean;
+  organizationId?: string;
+  applicationId?: string;
+  selfCustodySigner?: PublicSelfCustodySigner;
+  error?: string;
+  reason?: string;
   [key: string]: unknown;
 }
 
@@ -5189,6 +5208,58 @@ export async function runSlipwayCustodyPair(input: SlipwayCustodyPairInput, opti
   return 0;
 }
 
+/**
+ * `GET /api/applications/:ref/custody` carries the self-custody signer block the
+ * response wrapper injects (`selfCustodySigner`); this verb prints only that block.
+ * `--json` keeps the server's block verbatim.
+ */
+export async function runSlipwayCustodySignerStatus(input: SlipwayCustodySignerStatusInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayRequest<SlipwayCustodySignerStatusResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/custody`,
+    requestErrorCode: "SLIPWAY_CUSTODY_SIGNER_STATUS_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov self-custody signer status"
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const body = request.body;
+  const signer = body?.selfCustodySigner;
+  const signerIsObject = signer !== null && typeof signer === "object" && !Array.isArray(signer);
+  if (!request.response.ok || body?.ok !== true || !signerIsObject) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_CUSTODY_SIGNER_STATUS_FAILED";
+    const missingBlock = request.response.ok && body?.ok === true && !signerIsObject;
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      reason: missingBlock ? "self_custody_signer_missing" : body?.reason ?? body?.error,
+      applicationRef: input.applicationRef,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, missingBlock
+      ? `Error (${error}): Liskov's custody response for ${input.applicationRef} carried no self-custody signer block.`
+      : `Error (${error}): Liskov could not read the self-custody signer for ${input.applicationRef}.`);
+    return 1;
+  }
+
+  const applicationId = stringValue(body.applicationId) ?? input.applicationRef;
+  writeStructuredOrHuman(
+    options,
+    input.json,
+    {
+      ok: true,
+      organizationId: body.organizationId,
+      applicationId,
+      selfCustodySigner: signer
+    },
+    formatSelfCustodySignerStatus(applicationId, signer)
+  );
+  return 0;
+}
+
 export async function runSlipwayCustodyEnvironmentUpload(input: SlipwayCustodyEnvironmentUploadInput, options: SlipwayCliOptions = {}): Promise<number> {
   if (!input.yes) return writeConfirmationRequired(options, input.json, "SLIPWAY_CUSTODY_ENVIRONMENT_UPLOAD_CONFIRMATION_REQUIRED", "custody environment upload");
   const prepared = await prepareEnvironmentHandoffs(input, options);
@@ -7363,6 +7434,41 @@ function formatSelfCustodySigner(value: unknown): string | undefined {
   const pendingPart = pending && pending > 0 ? `, ${pending} pending` : "";
   const messagePart = message ? `: ${message}` : "";
   return `signer ${label}${addressPart}${pendingPart}${messagePart}`;
+}
+
+/** The `custody signer status` view: the full address and liveness times, beyond the one-line summary. */
+function formatSelfCustodySignerStatus(applicationId: string, signer: PublicSelfCustodySigner): string {
+  const status = stringValue(signer.status);
+  const address = stringValue(signer.address);
+  const message = stringValue(signer.message);
+  if ((!status || status === "not_configured") && !address) {
+    return [
+      `Self-custody signer for ${applicationId}: not configured.`,
+      message ? `Message: ${message}` : undefined
+    ].filter(Boolean).join("\n");
+  }
+  const pending = numberValue(signer.pendingRequestCount);
+  const connected = typeof signer.connected === "boolean" ? (signer.connected ? "yes" : "no") : undefined;
+  const lastConnectedAt = isoFromEpochMs(signer.lastConnectedAtMs);
+  const lastDisconnectedAt = isoFromEpochMs(signer.lastDisconnectedAtMs);
+  const offlineDeadlineAt = isoFromEpochMs(signer.offlineDeadlineAtMs);
+  return [
+    `Self-custody signer for ${applicationId}: ${signerStatusLabel(status)}.`,
+    `Address: ${address ?? "none"}`,
+    connected === undefined ? undefined : `Connected: ${connected}`,
+    pending === undefined ? undefined : `Pending sign requests: ${pending}`,
+    lastConnectedAt ? `Last connected at: ${lastConnectedAt}` : undefined,
+    lastDisconnectedAt ? `Last disconnected at: ${lastDisconnectedAt}` : undefined,
+    offlineDeadlineAt ? `Offline deadline: ${offlineDeadlineAt}` : undefined,
+    message ? `Message: ${message}` : undefined
+  ].filter(Boolean).join("\n");
+}
+
+function isoFromEpochMs(value: unknown): string | undefined {
+  const ms = numberValue(value);
+  if (ms === undefined) return undefined;
+  const date = new Date(ms);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
 function signerStatusLabel(status: string | undefined): string {

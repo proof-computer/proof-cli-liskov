@@ -33,6 +33,7 @@ USAGE
 COMMANDS
   account ensure APP_REF --chain acurast --yes
   pair APP_REF
+  signer status APP_REF
   preflight APP_REF
   environment upload APP_REF --secrets-file PATH --yes
   execution list APP_REF

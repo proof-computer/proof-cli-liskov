@@ -47,6 +47,7 @@ import {
   runSlipwayCustodyExecutionSubmit,
   runSlipwayCustodyMachineCatalog,
   runSlipwayCustodyPair,
+  runSlipwayCustodySignerStatus,
   runSlipwayCustodyPreflight,
   runSlipwayLogin,
   runSlipwayLogout,
@@ -3472,6 +3473,139 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.controlPlaneUrl, "wss://slipway.test/api/custody/signer");
     assert.equal(parsed.websocketUrl, "wss://slipway.test/api/custody/signer?pairingToken=lsk_pair_secret_for_signer");
     assert.match(parsed.signerCommand, /liskov-self-custody-signer --control-plane-url 'wss:\/\/slipway\.test\/api\/custody\/signer' --pairing-token 'lsk_pair_secret_for_signer'/u);
+  });
+
+  it("reads a self-custody signer's status from the custody resource without printing the session bearer", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "slipway_signer_status_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const online = {
+      status: "online",
+      address: "5H9bfMrws2Z5zceduYMxNzfT6o8ZBcRBXu9FBqpcXaLxyspR",
+      connected: true,
+      pendingRequestCount: 2,
+      offlineTtlMs: 300000,
+      offlineDeadlineAtMs: null,
+      lastConnectedAtMs: 1_790_000_000_000,
+      lastDisconnectedAtMs: null,
+      message: "Self-custody signer is online."
+    };
+    const notConfigured = {
+      status: "not_configured",
+      address: null,
+      connected: false,
+      pendingRequestCount: 0,
+      offlineTtlMs: 300000,
+      offlineDeadlineAtMs: null,
+      lastConnectedAtMs: null,
+      lastDisconnectedAtMs: null,
+      message: "No self-custody signer is paired for this application."
+    };
+    const custodyBody = (selfCustodySigner: unknown) => ({
+      ok: true,
+      generatedAtMs: 1_790_000_001_000,
+      organizationId: "org-1",
+      applicationId: "app-1",
+      custody: { address: null, accounts: [] },
+      selfCustodySigner
+    });
+    const requests: Array<{ url: string; method?: string; authorization?: string; body?: unknown }> = [];
+    const fetchReturning = (response: () => Response) => async (url: URL | RequestInfo, init?: RequestInit) => {
+      requests.push({
+        url: String(url),
+        method: init?.method,
+        authorization: (init?.headers as Record<string, string> | undefined)?.authorization,
+        body: init?.body
+      });
+      return response();
+    };
+
+    const jsonOut = writer();
+    const jsonCode = await runSlipwayCustodySignerStatus({
+      applicationRef: "proof-docs",
+      config: sessionFile,
+      json: true
+    }, { fetchImpl: fetchReturning(() => jsonResponse(custodyBody(online))), stdout: jsonOut.write });
+    assert.equal(jsonCode, 0);
+    assert.deepEqual(requests, [{
+      url: "https://slipway.test/api/applications/proof-docs/custody",
+      method: "GET",
+      authorization: `Bearer ${token}`,
+      body: undefined
+    }]);
+    assert.equal(jsonOut.text.includes(token), false);
+    const parsed = JSON.parse(jsonOut.text) as { ok: boolean; applicationId: string; selfCustodySigner: unknown };
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.applicationId, "app-1");
+    assert.deepEqual(parsed.selfCustodySigner, online);
+
+    const humanOut = writer();
+    const humanCode = await runSlipwayCustodySignerStatus({
+      applicationRef: "proof-docs",
+      config: sessionFile
+    }, {
+      fetchImpl: fetchReturning(() => jsonResponse(custodyBody({ ...online, status: "failed_offline", offlineDeadlineAtMs: 1_790_000_300_000 }))),
+      stdout: humanOut.write
+    });
+    assert.equal(humanCode, 0);
+    assert.match(humanOut.text, /Self-custody signer for app-1: failed offline\./u);
+    assert.match(humanOut.text, /Address: 5H9bfMrws2Z5zceduYMxNzfT6o8ZBcRBXu9FBqpcXaLxyspR\n/u);
+    assert.match(humanOut.text, /Pending sign requests: 2/u);
+    assert.match(humanOut.text, /Last connected at: 2026-09-21T/u);
+    assert.match(humanOut.text, /Offline deadline: 2026-09-21T/u);
+    assert.equal(humanOut.text.includes("Last disconnected at"), false);
+    assert.equal(humanOut.text.includes(token), false);
+
+    const onlineOut = writer();
+    assert.equal(await runSlipwayCustodySignerStatus({ applicationRef: "proof-docs", config: sessionFile }, {
+      fetchImpl: fetchReturning(() => jsonResponse(custodyBody(online))),
+      stdout: onlineOut.write
+    }), 0);
+    assert.match(onlineOut.text, /Self-custody signer for app-1: online\./u);
+    assert.match(onlineOut.text, /Address: 5H9bfMrws2Z5zceduYMxNzfT6o8ZBcRBXu9FBqpcXaLxyspR\n/u);
+    assert.match(onlineOut.text, /Pending sign requests: 2/u);
+    assert.equal(onlineOut.text.includes("Offline deadline"), false);
+
+    const notConfiguredOut = writer();
+    assert.equal(await runSlipwayCustodySignerStatus({ applicationRef: "proof-docs", config: sessionFile }, {
+      fetchImpl: fetchReturning(() => jsonResponse(custodyBody(notConfigured))),
+      stdout: notConfiguredOut.write
+    }), 0);
+    assert.match(notConfiguredOut.text, /Self-custody signer for app-1: not configured\./u);
+    assert.match(notConfiguredOut.text, /No self-custody signer is paired/u);
+    assert.equal(notConfiguredOut.text.includes("Address:"), false);
+
+    const unauthorizedOut = writer();
+    assert.equal(await runSlipwayCustodySignerStatus({ applicationRef: "proof-docs", config: sessionFile, json: true }, {
+      fetchImpl: fetchReturning(() => jsonResponse({ ok: false, error: "unauthorized" }, 401)),
+      stdout: unauthorizedOut.write
+    }), 1);
+    assert.equal((JSON.parse(unauthorizedOut.text) as { error: string }).error, "SLIPWAY_SESSION_UNAUTHORIZED");
+    assert.equal(unauthorizedOut.text.includes(token), false);
+
+    const failedOut = writer();
+    assert.equal(await runSlipwayCustodySignerStatus({ applicationRef: "proof-docs", config: sessionFile }, {
+      fetchImpl: fetchReturning(() => jsonResponse({ ok: false, error: "application_not_found" }, 404)),
+      stdout: failedOut.write
+    }), 1);
+    assert.match(failedOut.text, /Error \(SLIPWAY_CUSTODY_SIGNER_STATUS_FAILED\)/u);
+    assert.equal(failedOut.text.includes(token), false);
+
+    const missingOut = writer();
+    assert.equal(await runSlipwayCustodySignerStatus({ applicationRef: "proof-docs", config: sessionFile, json: true }, {
+      fetchImpl: fetchReturning(() => jsonResponse({ ok: true, organizationId: "org-1", applicationId: "app-1", custody: {} })),
+      stdout: missingOut.write
+    }), 1);
+    const missing = JSON.parse(missingOut.text) as { error: string; reason: string };
+    assert.equal(missing.error, "SLIPWAY_CUSTODY_SIGNER_STATUS_FAILED");
+    assert.equal(missing.reason, "self_custody_signer_missing");
   });
 
   it("runs live custody commands through saved bearer sessions", async () => {
