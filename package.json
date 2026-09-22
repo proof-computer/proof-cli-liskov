@@ -43,6 +43,10 @@
     "topics": {
       "liskov": {
         "description": "Liskov application deployment commands"
+      },
+      "liskov:application:lockbox": {
+        "description": "Liskov Application secret-grant commands.",
+        "hidden": true
       }
     }
   },

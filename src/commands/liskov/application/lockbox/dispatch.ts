@@ -7,7 +7,7 @@ export default class SlipwayApplicationLockboxDispatch extends OrganizationScope
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true })
   };
-  static description = "Dispatch the Liskov Lockbox upload workflow.";
+  static description = "Dispatch the Liskov secret-upload workflow.";
   static examples = [
     "<%= config.bin %> liskov application lockbox dispatch proof-docs --yes",
     "<%= config.bin %> liskov application lockbox dispatch proof-docs --ref release --json --yes"
@@ -18,9 +18,9 @@ export default class SlipwayApplicationLockboxDispatch extends OrganizationScope
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
     ref: Flags.string({ description: "Git ref to dispatch." }),
     "slipway-url": Flags.string({ description: "Liskov service URL." }),
-    yes: Flags.boolean({ char: "y", description: "Confirm the Lockbox workflow dispatch mutation." })
+    yes: Flags.boolean({ char: "y", description: "Confirm the secret-upload workflow dispatch mutation." })
   };
-  static summary = "Dispatch the Lockbox workflow.";
+  static summary = "Dispatch the secret-upload workflow.";
 
   async run(): Promise<void> {
     const { args, flags } = await this.parse(SlipwayApplicationLockboxDispatch);
