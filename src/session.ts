@@ -3898,7 +3898,7 @@ export async function runSlipwayApplicationLogs(input: SlipwayApplicationLogsInp
     ? { ...options, stdout: (line) => emitError(options, line) }
     : options;
   const writeLogsError = (structured: Record<string, unknown>, human: string): void => {
-    if (input.ndjson) emitError(options, human);
+    if (input.ndjson) emitError(options, sessionUnauthorizedHuman(structured.error, human));
     else writeStructuredOrHuman(options, input.json, structured, human);
   };
 
@@ -6790,12 +6790,26 @@ async function readJsonResponse<T>(response: Response): Promise<T | undefined> {
   }
 }
 
+// Liskov answers every rejected bearer token with the same 401, so the CLI
+// cannot tell an expired session from one that was never valid; the recovery is
+// the same either way. The sentence interpolates nothing: no token can reach it.
+const SESSION_UNAUTHORIZED_HUMAN = "Error (SLIPWAY_SESSION_UNAUTHORIZED): Liskov rejected the stored session — it has expired or is no longer valid. Run `proof liskov login` again.";
+
 function writeStructuredOrHuman(options: SlipwayCliOptions, json: boolean | undefined, value: unknown, human: string): void {
   if (json) {
     emit(options, JSON.stringify(value));
     return;
   }
-  emit(options, human);
+  const error = typeof value === "object" && value !== null ? (value as { error?: unknown }).error : undefined;
+  emit(options, sessionUnauthorizedHuman(error, human));
+}
+
+// A 401 reads as a rejected session with its recovery, not as a sentence about
+// whichever command happened to meet it (BKLG-20260921-5lvo).
+function sessionUnauthorizedHuman(error: unknown, human: string): string {
+  return error === "SLIPWAY_SESSION_UNAUTHORIZED" && !human.includes("proof liskov login")
+    ? SESSION_UNAUTHORIZED_HUMAN
+    : human;
 }
 
 function emit(options: SlipwayCliOptions, line: string): void {
@@ -7534,7 +7548,7 @@ function writeRetirementResponse(
       ? ` ${formatRetirementReceipt(receipt)}`
       : "";
     emit(options, [
-      `Error (${error}): ${body.reason ?? "Liskov retirement request failed."}${completion}`,
+      sessionUnauthorizedHuman(error, `Error (${error}): ${body.reason ?? "Liskov retirement request failed."}${completion}`),
       formatRepositoryBinding(body)
     ].filter(Boolean).join("\n"));
     return 1;
