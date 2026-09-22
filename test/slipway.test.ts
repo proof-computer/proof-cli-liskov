@@ -18,6 +18,7 @@ import {
   runSlipwayApplicationDeploymentStatus,
   runSlipwayApplicationImport,
   runSlipwayApplicationList,
+  runSlipwayApplicationLogs,
   runSlipwayApplicationLockboxDispatch,
   runSlipwayApplicationLockboxGrantEnsure,
   runSlipwayApplicationLockboxGrantStatus,
@@ -29,6 +30,7 @@ import {
   runSlipwayApplicationDevtoolsViewKey,
   runSlipwayApplicationCreate,
   runSlipwayApplicationRename,
+  runSlipwayApplicationRetirement,
   runSlipwayApplicationRun,
   runSlipwayApplicationRuntimeImageWorkflow,
   runSlipwayApplicationSetRepository,
@@ -1142,6 +1144,106 @@ describe("proof-cli Liskov runner", () => {
       if (status === 200) assert.equal(parsed.reason, "malformed_response");
       assert.equal(out.text.includes(token), false);
     }
+  });
+
+  it("tells a person whose session was rejected to log in again instead of naming the failed command", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "rejected_session_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const out = writer();
+    const code = await runSlipwayApplicationList({ config: sessionFile }, {
+      fetchImpl: async () => jsonResponse({ ok: false, error: "unauthorized" }, 401),
+      stdout: out.write
+    });
+
+    assert.equal(code, 1);
+    assert.equal(out.text, `${SESSION_REJECTED_HUMAN}\n`);
+    assert.equal(out.text.split("proof liskov login").length - 1, 1);
+    assert.equal(out.text.includes("could not list Applications"), false);
+    assert.equal(out.text.includes(token), false);
+  });
+
+  it("keeps the JSON shape of a rejected session unchanged", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "rejected_session_json_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const out = writer();
+    const code = await runSlipwayApplicationList({ config: sessionFile, json: true }, {
+      fetchImpl: async () => jsonResponse({ ok: false, error: "unauthorized" }, 401),
+      stdout: out.write
+    });
+
+    assert.equal(code, 1);
+    const parsed = JSON.parse(out.text) as Record<string, unknown>;
+    assert.equal(parsed.error, "SLIPWAY_SESSION_UNAUTHORIZED");
+    assert.deepEqual(Object.keys(parsed).sort(), ["error", "ok", "reason", "sessionFile", "slipwayUrl", "status"]);
+    assert.equal(out.text.includes("proof liskov login"), false);
+    assert.equal(out.text.includes(token), false);
+  });
+
+  it("keeps a non-401 failure's own human line", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "server_error_secret_token_do_not_print",
+      savedAtMs: 0
+    }, { config: sessionFile });
+
+    const out = writer();
+    const code = await runSlipwayApplicationList({ config: sessionFile }, {
+      fetchImpl: async () => jsonResponse({ ok: false, error: "internal" }, 500),
+      stdout: out.write
+    });
+
+    assert.equal(code, 1);
+    assert.equal(out.text, "Error (SLIPWAY_APPLICATION_LIST_FAILED): Liskov could not list Applications.\n");
+  });
+
+  it("tells a rejected session to log in again on the ndjson logs and retirement paths too", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "rejected_session_other_paths_secret_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const fetchImpl = async () => jsonResponse({ ok: false, error: "unauthorized" }, 401);
+
+    const logsOut = writer();
+    const logsErr = writer();
+    assert.equal(await runSlipwayApplicationLogs({ applicationRef: "alpha", config: sessionFile, ndjson: true }, {
+      fetchImpl,
+      stdout: logsOut.write,
+      stderr: logsErr.write
+    }), 1);
+    assert.equal(logsOut.text, "");
+    assert.equal(logsErr.text, `${SESSION_REJECTED_HUMAN}\n`);
+
+    const retirementOut = writer();
+    assert.equal(await runSlipwayApplicationRetirement({ applicationRef: "alpha", config: sessionFile }, {
+      fetchImpl,
+      stdout: retirementOut.write
+    }), 1);
+    assert.equal(retirementOut.text, `${SESSION_REJECTED_HUMAN}\n`);
+    assert.equal(`${logsErr.text}${retirementOut.text}`.includes(token), false);
   });
 
   it("lists only tombstones with the deleted Application view", async () => {
@@ -5774,6 +5876,8 @@ describe("proof-cli Liskov runner", () => {
     }
   });
 });
+
+const SESSION_REJECTED_HUMAN = "Error (SLIPWAY_SESSION_UNAUTHORIZED): Liskov rejected the stored session — it has expired or is no longer valid. Run `proof liskov login` again.";
 
 function writer(): { text: string; write: (line: string) => void } {
   const output = {
