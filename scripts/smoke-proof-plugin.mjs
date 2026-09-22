@@ -38,6 +38,7 @@ try {
   assertIncludes(applicationHelp.stdout, "liskov application deployment");
   assertIncludes(applicationHelp.stdout, "liskov application logs");
   assertExcludes(applicationHelp.stdout, "blackbox");
+  assertExcludes(applicationHelp.stdout, "lockbox");
 
   const applicationLogsHelp = run(process.execPath, [proofDevBin, "liskov", "application", "logs", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationLogsHelp.stdout, "Read recent Liskov Application logs");

@@ -2,6 +2,7 @@ import { OrganizationScopedCommand } from "../../../organization-context.js";
 
 export default class SlipwayApplicationLockbox extends OrganizationScopedCommand {
   static description = "Read Liskov Application secret-grant state.";
+  static hidden = true;
   static strict = false;
   static summary = "Read Liskov Application secret-grant state.";
 
