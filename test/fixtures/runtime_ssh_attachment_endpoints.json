@@ -1,0 +1,74 @@
+{
+  "everyState": {
+    "ok": true,
+    "schema": "runtime_ssh_attachment_endpoints_v1",
+    "attachmentId": "att-endpoint",
+    "provider": "tailscale",
+    "attachmentReadiness": "ready",
+    "endpoints": [
+      {
+        "useSite": "/ingress/0/network/services/0/provider",
+        "serviceName": "clickhouse",
+        "localPort": 8123,
+        "state": "ready",
+        "failureCode": null,
+        "dnsName": "liskov-prt-e22e799c1638.tail3b99c3.ts.net",
+        "publishedAtMs": 1754000010000,
+        "readyAtMs": 1754000020000,
+        "observedAtMs": 1754000020000
+      },
+      {
+        "useSite": "/ingress/0/network/services/1/provider",
+        "serviceName": "native",
+        "localPort": 9000,
+        "state": "degraded",
+        "failureCode": "access_probe_failed",
+        "dnsName": "liskov-prt-e22e799c1638.tail3b99c3.ts.net",
+        "publishedAtMs": 1754000010000,
+        "readyAtMs": 1754000020000,
+        "observedAtMs": 1754000030000
+      },
+      {
+        "useSite": "/ingress/0/network/services/2/provider",
+        "serviceName": "metrics",
+        "localPort": 9363,
+        "state": "published",
+        "failureCode": null,
+        "dnsName": "liskov-prt-e22e799c1638.tail3b99c3.ts.net",
+        "publishedAtMs": 1754000010000,
+        "readyAtMs": null,
+        "observedAtMs": 1754000010000
+      },
+      {
+        "useSite": "/ingress/0/network/services/3/provider",
+        "serviceName": "admin",
+        "localPort": 8443,
+        "state": "pending",
+        "failureCode": null,
+        "dnsName": null,
+        "publishedAtMs": null,
+        "readyAtMs": null,
+        "observedAtMs": null
+      },
+      {
+        "useSite": "/ingress/0/network/services/4/provider",
+        "serviceName": "replica",
+        "localPort": 9009,
+        "state": "withdrawn",
+        "failureCode": null,
+        "dnsName": "liskov-prt-e22e799c1638.tail3b99c3.ts.net",
+        "publishedAtMs": 1754000010000,
+        "readyAtMs": 1754000020000,
+        "observedAtMs": 1754000020000
+      }
+    ]
+  },
+  "noEndpoints": {
+    "ok": true,
+    "schema": "runtime_ssh_attachment_endpoints_v1",
+    "attachmentId": "att-ssh-only",
+    "provider": "tailscale",
+    "attachmentReadiness": "ready",
+    "endpoints": []
+  }
+}

@@ -92,6 +92,11 @@ export interface RuntimeSshAttachmentRevokeInput extends RuntimeSshCommandInput 
   attachmentId?: string;
 }
 
+export interface RuntimeSshAttachmentEndpointsInput extends RuntimeSshCommandInput {
+  applicationRef: string;
+  attachmentId?: string;
+}
+
 export interface RuntimeSshConnectionInput extends RuntimeSshCommandInput {
   acceptHostKey?: boolean;
   applicationRef: string;
@@ -196,6 +201,32 @@ interface AttachmentListResponse {
   error?: string;
   attachments?: RuntimeSshAttachmentSummary[];
   truncated?: boolean;
+}
+
+/** One private endpoint as `runtime_ssh_attachment_endpoints_v1` serves it.
+ *  Every nullable key is always present; `null` means "not observed". */
+interface RuntimeSshAttachmentEndpoint {
+  useSite: string;
+  serviceName: string;
+  localPort: number;
+  /** The only readiness fact. An unknown value is shown as itself, never as ready. */
+  state: string;
+  failureCode: string | null;
+  /** The endpoint's address. Present from `published`, which is not `ready`. */
+  dnsName: string | null;
+  publishedAtMs: number | null;
+  readyAtMs: number | null;
+  observedAtMs: number | null;
+}
+
+interface AttachmentEndpointsResponse {
+  ok?: boolean;
+  error?: string;
+  schema?: string;
+  attachmentId?: string;
+  provider?: string;
+  attachmentReadiness?: string;
+  endpoints?: RuntimeSshAttachmentEndpoint[];
 }
 
 interface AttachmentRevokeResponse {
@@ -533,6 +564,55 @@ export async function runRuntimeSshAttachmentList(
   }
   writeOutput(input.json, options, response.body, rows.length === 0
     ? "No Runtime SSH attachments. One is created when a job launches with SSH access enabled."
+    : rows.join("\n"));
+  return 0;
+}
+
+function formatEndpoint(entry: RuntimeSshAttachmentEndpoint): string {
+  return [
+    entry.useSite,
+    entry.serviceName,
+    entry.localPort,
+    entry.state,
+    entry.dnsName ?? "-",
+    entry.failureCode ?? "-"
+  ].join("\t");
+}
+
+/// The private endpoints one attachment publishes, as the server observed them.
+///
+/// `state` is the only readiness fact: an address (`dnsName`) is assigned at
+/// `published`, before anything has been observed answering on it, so neither
+/// the address, the attachment's readiness nor a timestamp is read as ready
+/// (`BKLG-20260921-nsc1`).
+export async function runRuntimeSshAttachmentEndpoints(
+  input: RuntimeSshAttachmentEndpointsInput,
+  options: RuntimeSshCliOptions = {}
+): Promise<number> {
+  const attachmentId = input.attachmentId?.trim();
+  if (!attachmentId) {
+    return localFailure(
+      input.json,
+      options,
+      "RUNTIME_SSH_ATTACHMENT_ID_REQUIRED",
+      "Reading endpoints needs the attachment id from `proof liskov runtime-ssh attachment list` or `proof liskov ssh --print-command --json`."
+    );
+  }
+  const response = await runtimeSshRequest<AttachmentEndpointsResponse>(input, options, {
+    method: "GET",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/runtime-ssh/attachments/${encodeURIComponent(attachmentId)}/endpoints`
+  });
+  if (!response.ok) return response.exitCode;
+  if (!response.response.ok || response.body?.ok !== true || !Array.isArray(response.body.endpoints)) {
+    return apiFailure(input.json, options, response.response.status, response.body?.error);
+  }
+  const endpoints = response.body.endpoints;
+  const rows = endpoints.map(formatEndpoint);
+  if (endpoints.some((entry) => entry.state === "published")) {
+    rows.push("A published endpoint has its address assigned but has not been observed ready yet.");
+  }
+  writeOutput(input.json, options, response.body, rows.length === 0
+    ? "No private endpoints on this attachment."
     : rows.join("\n"));
   return 0;
 }
