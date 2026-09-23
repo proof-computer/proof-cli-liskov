@@ -289,10 +289,12 @@ proof liskov application lockbox grant-status proof-docs --json
 ## Development
 
 ```sh
-pnpm install
-pnpm test
+pnpm install --frozen-lockfile
 pnpm typecheck
+pnpm test
 pnpm build
+node scripts/verify-package.mjs
+pnpm pack:dry-run
 ```
 
 To smoke the plugin through the root CLI:
@@ -300,6 +302,13 @@ To smoke the plugin through the root CLI:
 ```sh
 pnpm run smoke:proof-plugin
 ```
+
+`CLI CI` runs this complete matrix on pull requests and every push to `main`.
+The `CLI validation` check includes the plugin smoke through a pinned checkout
+of `proof-computer/proof-cli` at `02775f47b63b726cc515163200ec51e43ce72090`,
+using Node 24.5.0 and pnpm 10.33.0. From a worktree, set `PROOF_CLI_ROOT` to
+that root CLI checkout. CI has read-only repository permissions and does not
+publish packages or invoke live Liskov actions.
 
 ### Publish a registered policy while paused
 
