@@ -1,0 +1,66 @@
+name: CLI CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# This workflow only validates source and package artifacts. Release authority
+# remains in npm-publish.yml; tests receive neither secrets nor an OIDC token.
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    name: CLI validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: plugin
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: plugin
+          persist-credentials: false
+      - name: Check out the pinned root CLI for the plugin smoke
+        uses: actions/checkout@v6
+        with:
+          repository: proof-computer/proof-cli
+          ref: 02775f47b63b726cc515163200ec51e43ce72090
+          path: proof-cli
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.5.0
+          cache: pnpm
+          cache-dependency-path: |
+            plugin/pnpm-lock.yaml
+            proof-cli/pnpm-lock.yaml
+      - name: Prepare root CLI
+        working-directory: proof-cli
+        run: pnpm install --frozen-lockfile
+      - name: Install plugin
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Test
+        run: pnpm test
+      - name: Build
+        run: pnpm build
+      - name: Verify package artifacts
+        run: node scripts/verify-package.mjs
+      - name: Inspect package contents
+        run: pnpm pack:dry-run
+      - name: Exercise plugin through the root CLI
+        env:
+          PROOF_CLI_ROOT: ${{ github.workspace }}/proof-cli
+        run: pnpm smoke:proof-plugin
