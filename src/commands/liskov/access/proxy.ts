@@ -12,7 +12,7 @@ export function accessProxyAdvice(code: string): string {
     case "access_proxy_rejected_session_already_open":
       return ": a Runtime SSH session is already open on this job. Managed Runtime SSH allows one session at a time; retry when it closes.";
     case "access_proxy_rejected_connector_not_registered":
-      return ": the runtime has not connected to the access gateway for this job. Check the attachment is ready; if its access sidecar has failed, that is terminal for this run and the job must be relaunched.";
+      return ": the runtime has not connected to the access gateway for this job. If its sandbox just restarted, the access sidecar reconnects within about three minutes; retry then. If it does not, or the runtime stopped, access has ended for this run and the job must be relaunched.";
     case "access_proxy_rejected_connector_unavailable":
       return ": the runtime's connection to the access gateway is not ready yet. Retry in a few seconds.";
     // Worth its own sentence for a reason found the day this landed: the

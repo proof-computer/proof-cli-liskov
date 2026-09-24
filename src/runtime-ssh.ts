@@ -264,7 +264,18 @@ interface ManagedConnection {
   user: "root";
   port: 22;
   authorizedKeyFingerprints: string[];
-  host: { publicKey: string; fingerprint: string; signedEvidence: string };
+  host: {
+    publicKey: string;
+    fingerprint: string;
+    signedEvidence: string;
+    /**
+     * The host key this attachment reported before its current one, and when
+     * it was replaced (ADR-0158). Present only after the processor relaunched
+     * the job's runtime, which starts with a fresh host key.
+     */
+    previousFingerprint?: string;
+    rotatedAtMs?: number;
+  };
   trust: {
     claim: string;
     runtimeContactSha256: string;
@@ -877,7 +888,8 @@ async function runManagedConnection(
   const alias = `liskov-runtime-ssh-${connection.attachmentId}`;
   const sessionFile = resolveSlipwaySessionFile({ config: input.config, env: options.env });
   const knownHostsFile = path.join(path.dirname(sessionFile), "runtime-ssh-known-hosts");
-  const known = await inspectKnownHost(knownHostsFile, alias, connection.host.publicKey);
+  const rotatedFrom = connection.host.previousFingerprint ?? undefined;
+  const known = await inspectKnownHost(knownHostsFile, alias, connection.host.publicKey, rotatedFrom);
   if (!known.ok) {
     return localFailure(input.json, options, known.error, known.message);
   }
@@ -904,12 +916,16 @@ async function runManagedConnection(
   }
 
   if (!known.exists) {
-    writeHostTrustNotice(options, connection, selectedFingerprint);
+    if (known.rotated) {
+      writeHostRotationNotice(options, connection, selectedFingerprint);
+    } else {
+      writeHostTrustNotice(options, connection, selectedFingerprint);
+    }
     const accepted = input.acceptHostKey === true || await confirmHostKey(options, input.json);
     if (!accepted) {
       return localFailure(input.json, options, "RUNTIME_SSH_HOST_KEY_NOT_ACCEPTED", "The managed runtime host key was not accepted.");
     }
-    const persisted = await persistKnownHost(knownHostsFile, alias, connection.host.publicKey);
+    const persisted = await persistKnownHost(knownHostsFile, alias, connection.host.publicKey, rotatedFrom);
     if (!persisted.ok) {
       return localFailure(input.json, options, persisted.error, persisted.message);
     }
@@ -1371,6 +1387,7 @@ function validConnection(connection: ConnectionResponse["connection"]): connecti
     return false;
   }
   return hostFingerprint === connection.host.fingerprint
+    && validHostRotation(connection.host)
     && /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(connection.host.signedEvidence)
     && connection.host.signedEvidence.length <= 16_384
     && Array.isArray(connection.authorizedKeyFingerprints)
@@ -1435,11 +1452,41 @@ function sshFingerprint(publicKey: string): string {
   return `SHA256:${createHash("sha256").update(Buffer.from(encoded, "base64")).digest("base64").replace(/=+$/u, "")}`;
 }
 
+/**
+ * A host-key rotation the server vouches for (ADR-0158): both members or
+ * neither, naming a well-formed fingerprint other than the current one.
+ */
+function validHostRotation(host: ManagedConnection["host"]): boolean {
+  const { previousFingerprint, rotatedAtMs } = host;
+  if (previousFingerprint == null && rotatedAtMs == null) return true;
+  return typeof previousFingerprint === "string"
+    && /^SHA256:[A-Za-z0-9+/]{43}$/u.test(previousFingerprint)
+    && previousFingerprint !== host.fingerprint
+    && typeof rotatedAtMs === "number"
+    && Number.isSafeInteger(rotatedAtMs)
+    && rotatedAtMs > 0;
+}
+
+function pinnedKeyFingerprint(line: string, alias: string): string | undefined {
+  try {
+    return sshFingerprint(line.slice(alias.length).trim());
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * `rotated` means every pin for this alias is the key the server says the
+ * attachment reported before its current one: the job's runtime was relaunched
+ * with a fresh host key. It is reported as not yet pinned so the caller asks
+ * for consent again; any other mismatch still fails closed.
+ */
 async function inspectKnownHost(
   knownHostsFile: string,
   alias: string,
-  publicKey: string
-): Promise<{ ok: true; exists: boolean } | { ok: false; error: string; message: string }> {
+  publicKey: string,
+  rotatedFrom?: string
+): Promise<{ ok: true; exists: boolean; rotated?: true } | { ok: false; error: string; message: string }> {
   try {
     const metadata = await lstat(knownHostsFile);
     if (!metadata.isFile() || metadata.isSymbolicLink() || (metadata.mode & 0o777) !== 0o600) {
@@ -1447,7 +1494,11 @@ async function inspectKnownHost(
     }
     const content = await readFile(knownHostsFile, "utf8");
     const entries = content.split("\n").filter((line) => line.split(/\s+/u)[0] === alias);
-    if (entries.some((line) => line !== `${alias} ${publicKey}`)) {
+    const mismatched = entries.filter((line) => line !== `${alias} ${publicKey}`);
+    if (mismatched.length > 0) {
+      if (rotatedFrom !== undefined && mismatched.every((line) => pinnedKeyFingerprint(line, alias) === rotatedFrom)) {
+        return { ok: true, exists: false, rotated: true };
+      }
       return { ok: false, error: "RUNTIME_SSH_HOST_KEY_MISMATCH", message: `The pinned host key for ${alias} does not match the signed runtime host evidence.` };
     }
     return { ok: true, exists: entries.length > 0 };
@@ -1460,9 +1511,10 @@ async function inspectKnownHost(
 async function persistKnownHost(
   knownHostsFile: string,
   alias: string,
-  publicKey: string
+  publicKey: string,
+  rotatedFrom?: string
 ): Promise<{ ok: true } | { ok: false; error: string; message: string }> {
-  const inspected = await inspectKnownHost(knownHostsFile, alias, publicKey);
+  const inspected = await inspectKnownHost(knownHostsFile, alias, publicKey, rotatedFrom);
   if (!inspected.ok) return inspected;
   if (inspected.exists) return { ok: true };
   try {
@@ -1473,6 +1525,10 @@ async function persistKnownHost(
       existing = await readFile(knownHostsFile, "utf8");
     } catch (error) {
       if (!isNodeError(error) || error.code !== "ENOENT") throw error;
+    }
+    // A rotation replaces the alias's pin rather than adding a second one.
+    if (inspected.rotated) {
+      existing = existing.split("\n").filter((line) => line.split(/\s+/u)[0] !== alias).join("\n");
     }
     const suffix = existing === "" || existing.endsWith("\n") ? "" : "\n";
     const temporary = path.join(directory, `.runtime-ssh-known-hosts-${randomBytes(12).toString("hex")}.tmp`);
@@ -1498,6 +1554,29 @@ function writeHostTrustNotice(
     `  host key: ${connection.host.fingerprint}`,
     `  identity: ${selectedFingerprint}`,
     `  trust: ${connection.trust.claim}`
+  ].join("\n");
+  (options.stderr ?? console.error)(message);
+}
+
+function writeHostRotationNotice(
+  options: RuntimeSshCliOptions,
+  connection: ManagedConnection,
+  selectedFingerprint: string
+): void {
+  const rotatedAt = connection.host.rotatedAtMs == null
+    ? "-"
+    : new Date(connection.host.rotatedAtMs).toISOString();
+  const message = [
+    "Managed Runtime SSH host key changed: the job's runtime was restarted and started with a new host key.",
+    `  application: ${connection.applicationId} (${connection.applicationUid})`,
+    `  deployment: ${connection.liskovDeploymentId ?? "-"} / ${connection.deploymentId}`,
+    `  job: ${connection.liskovJobId ?? "-"} / ${connection.jobId}`,
+    `  restarted: ${rotatedAt}`,
+    `  pinned host key: ${connection.host.previousFingerprint ?? "-"}`,
+    `  new host key: ${connection.host.fingerprint}`,
+    `  identity: ${selectedFingerprint}`,
+    `  trust: ${connection.trust.claim}`,
+    "  As on first use, only Liskov vouches for the new key."
   ].join("\n");
   (options.stderr ?? console.error)(message);
 }
