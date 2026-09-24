@@ -591,6 +591,138 @@ test("managed access fails closed on a substituted pinned host key before ticket
   });
 });
 
+// ADR-0158 / BKLG-20260924-seyr: a processor-relaunched runtime has a fresh
+// host key. The server names the key it replaced; only that key may be re-pinned,
+// and only with the same consent a first connection takes.
+function rotatedConnection(identityKey: string, previousKey: string, hostKey: string) {
+  const connection = managedConnection(identityKey, hostKey);
+  return {
+    ...connection,
+    host: { ...connection.host, previousFingerprint: fingerprint(previousKey), rotatedAtMs: 1_790_237_696_000 }
+  };
+}
+
+const rotationAlias = "liskov-runtime-ssh-att_1234567890abcdef";
+
+function rotationTicketFetch(connection: unknown, onTicket: () => void) {
+  return async (url: string | URL | Request) => {
+    if (String(url).endsWith("/connection-requests")) {
+      return Response.json({ ok: true, connection });
+    }
+    onTicket();
+    return Response.json({ ok: false, error: "stop_after_pin" }, { status: 409 });
+  };
+}
+
+test("managed access re-pins a host key that rotated with a runtime restart, with consent", async () => {
+  await withSession(async (sessionFile) => {
+    const identity = path.join(path.dirname(sessionFile), "customer-identity");
+    const identityKey = ed25519PublicKey(7);
+    await writeFile(`${identity}.pub`, identityKey, { mode: 0o644 });
+    const knownHosts = path.join(path.dirname(sessionFile), "runtime-ssh-known-hosts");
+    const otherPin = `liskov-runtime-ssh-att_other ${ed25519PublicKey(3)}`;
+    await writeFile(knownHosts, `${otherPin}\n${rotationAlias} ${ed25519PublicKey(8)}\n`, { mode: 0o600 });
+    let tickets = 0;
+    const errors: string[] = [];
+    const prompts: string[] = [];
+    await runRuntimeSshConnection({ applicationRef: "app", config: sessionFile, identity }, {
+      fetchImpl: rotationTicketFetch(rotatedConnection(identityKey, ed25519PublicKey(8), ed25519PublicKey(9)), () => { tickets += 1; }),
+      confirmHostKey: async (prompt) => {
+        prompts.push(prompt);
+        return true;
+      },
+      stderr: (line) => errors.push(line)
+    });
+    assert.equal(prompts.length, 1, "a rotation asks for the same consent as first use");
+    assert.equal(tickets, 1, "a ticket is requested only after the re-pin");
+    const notice = errors.join("\n");
+    assert.match(notice, /runtime was restarted and started with a new host key/u);
+    assert.match(notice, new RegExp(`pinned host key: ${fingerprint(ed25519PublicKey(8)).replace(/[+/]/gu, "\\$&")}`, "u"));
+    assert.match(notice, /restarted: 2026-09-24T08:14:56.000Z/u);
+    assert.doesNotMatch(notice, /RUNTIME_SSH_HOST_KEY_MISMATCH/u);
+    assert.equal(
+      await readFile(knownHosts, "utf8"),
+      `${otherPin}\n${rotationAlias} ${ed25519PublicKey(9)}\n`,
+      "the old pin is replaced, other attachments' pins are kept"
+    );
+    assert.equal((await lstat(knownHosts)).mode & 0o777, 0o600);
+  });
+});
+
+test("managed access accepts a rotated host key non-interactively only with --accept-host-key", async () => {
+  await withSession(async (sessionFile) => {
+    const identity = path.join(path.dirname(sessionFile), "customer-identity");
+    const identityKey = ed25519PublicKey(7);
+    await writeFile(`${identity}.pub`, identityKey, { mode: 0o644 });
+    const knownHosts = path.join(path.dirname(sessionFile), "runtime-ssh-known-hosts");
+    const pinned = `${rotationAlias} ${ed25519PublicKey(8)}\n`;
+    await writeFile(knownHosts, pinned, { mode: 0o600 });
+    const connection = rotatedConnection(identityKey, ed25519PublicKey(8), ed25519PublicKey(9));
+
+    const refusals: string[] = [];
+    const refused = await runRuntimeSshConnection({ applicationRef: "app", config: sessionFile, identity, json: true }, {
+      fetchImpl: rotationTicketFetch(connection, () => assert.fail("no ticket without consent")),
+      stdout: (line) => refusals.push(line),
+      stderr: (line) => refusals.push(line)
+    });
+    assert.equal(refused, 1);
+    assert.match(refusals.join("\n"), /RUNTIME_SSH_HOST_KEY_NOT_ACCEPTED/u);
+    assert.equal(await readFile(knownHosts, "utf8"), pinned, "a refused rotation leaves the pin alone");
+
+    let tickets = 0;
+    await runRuntimeSshConnection({ acceptHostKey: true, applicationRef: "app", config: sessionFile, identity, json: true }, {
+      fetchImpl: rotationTicketFetch(connection, () => { tickets += 1; }),
+      stdout: () => undefined,
+      stderr: () => undefined
+    });
+    assert.equal(tickets, 1);
+    assert.equal(await readFile(knownHosts, "utf8"), `${rotationAlias} ${ed25519PublicKey(9)}\n`);
+  });
+});
+
+test("managed access still fails closed when the pinned key is not the one the rotation replaced", async () => {
+  await withSession(async (sessionFile) => {
+    const identity = path.join(path.dirname(sessionFile), "customer-identity");
+    const identityKey = ed25519PublicKey(7);
+    await writeFile(`${identity}.pub`, identityKey, { mode: 0o644 });
+    const knownHosts = path.join(path.dirname(sessionFile), "runtime-ssh-known-hosts");
+    const pinned = `${rotationAlias} ${ed25519PublicKey(6)}\n`;
+    await writeFile(knownHosts, pinned, { mode: 0o600 });
+    const errors: string[] = [];
+    const code = await runRuntimeSshConnection({ acceptHostKey: true, applicationRef: "app", config: sessionFile, identity }, {
+      // The server says the key rotated from 8; the operator pinned 6.
+      fetchImpl: rotationTicketFetch(rotatedConnection(identityKey, ed25519PublicKey(8), ed25519PublicKey(9)), () => assert.fail("no ticket on a mismatch")),
+      stderr: (line) => errors.push(line)
+    });
+    assert.equal(code, 1);
+    assert.match(errors.join("\n"), /RUNTIME_SSH_HOST_KEY_MISMATCH/u);
+    assert.equal(await readFile(knownHosts, "utf8"), pinned);
+  });
+});
+
+test("managed access refuses rotation evidence that is half present or names the current key", async () => {
+  await withSession(async (sessionFile) => {
+    const identity = path.join(path.dirname(sessionFile), "customer-identity");
+    const identityKey = ed25519PublicKey(7);
+    await writeFile(`${identity}.pub`, identityKey, { mode: 0o644 });
+    const base = managedConnection(identityKey, ed25519PublicKey(9));
+    for (const host of [
+      { ...base.host, previousFingerprint: fingerprint(ed25519PublicKey(8)) },
+      { ...base.host, rotatedAtMs: 1_790_237_696_000 },
+      { ...base.host, previousFingerprint: base.host.fingerprint, rotatedAtMs: 1_790_237_696_000 },
+      { ...base.host, previousFingerprint: "SHA256:not-a-fingerprint", rotatedAtMs: 1_790_237_696_000 }
+    ]) {
+      const errors: string[] = [];
+      const code = await runRuntimeSshConnection({ acceptHostKey: true, applicationRef: "app", config: sessionFile, identity }, {
+        fetchImpl: async () => Response.json({ ok: true, connection: { ...base, host } }),
+        stderr: (line) => errors.push(line)
+      });
+      assert.equal(code, 1, JSON.stringify(host));
+      assert.match(errors.join("\n"), /RUNTIME_SSH_CONNECTION_INVALID/u);
+    }
+  });
+});
+
 test("proof liskov ssh still exposes the exact-job flag surface", () => {
   for (const flag of ["job", "deployment", "identity", "accept-host-key", "print-command", "json"]) {
     assert.ok(LiskovSsh.flags[flag], flag);
