@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   evaluateApplicationManifest,
+  isRegisteredPublicationPair,
   isRegisteredSourcePublicationPair,
   setPolicyContractForTesting,
   validateApplicationManifest
@@ -174,6 +175,49 @@ describe("retained V5 application-manifest validation", () => {
       const result = evaluateApplicationManifest(future);
       assert.equal(result.valid, true);
       assert.equal(isRegisteredSourcePublicationPair(result), true);
+    } finally {
+      setPolicyContractForTesting(undefined);
+    }
+  });
+
+  it("registers a pinned V5 release for publication by its schema pair, not the bundle's source label", () => {
+    const pinned = {
+      ...retainedJavascript(),
+      release: { mode: "pinned", artifact: { digest: `sha256:${"a".repeat(64)}` } }
+    };
+    const result = evaluateApplicationManifest(pinned);
+    assert.equal(result.disposition, "supported");
+    assert.equal(result.valid, true);
+    assert.equal(isRegisteredPublicationPair(result), true);
+
+    // The pinned digest lives at release.artifact.digest; the request body's
+    // release.artifactDigest is not a manifest field.
+    const misplaced = evaluateApplicationManifest({
+      ...retainedJavascript(),
+      release: { mode: "pinned", artifactDigest: `sha256:${"a".repeat(64)}` }
+    });
+    assert.equal(misplaced.valid, false);
+    assert.ok(misplaced.errors.some((error) => error.pointer === "/release/artifactDigest"));
+  });
+
+  it("keeps an unregistered schema pair unpublishable whatever its release mode", () => {
+    setPolicyContractForTesting({
+      manifest: { publicationPairs: [] },
+      evaluate: () => ({
+        schema: "proof.liskov.policy-client-result.v1",
+        operation: "validate",
+        disposition: "supported",
+        valid: true,
+        pair: { schema: "proof.liskov.application-manifest", schemaVersion: 5 },
+        errors: [],
+        capabilityDiagnostics: [],
+        deprecationDiagnostics: []
+      })
+    });
+    try {
+      const result = evaluateApplicationManifest(retainedJavascript());
+      assert.equal(isRegisteredPublicationPair(result), false);
+      assert.equal(isRegisteredSourcePublicationPair(result), false);
     } finally {
       setPolicyContractForTesting(undefined);
     }

@@ -15,6 +15,7 @@ proof liskov application manifest validate --file .slipway/application-policy.js
 proof liskov application execution show proof-docs
 proof liskov application execution show proof-docs --watch --timeout-seconds 900
 proof liskov application policy publish proof-docs --file .liskov/proof-docs-v5.json --artifact-digest sha256:... --binding-revision 1 --revocation-epoch 0 --source-ref refs/heads/main --source-commit 0123456789abcdef0123456789abcdef01234567 --workflow-identity proof-computer/proof-docs/.github/workflows/release.yml@refs/heads/main --expected-pointer-version 0 --yes
+proof liskov application policy publish lab-inference-shell --file .liskov/lab-inference-shell.pinned.json --artifact-digest sha256:... --expected-pointer-version 0 --dry-run
 proof liskov application source-binding set proof-docs --repository proof-computer/proof-docs --allowed-ref refs/heads/main --workflow-identity proof-computer/proof-docs/.github/workflows/release.yml@refs/heads/main --manifest-path .liskov/proof-docs-v5.json --yes
 proof liskov application source-binding show proof-docs
 proof liskov application source-binding revoke proof-docs --expected-revision 1 --reason "credential exposure" --yes
@@ -204,8 +205,8 @@ publication selects an exact `--artifact-version`; `--dry-run` calls the
 read-only publication preflight. Actual publication observes preflight first
 and submits its `authoredDigest` as the race fence.
 
-Registered V5 publication is a distinct source-evidence path:
-`application create` (identity, with `--repository`) then
+Registered V5 publication of a source release is a distinct source-evidence
+path: `application create` (identity, with `--repository`) then
 `application source-binding set` then the attesting workflow, then
 `application policy publish`. `source-binding set` is the admin-only bind
 step over `PUT /api/applications/{id}/source-binding`; omit
@@ -216,12 +217,31 @@ it. Set and revoke send no request without `--yes`. There is no default for
 `--allowed-ref`.
 
 `application policy publish` validates the retained schema-5 document locally,
-requires the exact attested artifact/build facts and observed active-pointer
-version, then submits them to the server-owned `policy-versions` writer. It
-never creates a V4 draft, and no request is sent without `--yes`. On success,
-human output renders the server-authored immutable policy diagnostics with
-their severity, stable code, pointer, and message; `--json` preserves the same
-`policyVersion.policyDiagnostics` records unchanged.
+requires the observed active-pointer version and the release facts its
+`release.mode` selects, then submits them to the server-owned `policy-versions`
+writer. It never creates a V4 draft, and no request is sent without `--yes`.
+Both release modes take `--expected-pointer-version`, `--dry-run`,
+`--paused`/`--reason` and `--json` alike:
+
+- **`source`** (`release: {mode: source}`) — Liskov built the artifact from the
+  bound repository. `--artifact-digest` plus the attested build's evidence are
+  all required: `--binding-revision`, `--revocation-epoch`, `--source-ref`,
+  `--source-commit` and `--workflow-identity`.
+- **`pinned`** (`release: {mode: pinned, artifact: {digest}}`) — an artifact
+  already pinned to the Application, run without a source build.
+  `--artifact-digest` is required and must equal `release.artifact.digest`; a
+  mismatch is `SLIPWAY_APPLICATION_POLICY_PUBLISH_MANIFEST_INVALID` at
+  `/release/artifact/digest`. The flag is your assertion and the manifest is the
+  document, so neither overrides the other. A pinned release has no source
+  binding: any of the five build-evidence flags is a usage error
+  (`SLIPWAY_APPLICATION_POLICY_PUBLISH_INVALID`). Human output adds
+  `Release: pinned artifact <digest>.` and `--json` adds
+  `release: {mode: "pinned", artifactDigest}` to the server's response.
+
+Any other `release.mode` is refused locally as `unsupported_policy_feature`. On
+success, human output renders the server-authored immutable policy diagnostics
+with their severity, stable code, pointer, and message; `--json` preserves the
+same `policyVersion.policyDiagnostics` records unchanged.
 
 `application execution show` reads the same canonical explanation envelope as
 `application policy explain` and renders its `execution` and `spendCloseout`
@@ -313,7 +333,8 @@ publish packages or invoke live Liskov actions.
 ### Publish a registered policy while paused
 
 `application policy publish` supports `--paused --reason TEXT` for required
-secret setup. Use `--dry-run` to preview the exact artifact/source binding and
+secret setup, for a source or a pinned release. Use `--dry-run` to preview the
+exact artifact (and, for a source release, its source binding) and the
 active-pointer fence without committing. Replace `--dry-run` with `--yes` to
 publish and pause in one transaction, configure the declared secrets, then use
 `application resume --reason TEXT --yes` when execution is intended. Publication

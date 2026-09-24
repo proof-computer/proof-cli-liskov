@@ -52,7 +52,9 @@ export interface PolicyContractEvaluation {
 
 export interface PolicyContractBundle {
   manifest: {
-    publicationPairs: Array<PolicySchemaPair & { releaseMode: "source" }>;
+    /** The bundle labels every pair it registers for this CLI `source`; the
+     * label is data, not a restriction the adapter enforces. */
+    publicationPairs: Array<PolicySchemaPair & { releaseMode: string }>;
   };
   evaluate(request: Record<string, unknown>): PolicyContractEvaluation;
 }
@@ -97,6 +99,20 @@ export function isRegisteredSourcePublicationPair(result: PolicyContractEvaluati
     pair.schema === result.pair?.schema
     && pair.schemaVersion === result.pair?.schemaVersion
     && pair.releaseMode === "source");
+}
+
+/**
+ * Whether the document's exact schema pair is registered for publication
+ * through this CLI, whatever release mode the bundle labels it with. The
+ * registered writer takes both V5 release modes for a registered pair; the
+ * bundle labels its pairs `source` only because this CLI once published
+ * nothing else (BKLG-20260924-ahz3).
+ */
+export function isRegisteredPublicationPair(result: PolicyContractEvaluation): boolean {
+  if (result.disposition !== "supported" || !result.pair) return false;
+  return contract().manifest.publicationPairs.some((pair) =>
+    pair.schema === result.pair?.schema
+    && pair.schemaVersion === result.pair?.schemaVersion);
 }
 
 export function validateApplicationManifest(value: unknown): PolicyValidationError[] {

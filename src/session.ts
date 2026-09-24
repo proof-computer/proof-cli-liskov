@@ -39,6 +39,7 @@ import {
 } from "./organization-context.js";
 import {
   evaluateApplicationManifestText,
+  isRegisteredPublicationPair,
   isRegisteredSourcePublicationPair,
   validateApplicationManifestV4,
   type PolicyContractEvaluation
@@ -216,11 +217,13 @@ export interface SlipwayApplicationPolicyPublishInput {
   applicationRef: string;
   file: string;
   artifactDigest: string;
-  bindingRevision: number;
-  revocationEpoch: number;
-  sourceRef: string;
-  sourceCommit: string;
-  workflowIdentity: string;
+  /** Source-build evidence: required for a `source` release, refused for a
+   * `pinned` one, which has no source binding to carry. */
+  bindingRevision?: number;
+  revocationEpoch?: number;
+  sourceRef?: string;
+  sourceCommit?: string;
+  workflowIdentity?: string;
   expectedPointerVersion: number;
   yes?: boolean;
   slipwayUrl?: string;
@@ -3287,7 +3290,13 @@ export async function runSlipwayApplicationPolicyPublish(
     ...contractResult.capabilityDiagnostics,
     ...contractResult.deprecationDiagnostics
   ];
-  if (!isRegisteredSourcePublicationPair(contractResult)) {
+  const documentRoot = objectRecord(document);
+  const release = objectRecord(documentRoot.release);
+  const releaseMode = release.mode === "source" || release.mode === "pinned" ? release.mode : undefined;
+  const registered = releaseMode === "pinned"
+    ? isRegisteredPublicationPair(contractResult)
+    : isRegisteredSourcePublicationPair(contractResult);
+  if (!registered) {
     diagnostics.push({
       code: contractResult.disposition === "unknown_opaque" ? "unknown_policy_schema" : "invalid_manifest",
       message: contractResult.disposition === "unknown_opaque"
@@ -3296,7 +3305,6 @@ export async function runSlipwayApplicationPolicyPublish(
       pointer: "/schema"
     });
   }
-  const documentRoot = objectRecord(document);
   if (documentRoot.applicationId !== input.applicationRef) {
     diagnostics.push({
       code: "invalid_manifest",
@@ -3304,15 +3312,25 @@ export async function runSlipwayApplicationPolicyPublish(
       pointer: "/applicationId"
     });
   }
-  const release = objectRecord(documentRoot.release);
-  if (release.mode !== "source") {
+  if (releaseMode === undefined) {
     diagnostics.push({
       code: "unsupported_policy_feature",
-      message: "this command publishes source releases; release.mode must be source",
+      message: "this command publishes source and pinned releases; release.mode must be source or pinned",
       pointer: "/release/mode"
     });
   }
-  if (diagnostics.length > 0) {
+  // The flag is the operator's assertion and the manifest is the document;
+  // they must agree, and neither silently overrides the other. A missing
+  // digest is already the contract's own diagnostic.
+  const pinnedDigest = objectRecord(release.artifact).digest;
+  if (releaseMode === "pinned" && typeof pinnedDigest === "string" && pinnedDigest !== input.artifactDigest) {
+    diagnostics.push({
+      code: "invalid_manifest",
+      message: `release.artifact.digest ${pinnedDigest} must equal --artifact-digest ${input.artifactDigest}`,
+      pointer: "/release/artifact/digest"
+    });
+  }
+  if (diagnostics.length > 0 || releaseMode === undefined) {
     const first = diagnostics[0]!;
     writeStructuredOrHuman(options, input.json, {
       ok: false,
@@ -3324,6 +3342,18 @@ export async function runSlipwayApplicationPolicyPublish(
     return 1;
   }
 
+  const evidenceError = releaseEvidenceFlagError(releaseMode, input);
+  if (evidenceError) {
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error: "SLIPWAY_APPLICATION_POLICY_PUBLISH_INVALID",
+      message: evidenceError,
+      applicationRef: input.applicationRef
+    }, `Error (SLIPWAY_APPLICATION_POLICY_PUBLISH_INVALID): ${evidenceError}`);
+    return 1;
+  }
+
+  const pinned = releaseMode === "pinned";
   return runSlipwayJsonCommand({
     config: input.config,
     slipwayUrl: input.slipwayUrl,
@@ -3332,7 +3362,12 @@ export async function runSlipwayApplicationPolicyPublish(
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/policy-versions`,
     body: {
       document,
-      release: {
+      // A pinned release names an artifact already pinned to the
+      // Application; it carries no source binding, so no build evidence.
+      release: pinned ? {
+        mode: "pinned",
+        artifactDigest: input.artifactDigest
+      } : {
         mode: "source",
         artifactDigest: input.artifactDigest,
         build: {
@@ -3353,16 +3388,31 @@ export async function runSlipwayApplicationPolicyPublish(
     overCapRefused: input.dryRun
       ? `Liskov would refuse to publish a policy for Application ${input.applicationRef}`
       : `Liskov did not publish a policy for Application ${input.applicationRef}`,
+    // The server's response does not echo the release; a pinned publication
+    // names it so the caller sees which artifact the policy now runs. A
+    // source publication's output is unchanged.
+    ...(pinned ? {
+      jsonBody: (body: unknown) => ({
+        ...objectRecord(body),
+        release: { mode: "pinned", artifactDigest: input.artifactDigest }
+      })
+    } : {}),
     human: (body) => {
       const policy = objectRecord(objectRecord(body).policyVersion);
       const version = stringValue(policy.policyVersionId) ?? "registered V5 policy";
       const pointer = numberValue(policy.activePointerVersion);
       const generation = numberValue(policy.handlerGeneration);
       const summary = `${input.dryRun ? "Previewed" : "Published"} ${version} for ${input.applicationRef}${pointer === undefined ? "" : ` at pointer ${pointer}`}${generation === undefined ? "" : ` under handler generation ${generation}`}.`;
+      const releaseLine = pinned ? `Release: pinned artifact ${input.artifactDigest}.` : undefined;
       const setup = input.paused ? (input.dryRun
         ? "The Application would remain paused; no publication was committed."
         : "The Application is paused. Configure required secrets before resuming.") : undefined;
-      return [summary, ...(setup ? [setup] : []), ...formatPolicyDiagnosticLines(policy.policyDiagnostics)].join("\n");
+      return [
+        summary,
+        ...(releaseLine ? [releaseLine] : []),
+        ...(setup ? [setup] : []),
+        ...formatPolicyDiagnosticLines(policy.policyDiagnostics)
+      ].join("\n");
     }
   }, options);
 }
@@ -3377,21 +3427,52 @@ function registeredPolicyPublicationInputError(input: SlipwayApplicationPolicyPu
   if (!/^sha256:[0-9a-f]{64}$/u.test(input.artifactDigest)) {
     return "--artifact-digest must be sha256: followed by 64 lowercase hexadecimal characters.";
   }
-  if (!Number.isSafeInteger(input.bindingRevision) || input.bindingRevision < 0) {
+  // Build evidence is checked for shape wherever it is given; whether it may
+  // be given at all depends on the manifest's release mode, checked after the
+  // manifest is read.
+  if (input.bindingRevision !== undefined && (!Number.isSafeInteger(input.bindingRevision) || input.bindingRevision < 0)) {
     return "--binding-revision must be a non-negative safe integer.";
   }
-  if (!Number.isSafeInteger(input.revocationEpoch) || input.revocationEpoch < 0) {
+  if (input.revocationEpoch !== undefined && (!Number.isSafeInteger(input.revocationEpoch) || input.revocationEpoch < 0)) {
     return "--revocation-epoch must be a non-negative safe integer.";
   }
-  if (!input.sourceRef.trim()) return "--source-ref must not be empty.";
-  if (!/^[0-9a-f]{40}$/u.test(input.sourceCommit)) {
+  if (input.sourceRef !== undefined && !input.sourceRef.trim()) return "--source-ref must not be empty.";
+  if (input.sourceCommit !== undefined && !/^[0-9a-f]{40}$/u.test(input.sourceCommit)) {
     return "--source-commit must be a 40-character lowercase hexadecimal Git commit.";
   }
-  if (!input.workflowIdentity.trim()) return "--workflow-identity must not be empty.";
+  if (input.workflowIdentity !== undefined && !input.workflowIdentity.trim()) return "--workflow-identity must not be empty.";
   if (!Number.isSafeInteger(input.expectedPointerVersion) || input.expectedPointerVersion < 0) {
     return "--expected-pointer-version must be a non-negative safe integer.";
   }
   return undefined;
+}
+
+/**
+ * A source release needs every piece of the attested build's evidence; a
+ * pinned release has no source binding, so any of it is a usage error rather
+ * than something silently dropped from the request.
+ */
+function releaseEvidenceFlagError(
+  mode: "source" | "pinned",
+  input: SlipwayApplicationPolicyPublishInput
+): string | undefined {
+  const evidence: Array<[string, unknown]> = [
+    ["--binding-revision", input.bindingRevision],
+    ["--revocation-epoch", input.revocationEpoch],
+    ["--source-ref", input.sourceRef],
+    ["--source-commit", input.sourceCommit],
+    ["--workflow-identity", input.workflowIdentity]
+  ];
+  if (mode === "source") {
+    const missing = evidence.filter(([, value]) => value === undefined).map(([flag]) => flag);
+    return missing.length === 0
+      ? undefined
+      : `a source release requires the attested build's evidence; missing ${missing.join(", ")}.`;
+  }
+  const given = evidence.filter(([, value]) => value !== undefined).map(([flag]) => flag);
+  return given.length === 0
+    ? undefined
+    : `${given.join(", ")} ${given.length === 1 ? "does" : "do"} not apply to a pinned release: it names an already-pinned artifact and carries no source binding.`;
 }
 
 export async function runSlipwayApplicationSourceBindingSet(
@@ -6322,6 +6403,8 @@ async function runSlipwayJsonCommand(
     fetchFailedMessage: string;
     requestFailureDetails?: Record<string, unknown>;
     human: (body: unknown) => string;
+    /** What a successful response prints under `--json`, when not the body itself. */
+    jsonBody?: (body: unknown) => unknown;
     /** What an `organization_over_plan_caps` refusal did not start, for its human line. */
     overCapRefused?: string;
   },
@@ -6346,6 +6429,7 @@ async function runSlipwayJsonCommand(
     errorCode: input.errorCode,
     json: input.json,
     human: input.human,
+    jsonBody: input.jsonBody,
     overCapRefused: input.overCapRefused,
     options
   });
@@ -6357,6 +6441,7 @@ function writeCommandResponse(input: {
   errorCode: string;
   json?: boolean;
   human: (body: unknown) => string;
+  jsonBody?: (body: unknown) => unknown;
   overCapRefused?: string;
   options: SlipwayCliOptions;
 }): number {
@@ -6384,7 +6469,12 @@ function writeCommandResponse(input: {
     }, `Error (${error}): ${input.body?.reason ?? input.body?.error ?? "Liskov request failed."}`);
     return 1;
   }
-  writeStructuredOrHuman(input.options, input.json, input.body, input.human(input.body));
+  writeStructuredOrHuman(
+    input.options,
+    input.json,
+    input.jsonBody ? input.jsonBody(input.body) : input.body,
+    input.human(input.body)
+  );
   return 0;
 }
 
