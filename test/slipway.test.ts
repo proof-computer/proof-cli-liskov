@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 
+import LiskovApplicationPolicyPublish from "../src/commands/liskov/application/policy/publish.js";
 import RuntimeImageWorkflowCommand from "../src/commands/liskov/application/runtime-image/workflow.js";
 import {
   DEFAULT_SLIPWAY_URL,
@@ -3196,6 +3197,174 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(outputs[1]?.error, "SLIPWAY_APPLICATION_POLICY_PUBLISH_MANIFEST_INVALID");
   });
 
+  describe("pinned release publication (BKLG-20260924-ahz3)", () => {
+    const pinnedDigest = `sha256:${"c".repeat(64)}`;
+    const sourceEvidence = {
+      bindingRevision: 1,
+      revocationEpoch: 0,
+      sourceCommit: "b".repeat(40),
+      sourceRef: "refs/heads/main",
+      workflowIdentity: "proof-computer/alpha/.github/workflows/release.yml@refs/heads/main"
+    };
+
+    async function pinnedFixture(prefix: string, digest = pinnedDigest) {
+      const dir = await mkdtemp(path.join(tmpdir(), prefix));
+      const config = path.join(dir, "session.json");
+      const file = path.join(dir, "manifest.json");
+      const document = retainedV5PinnedManifest("alpha", digest);
+      await writeFile(file, JSON.stringify(document), "utf8");
+      const token = "pinned_publication_token_do_not_print";
+      await saveSlipwaySession({ version: 1, slipwayUrl: "https://slipway.test", sessionToken: token, savedAtMs: 0 }, { config });
+      return { config, file, document, token };
+    }
+
+    const refuseNetwork = async (): Promise<Response> => {
+      throw new Error("a refused publication must not reach the server");
+    };
+
+    it("accepts a pinned publication without any source-build flag", () => {
+      for (const flag of ["binding-revision", "revocation-epoch", "source-ref", "source-commit", "workflow-identity"]) {
+        assert.notEqual((LiskovApplicationPolicyPublish.flags[flag] as { required?: boolean }).required, true, flag);
+      }
+      assert.equal((LiskovApplicationPolicyPublish.flags["artifact-digest"] as { required?: boolean }).required, true);
+    });
+
+    it("sends the pinned body with no build evidence and names the mode in JSON and human output", async () => {
+      const { config, file, document, token } = await pinnedFixture("proof-liskov-pinned-publish-");
+      const requests: Array<{ url: string; body: unknown }> = [];
+      const response = {
+        ok: true,
+        policyVersion: { policyVersionId: "alpha-v2", activePointerVersion: 2, handlerGeneration: 3 }
+      };
+      const out = writer();
+      assert.equal(await runSlipwayApplicationPolicyPublish({
+        applicationRef: "alpha", artifactDigest: pinnedDigest, config, expectedPointerVersion: 1, file, json: true, yes: true
+      }, {
+        fetchImpl: async (url, init) => {
+          requests.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+          return jsonResponse(response);
+        },
+        stdout: out.write
+      }), 0);
+      assert.deepEqual(requests, [{
+        url: "https://slipway.test/api/applications/alpha/policy-versions",
+        body: {
+          document,
+          release: { mode: "pinned", artifactDigest: pinnedDigest },
+          expectedActivePointerVersion: 1
+        }
+      }]);
+      assert.deepEqual(JSON.parse(out.text), { ...response, release: { mode: "pinned", artifactDigest: pinnedDigest } });
+      assert.equal(out.text.includes(token), false);
+
+      const human = writer();
+      assert.equal(await runSlipwayApplicationPolicyPublish({
+        applicationRef: "alpha", artifactDigest: pinnedDigest, config, expectedPointerVersion: 1, file, yes: true
+      }, { fetchImpl: async () => jsonResponse(response), stdout: human.write }), 0);
+      assert.equal(human.text, [
+        "Published alpha-v2 for alpha at pointer 2 under handler generation 3.",
+        `Release: pinned artifact ${pinnedDigest}.\n`
+      ].join("\n"));
+    });
+
+    it("previews a pinned publication with --dry-run, paused, without committing", async () => {
+      const { config, file } = await pinnedFixture("proof-liskov-pinned-dry-run-");
+      const bodies: Array<Record<string, unknown>> = [];
+      const out = writer();
+      assert.equal(await runSlipwayApplicationPolicyPublish({
+        applicationRef: "alpha", artifactDigest: pinnedDigest, config, expectedPointerVersion: 0, file,
+        dryRun: true, paused: true, reason: "configure secrets"
+      }, {
+        fetchImpl: async (_url, init) => {
+          bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+          return jsonResponse({ ok: true, dryRun: true, policyVersion: { policyVersionId: "alpha-v1" } });
+        },
+        stdout: out.write
+      }), 0);
+      assert.equal(bodies.length, 1);
+      assert.deepEqual(bodies[0]?.release, { mode: "pinned", artifactDigest: pinnedDigest });
+      assert.equal(bodies[0]?.dryRun, true);
+      assert.equal(bodies[0]?.postPublishStatus, "paused");
+      assert.equal(bodies[0]?.reason, "configure secrets");
+      assert.equal(out.text, [
+        "Previewed alpha-v1 for alpha.",
+        `Release: pinned artifact ${pinnedDigest}.`,
+        "The Application would remain paused; no publication was committed.\n"
+      ].join("\n"));
+    });
+
+    it("refuses a digest that disagrees with the manifest as a manifest diagnostic, before network I/O", async () => {
+      const manifestDigest = `sha256:${"d".repeat(64)}`;
+      const { config, file } = await pinnedFixture("proof-liskov-pinned-mismatch-", manifestDigest);
+      const out = writer();
+      assert.equal(await runSlipwayApplicationPolicyPublish({
+        applicationRef: "alpha", artifactDigest: pinnedDigest, config, expectedPointerVersion: 0, file, json: true, yes: true
+      }, { fetchImpl: refuseNetwork, stdout: out.write }), 1);
+      const output = JSON.parse(out.text) as { error: string; diagnostics: Array<{ code: string; pointer: string; message: string }> };
+      assert.equal(output.error, "SLIPWAY_APPLICATION_POLICY_PUBLISH_MANIFEST_INVALID");
+      assert.deepEqual(output.diagnostics.map((diagnostic) => [diagnostic.code, diagnostic.pointer]), [
+        ["invalid_manifest", "/release/artifact/digest"]
+      ]);
+      assert.match(output.diagnostics[0]!.message, new RegExp(`${manifestDigest}.*${pinnedDigest}`, "u"));
+
+      const human = writer();
+      assert.equal(await runSlipwayApplicationPolicyPublish({
+        applicationRef: "alpha", artifactDigest: pinnedDigest, config, expectedPointerVersion: 0, file, yes: true
+      }, { fetchImpl: refuseNetwork, stdout: human.write }), 1);
+      assert.match(human.text, /^Error \(SLIPWAY_APPLICATION_POLICY_PUBLISH_MANIFEST_INVALID\): invalid_manifest \/release\/artifact\/digest: /u);
+    });
+
+    it("refuses every source-build flag for a pinned release as a usage error, before network I/O", async () => {
+      const { config, file } = await pinnedFixture("proof-liskov-pinned-evidence-");
+      const cases: Array<[string, Partial<typeof sourceEvidence>]> = [
+        ["--binding-revision", { bindingRevision: 1 }],
+        ["--revocation-epoch", { revocationEpoch: 0 }],
+        ["--source-ref", { sourceRef: sourceEvidence.sourceRef }],
+        ["--source-commit", { sourceCommit: sourceEvidence.sourceCommit }],
+        ["--workflow-identity", { workflowIdentity: sourceEvidence.workflowIdentity }]
+      ];
+      for (const [flag, evidence] of cases) {
+        const out = writer();
+        assert.equal(await runSlipwayApplicationPolicyPublish({
+          applicationRef: "alpha", artifactDigest: pinnedDigest, config, expectedPointerVersion: 0, file, json: true, yes: true,
+          ...evidence
+        }, { fetchImpl: refuseNetwork, stdout: out.write }), 1, flag);
+        const output = JSON.parse(out.text) as { error: string; message: string };
+        assert.equal(output.error, "SLIPWAY_APPLICATION_POLICY_PUBLISH_INVALID", flag);
+        assert.equal(output.message, `${flag} does not apply to a pinned release: it names an already-pinned artifact and carries no source binding.`);
+      }
+      const out = writer();
+      assert.equal(await runSlipwayApplicationPolicyPublish({
+        applicationRef: "alpha", artifactDigest: pinnedDigest, config, expectedPointerVersion: 0, file, yes: true,
+        ...sourceEvidence
+      }, { fetchImpl: refuseNetwork, stdout: out.write }), 1);
+      assert.equal(
+        out.text,
+        "Error (SLIPWAY_APPLICATION_POLICY_PUBLISH_INVALID): --binding-revision, --revocation-epoch, --source-ref, --source-commit, --workflow-identity do not apply to a pinned release: it names an already-pinned artifact and carries no source binding.\n"
+      );
+    });
+
+    it("still requires the full build evidence for a source release, before network I/O", async () => {
+      const dir = await mkdtemp(path.join(tmpdir(), "proof-liskov-source-evidence-"));
+      const file = path.join(dir, "manifest.json");
+      await writeFile(file, JSON.stringify(retainedV5SourceManifest("alpha")), "utf8");
+      const { sourceRef: _omitted, ...withoutSourceRef } = sourceEvidence;
+      for (const [evidence, missing] of [
+        [withoutSourceRef, "--source-ref"],
+        [{}, "--binding-revision, --revocation-epoch, --source-ref, --source-commit, --workflow-identity"]
+      ] as const) {
+        const out = writer();
+        assert.equal(await runSlipwayApplicationPolicyPublish({
+          applicationRef: "alpha", artifactDigest: pinnedDigest, expectedPointerVersion: 0, file, json: true, yes: true,
+          ...evidence
+        }, { fetchImpl: refuseNetwork, stdout: out.write }), 1);
+        const output = JSON.parse(out.text) as { error: string; message: string };
+        assert.equal(output.error, "SLIPWAY_APPLICATION_POLICY_PUBLISH_INVALID");
+        assert.equal(output.message, `a source release requires the attested build's evidence; missing ${missing}.`);
+      }
+    });
+  });
+
   it("reconciles executor operations with exact guards, dry-run default, JSON-only stdout, and token redaction", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
@@ -6109,6 +6278,10 @@ function runtimeImageBuildManifest(
       }
     }
   };
+}
+
+function retainedV5PinnedManifest(applicationId: string, digest: string): Record<string, unknown> {
+  return { ...retainedV5SourceManifest(applicationId), release: { mode: "pinned", artifact: { digest } } };
 }
 
 function retainedV5SourceManifest(applicationId: string): Record<string, unknown> {
