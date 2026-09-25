@@ -61,12 +61,14 @@ const requiredArtifacts = [
   "dist/policy-client-bundle/policy-client-contract.wasm.gz",
   "dist/policy-client-bundle/policy-client.cjs",
   "oclif.manifest.json",
-  "README.md"
+  "README.md",
+  "LICENSE"
 ];
 const requiredFilesEntries = [
   "dist",
   "oclif.manifest.json",
-  "README.md"
+  "README.md",
+  "LICENSE"
 ];
 const forbiddenDependencies = [
   "slipway",
@@ -83,6 +85,10 @@ const errors = [];
 
 if (packageJson.name !== "@proof-computer/proof-cli-liskov") {
   errors.push("package.json name must be @proof-computer/proof-cli-liskov");
+}
+
+if (packageJson.license !== "FSL-1.1-Apache-2.0") {
+  errors.push("package.json license must be FSL-1.1-Apache-2.0");
 }
 
 if (packageJson.bin) {

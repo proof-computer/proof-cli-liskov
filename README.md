@@ -371,3 +371,11 @@ of a `once` policy normally starts a spend event; the paused form holds planning
 1–500 characters after trimming. A stale `--expected-pointer-version` refuses;
 read the new pointer and review again before confirming. These options require
 a server supporting registered publication previews and atomic setup holds.
+
+## License
+
+This package is licensed under the Functional Source License, Version 1.1,
+with Apache-2.0 as the future licence (SPDX `FSL-1.1-Apache-2.0`). Each
+version becomes available under Apache-2.0 two years after it is released.
+Releases tagged before this licence was added keep the terms they were
+published under. See [`LICENSE`](LICENSE) for the full text.
