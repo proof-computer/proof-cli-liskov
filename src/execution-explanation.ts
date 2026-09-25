@@ -126,10 +126,18 @@ export interface ExecutionBlockerView {
 export interface ExecutionLineageView {
   linkedReservationId: string | null;
   unit: string | null;
+  /** What was held — a ceiling, never a cost (ADR-0169). */
   amount: string | null;
+  /** What the settlement charged; absent until a settlement exists. */
+  settledAmount: string | null;
+  /** What the settlement holds for review. */
+  unknownAmount: string | null;
+  /** What the settlement gave back; reported, never derived. */
+  releasedAmount: string | null;
   reservationAtMs: number | null;
   exposureState: string | null;
   settlementDisposition: string | null;
+  settlementReason: string | null;
   closeoutId: string | null;
 }
 
@@ -288,10 +296,7 @@ export function formatExecutionExplanation(explanation: PolicyExplanation): stri
   lines.push(`  reservation ${reported(spend.reservationId)}; reserves ${reported(spend.reserveCount)}, settlements ${reported(spend.settlementCount)}`);
   if (spend.settlementEffect) lines.push(...effectLines("  settlement effect", spend.settlementEffect));
   for (const lineage of spend.lineages) {
-    const amount = lineage.amount === null ? "amount not reported" : `${lineage.amount} ${lineage.unit ?? "unit not reported"}`;
-    const disposition = lineage.settlementDisposition ? `; ${lineage.settlementDisposition}${lineage.closeoutId ? ` (${lineage.closeoutId})` : ""}` : "";
-    const state = lineage.exposureState ? `; ${lineage.exposureState}` : "";
-    lines.push(`  lineage ${reported(lineage.linkedReservationId)}: ${amount}${state}${disposition}`);
+    lines.push(`  lineage ${reported(lineage.linkedReservationId)}: ${lineageFigures(lineage)}`);
   }
   if (spend.refusal) lines.push(`  refusal: ${spend.refusal}`);
   lines.push(...traceLines("  trace", spend.completeThrough, spend.gaps, spend.entries));
@@ -576,6 +581,10 @@ function semanticFacts(explanation: PolicyExplanation): Record<string, unknown> 
         linkedReservationId: lineage.linkedReservationId,
         exposureState: lineage.exposureState,
         settlementDisposition: lineage.settlementDisposition,
+        settledAmount: lineage.settledAmount,
+        unknownAmount: lineage.unknownAmount,
+        releasedAmount: lineage.releasedAmount,
+        settlementReason: lineage.settlementReason,
         closeoutId: lineage.closeoutId
       })),
       refusal: spend.refusal,
@@ -700,12 +709,36 @@ function lineagesView(value: unknown): ExecutionLineageView[] {
       linkedReservationId: optionalString(record.linkedReservationId),
       unit: optionalString(record.unit),
       amount: optionalString(record.amount),
+      settledAmount: optionalString(record.settledAmount),
+      unknownAmount: optionalString(record.unknownAmount),
+      releasedAmount: optionalString(record.releasedAmount),
       reservationAtMs: optionalInteger(record.reservationAtMs),
       exposureState: optionalString(record.exposureState),
       settlementDisposition: optionalString(record.settlementDisposition),
+      settlementReason: optionalString(record.settlementReason),
       closeoutId: optionalString(record.closeoutId)
     }];
   });
+}
+
+/**
+ * One lineage's figures in ADR-0169's words: reserved, charged, released and
+ * under review, each only when the server reports it. Nothing is derived — a
+ * released figure is never `reserved − charged` (ADR-0102).
+ */
+function lineageFigures(lineage: ExecutionLineageView): string {
+  const clauses = [
+    lineage.amount === null ? "amount not reported" : `reserved ${lineage.amount} ${lineage.unit ?? "unit not reported"}`
+  ];
+  if (lineage.settledAmount !== null) clauses.push(`charged ${lineage.settledAmount}`);
+  if (lineage.releasedAmount !== null) clauses.push(`released ${lineage.releasedAmount}`);
+  if (lineage.unknownAmount !== null) clauses.push(`under review ${lineage.unknownAmount}`);
+  if (lineage.exposureState) clauses.push(lineage.exposureState);
+  if (lineage.settlementDisposition) {
+    clauses.push(`${lineage.settlementDisposition}${lineage.closeoutId ? ` (${lineage.closeoutId})` : ""}`);
+  }
+  if (lineage.settlementReason === "report_absent_not_billed") clauses.push("not billed — no report filed");
+  return clauses.join("; ");
 }
 
 function refusalCode(value: unknown): string | null {
