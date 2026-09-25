@@ -26,7 +26,10 @@ try {
 
   const help = run(process.execPath, [proofDevBin, "liskov", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(help.stdout, "Liskov application deployment commands");
-  assertIncludes(help.stdout, "liskov custody");
+  assertIncludes(help.stdout.replace(/\s+/g, " "), "Live custody commands are operator-only and hidden");
+  if (/^\s+liskov custody\b/m.test(help.stdout)) {
+    throw new Error("Expected liskov --help not to list the operator-only custody topic");
+  }
 
   const loginHelp = run(process.execPath, [proofDevBin, "liskov", "login", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(loginHelp.stdout, "Start Liskov CLI login");
@@ -164,7 +167,7 @@ try {
   assertExcludes(manifestValidateHelp.stdout, "--organization");
 
   const custodyHelp = run(process.execPath, [proofDevBin, "liskov", "custody", "--help"], { cwd: proofCliRoot, env });
-  assertIncludes(custodyHelp.stdout, "Operate Liskov live custody");
+  assertIncludes(custodyHelp.stdout, "Operator-only Liskov live custody commands");
   assertIncludes(custodyHelp.stdout, "liskov custody execution");
 
   const custodySubmitHelp = run(process.execPath, [proofDevBin, "liskov", "custody", "execution", "submit", "--help"], { cwd: proofCliRoot, env });

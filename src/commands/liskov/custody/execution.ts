@@ -1,6 +1,7 @@
 import { OrganizationScopedCommand } from "../../../organization-context.js";
 
 export default class SlipwayCustodyExecution extends OrganizationScopedCommand {
+  static hidden = true;
   static description = "Manage Liskov live custody executions.";
   static summary = "Manage Liskov live custody executions.";
 

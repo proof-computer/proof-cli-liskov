@@ -1,6 +1,7 @@
 import { OrganizationScopedCommand } from "../../../organization-context.js";
 
 export default class SlipwayCustodyEnvironment extends OrganizationScopedCommand {
+  static hidden = true;
   static description = "Manage encrypted live custody environment handoffs.";
   static summary = "Manage encrypted live custody environment handoffs.";
 

@@ -47,6 +47,10 @@
       "liskov:application:lockbox": {
         "description": "Liskov Application secret-grant commands.",
         "hidden": true
+      },
+      "liskov:custody": {
+        "description": "Operator-only Liskov live custody commands.",
+        "hidden": true
       }
     }
   },

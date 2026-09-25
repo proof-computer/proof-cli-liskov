@@ -4,6 +4,7 @@ import { OrganizationScopedCommand } from "../../../../organization-context.js";
 import { runSlipwayCustodyExecutionSubmit } from "../../../../session.js";
 
 export default class SlipwayCustodyExecutionSubmit extends OrganizationScopedCommand {
+  static hidden = true;
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true })
   };

@@ -157,6 +157,21 @@ for (const command of scopedLeafCommands) {
   }
 }
 
+const custodyCommands = Object.values(oclifManifest.commands).filter((command) =>
+  command.id === "liskov:custody" || command.id.startsWith("liskov:custody:")
+);
+if (custodyCommands.length === 0) {
+  errors.push("oclif manifest must declare the operator-only liskov:custody commands");
+}
+for (const command of custodyCommands) {
+  if (command.hidden !== true) {
+    errors.push(`${command.id} is operator-only and must be hidden from help`);
+  }
+}
+if (packageJson.oclif?.topics?.["liskov:custody"]?.hidden !== true) {
+  errors.push("package.json oclif.topics must declare liskov:custody as hidden");
+}
+
 const unscopedCommands = Object.values(oclifManifest.commands).filter((command) =>
   locallyUnscopedCommands.has(command.id) ||
   command.id === "liskov:access:proxy" ||

@@ -66,17 +66,6 @@ proof liskov runtime-ssh attachment revoke org-123 att_123
 proof liskov ssh proof-docs --print-command
 proof liskov ssh proof-docs --deployment dep-123 --job job-123
 proof liskov ssh proof-docs --job 155468
-proof liskov custody account ensure proof-docs --chain acurast --yes
-proof liskov custody signer status proof-docs --json
-proof liskov custody preflight proof-docs --json
-proof liskov custody execution run-one proof-docs --plan-item-id PLAN_ITEM_ID_FROM_ONE_ITEM --idempotency-key OPAQUE_KEY_FROM_SAME_ITEM --expect-kind acurast.deploy --expect-policy-digest POLICY_DIGEST_FROM_SAME_ITEM --yes-spend --yes
-proof liskov custody environment upload proof-docs --secrets-file .env.local --yes
-proof liskov custody execution list proof-docs --json
-proof liskov custody execution submit proof-docs --plan-item-id ID --idempotency-key KEY --yes-spend --yes
-proof liskov custody execution observe proof-docs --execution-id ID --json
-proof liskov custody execution diagnose proof-docs --execution-id ID --network mainnet --json
-proof liskov custody execution recover proof-docs --execution-id ID --reason "operator reviewed" --yes
-proof liskov custody machine catalog --network mainnet --json
 proof liskov application backfill-identities
 # Deprecated clean-only compatibility bridge; use application retire.
 proof liskov application delete proof-docs
@@ -90,10 +79,11 @@ proof liskov logout
 
 Liskov builder login is designed as a browser-confirmed GitHub device-style
 flow. The CLI stores the local bearer token under an XDG-style config path and
-never prints token material. Application mutation and live custody commands are
-private/internal plugin commands that use the saved GitHub App CLI session and
-the server's readable-Application checks. The private `liskov:ops` sr25519
-login remains an operator recovery path, not the normal builder-facing command.
+never prints token material. Application mutation commands and the
+operator-only custody commands are private/internal plugin commands that use the
+saved GitHub App CLI session and the server's readable-Application checks. The
+private `liskov:ops` sr25519 login remains an operator recovery path, not the
+normal builder-facing command.
 
 Liskov commands report one bounded completion event to the Liskov API by
 default: the command id, plugin version, and success or failure. Arguments,
@@ -176,10 +166,10 @@ checks remain the authority for whether the run happens. Pressing Run twice
 while the first is unspent is one run, not two.
 
 Pause, resume, run, delete, and identity backfill dry-run by default and require
-`--yes` to mutate. Publish and other mutating Application and custody commands
-require `--yes`; live execution submit also requires `--yes-spend`. The plugin does
-not expose the old direct manual Acurast spend fallback; diagnostics and
-machine catalog reads stay server-side.
+`--yes` to mutate. Publish, other mutating Application commands and the mutating
+operator-only custody commands require `--yes`; live execution submit also
+requires `--yes-spend`. The plugin does not expose the old direct manual Acurast
+spend fallback; diagnostics and machine catalog reads stay server-side.
 
 Runtime SSH is a private-preview, bring-your-own Tailscale capability. Starter,
 Team, and Enterprise organization owners or administrators connect their own
@@ -264,16 +254,6 @@ dry-run unless `--yes`; it requires exact identity expectations and refuses any
 placeholder with lease, proposal, chain/contact evidence, a later replacement,
 or non-terminal billing correlation.
 
-For guarded `custody execution run-one` submit mode, first run `custody
-preflight APP_REF --json`. Choose one `actionPlan.items[]` entry whose
-`executorMode` is `custodial.live`, then copy both its `planItemId` and its
-opaque `idempotencyKey` unchanged into the run-one command. Never generate or
-replace the key. After both confirmation flags are present, the CLI fetches a
-fresh UID-scoped preflight, validates the pair plus the expected kind, policy
-digest, optional deployment, and blockers, and only then sends the guarded
-submit. If a timestamp-derived plan ID changed, the unchanged unique returned
-key may select the refreshed ID; the server remains the final authority.
-
 `proof liskov application runtime-image workflow APP_ID --manifest PATH`
 writes a manual GitHub Actions caller for the manifest-bound runtime-image
 pipeline at
@@ -290,6 +270,38 @@ The active Application policy must allow the repository/ref under
 `runtimeImageAutomation.github`; if it pins `workflowRef`, set it to the
 generated caller path, such as
 `<owner>/<repo>/.github/workflows/liskov-runtime-image.yml@refs/heads/<branch>`.
+
+## Operator-only commands
+
+The `proof liskov custody` namespace is internal Liskov operator tooling for
+live custody of internal Applications. It is hidden from `proof --help`,
+`proof liskov --help` and command listings, and it is not part of the customer
+command contract. Every command keeps its name, flags, output and behaviour, and
+`proof liskov custody --help` lists them for operators.
+
+```sh
+proof liskov custody account ensure proof-docs --chain acurast --yes
+proof liskov custody signer status proof-docs --json
+proof liskov custody preflight proof-docs --json
+proof liskov custody execution run-one proof-docs --plan-item-id PLAN_ITEM_ID_FROM_ONE_ITEM --idempotency-key OPAQUE_KEY_FROM_SAME_ITEM --expect-kind acurast.deploy --expect-policy-digest POLICY_DIGEST_FROM_SAME_ITEM --yes-spend --yes
+proof liskov custody environment upload proof-docs --secrets-file .env.local --yes
+proof liskov custody execution list proof-docs --json
+proof liskov custody execution submit proof-docs --plan-item-id ID --idempotency-key KEY --yes-spend --yes
+proof liskov custody execution observe proof-docs --execution-id ID --json
+proof liskov custody execution diagnose proof-docs --execution-id ID --network mainnet --json
+proof liskov custody execution recover proof-docs --execution-id ID --reason "operator reviewed" --yes
+proof liskov custody machine catalog --network mainnet --json
+```
+
+For guarded `custody execution run-one` submit mode, first run `custody
+preflight APP_REF --json`. Choose one `actionPlan.items[]` entry whose
+`executorMode` is `custodial.live`, then copy both its `planItemId` and its
+opaque `idempotencyKey` unchanged into the run-one command. Never generate or
+replace the key. After both confirmation flags are present, the CLI fetches a
+fresh UID-scoped preflight, validates the pair plus the expected kind, policy
+digest, optional deployment, and blockers, and only then sends the guarded
+submit. If a timestamp-derived plan ID changed, the unchanged unique returned
+key may select the refreshed ID; the server remains the final authority.
 
 ## Advanced: secret-grant plumbing
 
