@@ -1,6 +1,7 @@
 import { OrganizationScopedCommand } from "../../../organization-context.js";
 
 export default class SlipwayCustodyMachine extends OrganizationScopedCommand {
+  static hidden = true;
   static description = "Read Acurast machine-class data from Liskov.";
   static summary = "Read Acurast machine-class data.";
 
