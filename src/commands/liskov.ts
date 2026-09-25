@@ -55,6 +55,9 @@ COMMANDS
   application action-plan APP_REF
   application action-plan retry APP_REF --decision-id ID --reason TEXT --yes
   application secrets APP_REF [--json]
+  application vars list APP_REF [--json]
+  application vars set APP_REF NAME VALUE [--yes] [--json]
+  application vars unset APP_REF NAME [--yes] [--json]
   application logs APP_REF [--limit N] [--deployment ID] [--job ID] [--origin all|customer|runtime-ssh|runtime_ssh] [--event GLOB] [--follow] [--from-start] [--ndjson] [--json]
   application devtools view-key APP_REF DEPLOYMENT_ID
   application runtime-image workflow APP_ID --manifest PATH [--output PATH]

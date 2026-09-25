@@ -27,6 +27,10 @@ proof liskov application status proof-docs
 proof liskov application plans proof-docs --json
 proof liskov application secrets proof-docs
 proof liskov application secrets proof-docs --json
+proof liskov application vars list proof-docs
+proof liskov application vars set proof-docs RPC_URL wss://rpc.example
+proof liskov application vars set proof-docs RPC_URL wss://rpc.example --yes
+proof liskov application vars unset proof-docs RPC_URL --yes
 proof liskov application logs proof-docs --limit 100
 proof liskov application logs proof-docs --deployment dep-123 --job job-123 --origin runtime-ssh --json
 proof liskov application logs proof-docs --follow
@@ -122,6 +126,17 @@ resolves no review.
 
 `application secrets` reads the managed secrets an Application's active
 policy requires and whether each is present; values are never shown.
+
+`application vars list` reads the managed variables an Application's active
+policy declares, with each value in the clear: a managed variable is
+non-secret by contract, so put credentials in Secrets. `application vars set
+APP_REF NAME VALUE` stores one value verbatim (`""` is a value; pass a value
+that starts with a dash after `--`), and `application vars unset APP_REF NAME`
+clears it back to the declared default or to unset. Set and unset are dry runs
+by default: they show the current and resulting value and write nothing unless
+`--yes` is present. The commands set values only; declaring or removing a
+variable is a policy change. A refused write exits 1 with the server's code as
+`reason` (`undeclared_variable`, `variable_value_too_large`, …).
 
 Application logging is opt-in through Manifest V4
 `observability.logs.enabled`. Liskov provisions and reads it as a managed
