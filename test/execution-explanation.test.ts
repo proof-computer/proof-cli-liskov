@@ -118,9 +118,13 @@ function typedSpineEnvelope(
       exposureId: null,
       unit: "service_credit_micros",
       amount: "0",
+      settledAmount: null,
+      unknownAmount: null,
+      releasedAmount: null,
       reservationAtMs: 10,
       exposureState: "open_reserve",
       settlementDisposition: null,
+      settlementReason: null,
       closeoutId: null
     }],
     reserveCount: 1,
@@ -313,13 +317,85 @@ describe("typed-spine execution view", () => {
         attempts: []
       }
     }, {
-      provenance: { reservationId: null, lineages: [{ linkedReservationId: "r1", exposureId: null, unit: null, amount: null, reservationAtMs: null, exposureState: null, settlementDisposition: null, closeoutId: null }] }
+      provenance: { reservationId: null, lineages: [{ linkedReservationId: "r1", exposureId: null, unit: null, amount: null, settledAmount: null, unknownAmount: null, releasedAmount: null, reservationAtMs: null, exposureState: null, settlementDisposition: null, settlementReason: null, closeoutId: null }] }
     });
     const text = formatExecutionExplanation(parse(envelope));
     assert.match(text, /stage: not reported/);
     assert.match(text, /reservation not reported/);
-    assert.match(text, /amount not reported/);
+    assert.match(text, /lineage r1: amount not reported$/m);
+    assert.doesNotMatch(text, /charged|released|under review|not billed/);
     assert.doesNotMatch(text, /undefined|null/);
+  });
+
+  it("labels a settled lineage's reserve, charge and release, and never prints the reserve unlabelled (ADR-0169)", () => {
+    const envelope = typedSpineEnvelope({}, {
+      code: "spend_settled",
+      provenance: { lineages: [{
+        linkedReservationId: "v5-reserve:app_1:g1:r6", exposureId: null, unit: "service_credit_micros",
+        amount: "50000", settledAmount: "3820", unknownAmount: null, releasedAmount: "46180",
+        reservationAtMs: 10, exposureState: null, settlementDisposition: "settle", settlementReason: null, closeoutId: "closeout-1"
+      }] }
+    });
+    const explanation = parse(envelope);
+    const lineage = spendView(explanation).lineages[0];
+    assert.equal(lineage?.settledAmount, "3820");
+    assert.equal(lineage?.releasedAmount, "46180");
+    assert.equal(lineage?.unknownAmount, null);
+    const text = formatExecutionExplanation(explanation);
+    assert.match(
+      text,
+      /lineage v5-reserve:app_1:g1:r6: reserved 50000 service_credit_micros; charged 3820; released 46180; settle \(closeout-1\)$/m
+    );
+    assert.doesNotMatch(text, /: 50000 /, "the held reserve is never the lineage's unlabelled amount");
+    assert.doesNotMatch(text, /under review|not billed|refund|spent|used/);
+  });
+
+  it("prints every reported figure in order, and a zero charge as 0 rather than absent", () => {
+    const envelope = typedSpineEnvelope({}, {
+      provenance: { lineages: [{
+        linkedReservationId: "r1", exposureId: null, unit: "service_credit_micros",
+        amount: "50000", settledAmount: "0", unknownAmount: "0", releasedAmount: "50000",
+        reservationAtMs: 10, exposureState: "closed", settlementDisposition: "settle", settlementReason: null, closeoutId: null
+      }] }
+    });
+    const text = formatExecutionExplanation(parse(envelope));
+    assert.match(
+      text,
+      /lineage r1: reserved 50000 service_credit_micros; charged 0; released 50000; under review 0; closed; settle$/m
+    );
+  });
+
+  it("says a review lineage's held amount is under review, and derives no release from it", () => {
+    const envelope = typedSpineEnvelope({}, {
+      code: "spend_unknown_review",
+      provenance: { lineages: [{
+        linkedReservationId: "r1", exposureId: null, unit: "service_credit_micros",
+        amount: "50000", settledAmount: null, unknownAmount: "50000", releasedAmount: null,
+        reservationAtMs: 10, exposureState: "unknown_review", settlementDisposition: "unknown", settlementReason: null, closeoutId: "closeout-2"
+      }] }
+    });
+    const text = formatExecutionExplanation(parse(envelope));
+    assert.match(
+      text,
+      /lineage r1: reserved 50000 service_credit_micros; under review 50000; unknown_review; unknown \(closeout-2\)$/m
+    );
+    assert.doesNotMatch(text, /charged|released/);
+  });
+
+  it("names the managed no-report zero as not billed", () => {
+    const envelope = typedSpineEnvelope({}, {
+      code: "spend_settled",
+      provenance: { lineages: [{
+        linkedReservationId: "r1", exposureId: null, unit: "service_credit_micros",
+        amount: "50000", settledAmount: "0", unknownAmount: null, releasedAmount: "50000",
+        reservationAtMs: 10, exposureState: null, settlementDisposition: "settle", settlementReason: "report_absent_not_billed", closeoutId: "closeout-3"
+      }] }
+    });
+    const text = formatExecutionExplanation(parse(envelope));
+    assert.match(
+      text,
+      /lineage r1: reserved 50000 service_credit_micros; charged 0; released 50000; settle \(closeout-3\); not billed — no report filed$/m
+    );
   });
 
   it("reads the rollout-row path without claiming a typed-spine occurrence", () => {
@@ -411,7 +487,7 @@ describe("typed-spine execution view", () => {
     const after = parse(typedSpineEnvelope({
       code: "occurrence_complete",
       provenance: { stage: "effect_closed", effect: effect({ state: "closed", closeoutOutcome: "completed", receipts: { submission: null, observation: true, reconciliation: false, closeout: true } }) }
-    }, { code: "spend_reclaimed", provenance: { lineages: [{ linkedReservationId: "v5-reserve:app_1:g1:r6", exposureId: null, unit: "service_credit_micros", amount: "0", reservationAtMs: 10, exposureState: null, settlementDisposition: "reclaim", closeoutId: "closeout-1" }] } }));
+    }, { code: "spend_reclaimed", provenance: { lineages: [{ linkedReservationId: "v5-reserve:app_1:g1:r6", exposureId: null, unit: "service_credit_micros", amount: "0", settledAmount: "0", unknownAmount: null, releasedAmount: "0", reservationAtMs: 10, exposureState: null, settlementDisposition: "reclaim", settlementReason: null, closeoutId: "closeout-1" }] } }));
     assert.notEqual(executionDigest(before), executionDigest(after));
     const paths = executionChanges(before, after).map((change) => change.path);
     assert.ok(paths.includes("execution.code"));
@@ -419,6 +495,8 @@ describe("typed-spine execution view", () => {
     assert.ok(paths.includes("execution.effectState"));
     assert.ok(paths.includes("spendCloseout.code"));
     assert.ok(paths.includes("spendCloseout.lineages[0].settlementDisposition"));
+    assert.ok(paths.includes("spendCloseout.lineages[0].settledAmount"), "a settlement's charge arriving is a change");
+    assert.ok(paths.includes("spendCloseout.lineages[0].releasedAmount"));
   });
 
   it("treats a finalized receipt's arrival as a semantic change, even while the state stays mutation_armed", () => {
@@ -522,7 +600,7 @@ describe("application execution show", () => {
       assert.match(out.text, /occurrence policy-occurrence:sha256:11/);
       assert.match(out.text, /stage: .*\[effect_observed\]/);
       assert.match(out.text, /job 155065/);
-      assert.match(out.text, /lineage v5-reserve:app_1:g1:r6: 0 service_credit_micros; open_reserve/);
+      assert.match(out.text, /lineage v5-reserve:app_1:g1:r6: reserved 0 service_credit_micros; open_reserve$/m);
       assert.match(out.text, /Convergence \(proof\.liskov\.execution-convergence\.v1\)/);
       assert.equal(out.text.includes(TOKEN), false);
     });

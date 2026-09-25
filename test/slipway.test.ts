@@ -916,6 +916,8 @@ describe("proof-cli Liskov runner", () => {
     assert.match(out.text, /tx-safe/u);
     assert.match(out.text, /exec-safe/u);
     assert.match(out.text, /Next charge: \$0\.00/u);
+    assert.match(out.text, /^Available \$10\.00; reserved \$2\.00; charged \$3\.00; promo \$4\.00$/mu);
+    assert.doesNotMatch(out.text, /used \$/u, "usedUsd is the settled figure, so its word is charged (ADR-0169)");
     assert.match(out.text, /returned 1, total 3, next offset 2/u);
     assert.match(out.text, /chain pending/u);
     assert.doesNotMatch(out.text, /provider-secret-reference|private memo|secret-idempotency-key|private-chain-payload/u);

@@ -78,7 +78,7 @@ function formatCredits(credits: LiskovServiceCredits): string {
   return [
     `Available ${usd(credits.availableUsd)}`,
     `reserved ${usd(credits.reservedUsd)}`,
-    `used ${usd(credits.usedUsd)}`,
+    `charged ${usd(credits.usedUsd)}`,
     `promo ${usd(credits.promoUsd)}`
   ].join("; ");
 }
