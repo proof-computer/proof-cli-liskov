@@ -21,7 +21,7 @@ This public npm package owns the Slipway plugin for the root `proof` CLI.
 - Keep local session files and command output secret-safe. Bearer tokens must
   not appear in URLs, logs, JSON output, human output, errors, or debug text.
 - Keep package verification focused on the npm/plugin surface: `dist`,
-  `oclif.manifest.json`, and `README.md`.
+  `oclif.manifest.json`, `README.md` and `LICENSE`.
 
 ## CLI Development Guidance
 
