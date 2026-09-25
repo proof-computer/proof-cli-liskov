@@ -40,6 +40,18 @@ try {
   assertIncludes(applicationHelp.stdout, "Read Liskov Application state");
   assertIncludes(applicationHelp.stdout, "liskov application deployment");
   assertIncludes(applicationHelp.stdout, "liskov application logs");
+  assertIncludes(applicationHelp.stdout, "liskov application vars");
+
+  const applicationVarsHelp = run(process.execPath, [proofDevBin, "liskov", "application", "vars", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationVarsHelp.stdout, "liskov application vars list");
+  assertIncludes(applicationVarsHelp.stdout, "liskov application vars set");
+  assertIncludes(applicationVarsHelp.stdout, "liskov application vars unset");
+
+  const applicationVarsSetHelp = run(process.execPath, [proofDevBin, "liskov", "application", "vars", "set", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(applicationVarsSetHelp.stdout, "APP_REF NAME VALUE");
+  assertIncludes(applicationVarsSetHelp.stdout, "--yes");
+  assertIncludes(applicationVarsSetHelp.stdout, "--organization <selector>");
+  assertExcludes(applicationVarsSetHelp.stdout, "--unset");
   assertExcludes(applicationHelp.stdout, "blackbox");
   assertExcludes(applicationHelp.stdout, "lockbox");
 

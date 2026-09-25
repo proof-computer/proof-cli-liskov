@@ -434,6 +434,35 @@ export interface SlipwayApplicationSecretsInput {
   json?: boolean;
 }
 
+export interface SlipwayApplicationVarsListInput {
+  applicationRef: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationVarsSetInput {
+  applicationRef: string;
+  name: string;
+  /** Taken verbatim: `""` is a value, and nothing is trimmed. */
+  value: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+  /** Without it the command reads the current row and writes nothing. */
+  yes?: boolean;
+}
+
+export interface SlipwayApplicationVarsUnsetInput {
+  applicationRef: string;
+  name: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+  /** Without it the command reads the current row and writes nothing. */
+  yes?: boolean;
+}
+
 export interface SlipwayGenericResponse {
   ok?: boolean;
   error?: string;
@@ -1275,6 +1304,53 @@ interface SlipwayApplicationSecretsResponse {
     counts?: { required?: number; present?: number | null; missing?: number | null };
     resolution?: { available?: boolean; reason?: string };
   };
+  error?: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+interface SlipwayApplicationVariableDeclaration {
+  name?: string;
+  required?: boolean;
+  delivery?: string;
+  default?: string;
+}
+
+interface SlipwayApplicationVariableItem {
+  name?: string;
+  required?: boolean;
+  scope?: string;
+  delivery?: string;
+  status?: "set" | "default" | "unset" | string;
+  /** `null` when unset; `""` is a value. */
+  value?: string | null;
+  default?: string;
+  updatedAtMs?: number;
+  updatedBy?: string;
+}
+
+interface SlipwayApplicationVariablesResponse {
+  ok?: boolean;
+  generatedAtMs?: number;
+  activePolicyVersionId?: string | null;
+  activePolicyDigest?: string | null;
+  variables?: {
+    declarations?: SlipwayApplicationVariableDeclaration[];
+    items?: SlipwayApplicationVariableItem[];
+    counts?: { declared?: number; set?: number; default?: number; unset?: number; missingRequired?: number };
+  };
+  error?: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+interface SlipwayApplicationVariableValueResponse {
+  ok?: boolean;
+  generatedAtMs?: number;
+  name?: string;
+  status?: "set" | "unset" | string;
+  updatedAtMs?: number;
+  updatedBy?: string;
   error?: string;
   reason?: string;
   [key: string]: unknown;
@@ -3878,6 +3954,155 @@ export async function runSlipwayApplicationSecrets(input: SlipwayApplicationSecr
 
   writeStructuredOrHuman(options, input.json, body, formatApplicationSecrets(body, input.applicationId));
   return 0;
+}
+
+export async function runSlipwayApplicationVarsList(input: SlipwayApplicationVarsListInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const read = await readApplicationVariables(input, "SLIPWAY_APPLICATION_VARIABLES_FAILED", options);
+  if (!read.ok) return read.exitCode;
+  writeStructuredOrHuman(options, input.json, read.body, formatApplicationVariables(read.body, input.applicationRef));
+  return 0;
+}
+
+export async function runSlipwayApplicationVarsSet(input: SlipwayApplicationVarsSetInput, options: SlipwayCliOptions = {}): Promise<number> {
+  return runApplicationVariableValue(input, { name: input.name, value: input.value }, "SLIPWAY_APPLICATION_VARIABLE_SET_FAILED", options);
+}
+
+export async function runSlipwayApplicationVarsUnset(input: SlipwayApplicationVarsUnsetInput, options: SlipwayCliOptions = {}): Promise<number> {
+  return runApplicationVariableValue(input, { name: input.name, unset: true }, "SLIPWAY_APPLICATION_VARIABLE_UNSET_FAILED", options);
+}
+
+// The variable-values route has no server-side dry run (no `confirm` field),
+// so the dry run is here: without --yes, read the current row and POST nothing.
+// With --yes, POST without a prior read — the server checks the name against
+// the active policy and its `undeclared_variable` reaches the caller unchanged.
+async function runApplicationVariableValue(
+  input: SlipwayApplicationVarsUnsetInput,
+  write: { name: string; value: string } | { name: string; unset: true },
+  errorCode: string,
+  options: SlipwayCliOptions
+): Promise<number> {
+  if (input.yes !== true) {
+    const read = await readApplicationVariables(input, errorCode, options);
+    if (!read.ok) return read.exitCode;
+    const variables = objectRecord(read.body.variables);
+    const declared = arrayValue(variables.declarations)
+      .map(objectRecord)
+      .find((declaration) => declaration.name === input.name);
+    if (declared === undefined) {
+      const error = "SLIPWAY_APPLICATION_VARIABLE_UNDECLARED";
+      const message = `${input.name} is not a managed variable of ${input.applicationRef}'s active policy`;
+      writeStructuredOrHuman(options, input.json, {
+        ok: false,
+        error,
+        applicationRef: input.applicationRef,
+        name: input.name,
+        message
+      }, `Error (${error}): ${message}`);
+      return 1;
+    }
+    const current = arrayValue(variables.items)
+      .map(objectRecord)
+      .find((item) => item.name === input.name);
+    // What --yes would leave behind: an unset falls back to the declared default.
+    const next = "value" in write
+      ? { status: "set", value: write.value }
+      : typeof declared.default === "string"
+        ? { status: "default", value: declared.default }
+        : { status: "unset", value: null };
+    writeStructuredOrHuman(options, input.json, {
+      ok: true,
+      dryRun: true,
+      applicationRef: input.applicationRef,
+      name: input.name,
+      current: current ?? null,
+      next
+    }, formatApplicationVariableDryRun(input.applicationRef, input.name, current, declared, "value" in write, next));
+    return 0;
+  }
+
+  const request = await authenticatedSlipwayJsonRequest<SlipwayApplicationVariableValueResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/variable-values`,
+    body: write,
+    requestErrorCode: errorCode,
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not write Liskov Application variable value"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  const body = request.body;
+  if (!request.response.ok || body?.ok !== true) {
+    return writeApplicationVariablesFailure(
+      request.response,
+      body,
+      errorCode,
+      input,
+      `Liskov refused to ${"value" in write ? "set" : "unset"} ${input.name} on Application ${input.applicationRef}`,
+      options
+    );
+  }
+  writeStructuredOrHuman(options, input.json, body, formatApplicationVariableValue(body, input.applicationRef, input.name));
+  return 0;
+}
+
+async function readApplicationVariables(
+  input: { applicationRef: string; name?: string; config?: string; slipwayUrl?: string; json?: boolean },
+  errorCode: string,
+  options: SlipwayCliOptions
+): Promise<{ ok: true; body: SlipwayApplicationVariablesResponse } | { ok: false; exitCode: number }> {
+  const request = await authenticatedSlipwayRequest<SlipwayApplicationVariablesResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/variables`,
+    requestErrorCode: errorCode,
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read Liskov Application variables"
+  }, options);
+  if (!request.ok) return request;
+  if (!request.response.ok || request.body?.ok !== true) {
+    return { ok: false, exitCode: writeApplicationVariablesFailure(
+      request.response,
+      request.body,
+      errorCode,
+      input,
+      `Liskov could not read variables for Application ${input.applicationRef}`,
+      options
+    ) };
+  }
+  return { ok: true, body: request.body };
+}
+
+// The server's `error` code is the `reason` a caller keys on
+// (`undeclared_variable`, `variable_value_too_large`, …); its sentence is `message`.
+function writeApplicationVariablesFailure(
+  response: Response,
+  body: { error?: string; reason?: string } | undefined,
+  errorCode: string,
+  input: { applicationRef: string; name?: string; json?: boolean },
+  failure: string,
+  options: SlipwayCliOptions
+): number {
+  const error = response.status === 401
+    ? "SLIPWAY_SESSION_UNAUTHORIZED"
+    : body?.error === "invalid_organization_selector" || body?.error === "not_a_member"
+      ? body.error
+      : errorCode;
+  const reason = stringValue(body?.error);
+  const message = stringValue(body?.reason);
+  const detail = [reason, message === undefined ? undefined : `(${message})`].filter(Boolean).join(" ");
+  writeStructuredOrHuman(options, input.json, {
+    ok: false,
+    error,
+    status: response.status,
+    reason,
+    message,
+    applicationRef: input.applicationRef,
+    name: input.name
+  }, `Error (${error}): ${failure}${detail ? `: ${detail}` : "."}`);
+  return 1;
 }
 
 export async function runSlipwayApplicationDeploymentStatus(input: SlipwayApplicationDeploymentStatusInput, options: SlipwayCliOptions = {}): Promise<number> {
@@ -7472,6 +7697,98 @@ function formatApplicationSecrets(body: SlipwayApplicationSecretsResponse, fallb
     lines.push(`Present/missing not yet resolved${reason ? ` (${reason})` : ""}.`);
   }
   return lines.join("\n");
+}
+
+const VARIABLES_PLAINTEXT_NOTICE = "Values are plaintext by design; put credentials in Secrets.";
+
+function formatApplicationVariables(body: SlipwayApplicationVariablesResponse, applicationRef: string): string {
+  const variables = objectRecord(body.variables);
+  const counts = objectRecord(variables.counts);
+  const items = arrayValue(variables.items).map(objectRecord);
+  const count = (key: string, fallback: number): number => numberValue(counts[key]) ?? fallback;
+  const byStatus = (status: string): number => items.filter((item) => item.status === status).length;
+  const policy = stringValue(body.activePolicyVersionId);
+  const lines = [
+    `Variables for ${applicationRef}${policy ? ` (active policy ${policy})` : ""}: ` +
+      `${count("declared", items.length)} declared, ${count("set", byStatus("set"))} set, ` +
+      `${count("default", byStatus("default"))} default, ${count("unset", byStatus("unset"))} unset, ` +
+      `${count("missingRequired", 0)} required missing.`
+  ];
+  if (items.length === 0) {
+    lines.push("  No managed variables in the active policy.");
+  }
+  for (const item of items) {
+    const details = formatVariableDetails(item);
+    lines.push(
+      `  ${stringValue(item.name) ?? "variable"}  ${stringValue(item.status) ?? "unknown"}  ${formatVariableValue(item.value)}` +
+        (details.length > 0 ? `  (${details.join("; ")})` : "")
+    );
+  }
+  lines.push(VARIABLES_PLAINTEXT_NOTICE);
+  return lines.join("\n");
+}
+
+function formatApplicationVariableDryRun(
+  applicationRef: string,
+  name: string,
+  current: Record<string, unknown> | undefined,
+  declaration: Record<string, unknown>,
+  setting: boolean,
+  next: { status: string; value: string | null }
+): string {
+  const row = current ?? { ...declaration, status: "unset", value: null };
+  const details = formatVariableDetails(row);
+  const currentLine = `  current: ${stringValue(row.status) ?? "unknown"}  ${formatVariableValue(row.value)}` +
+    (details.length > 0 ? `  (${details.join("; ")})` : "");
+  if (!setting && row.status !== "set") {
+    return [
+      `Dry run: ${name} on ${applicationRef} has no value set; nothing to clear.`,
+      currentLine
+    ].join("\n");
+  }
+  return [
+    `Dry run: would ${setting ? "set" : "unset"} ${name} on ${applicationRef}.`,
+    currentLine,
+    `  after:   ${next.status}  ${formatVariableValue(next.value)}`,
+    `Re-run with --yes to ${setting ? "write" : "clear"} the value.`
+  ].join("\n");
+}
+
+function formatApplicationVariableValue(
+  body: SlipwayApplicationVariableValueResponse,
+  applicationRef: string,
+  name: string
+): string {
+  const status = stringValue(body.status) ?? "unknown";
+  const details: string[] = [];
+  const updatedAtMs = numberValue(body.updatedAtMs);
+  if (updatedAtMs !== undefined) details.push(`updated ${new Date(updatedAtMs).toISOString()}`);
+  const updatedBy = stringValue(body.updatedBy);
+  if (updatedBy) details.push(`by ${updatedBy}`);
+  return `${status === "unset" ? "Cleared" : "Set"} ${stringValue(body.name) ?? name} on ${applicationRef}: status ${status}` +
+    (details.length > 0 ? ` (${details.join(" ")})` : "") + ".";
+}
+
+function formatVariableDetails(item: Record<string, unknown>): string[] {
+  const details: string[] = [];
+  if (booleanValue(item.required)) details.push("required");
+  if (typeof item.default === "string") details.push(`default ${formatVariableValue(item.default)}`);
+  const updatedAtMs = numberValue(item.updatedAtMs);
+  const updatedBy = stringValue(item.updatedBy);
+  if (updatedAtMs !== undefined || updatedBy) {
+    details.push([
+      "updated",
+      updatedAtMs === undefined ? undefined : new Date(updatedAtMs).toISOString(),
+      updatedBy ? `by ${updatedBy}` : undefined
+    ].filter(Boolean).join(" "));
+  }
+  return details;
+}
+
+// Quoted so `""` is visibly a value distinct from `not set`, and so a value's
+// control characters are escaped rather than written to the terminal.
+function formatVariableValue(value: unknown): string {
+  return typeof value === "string" ? JSON.stringify(value) : "not set";
 }
 
 function formatApplicationActivity(body: SlipwayGenericResponse, fallbackApplicationId: string, count: number): string {
