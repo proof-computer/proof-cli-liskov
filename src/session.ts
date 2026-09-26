@@ -654,6 +654,22 @@ export interface SlipwayAdminRetirementAdjudicateLineageInput {
   json?: boolean;
 }
 
+export interface SlipwayAdminRetirementHistoricalCloseoutInput {
+  applicationUid: string;
+  manifestRef: string;
+  expectRetirement: string;
+  expectAssessmentDigest: string;
+  actorKind: string;
+  actorId: string;
+  reason: string;
+  confirm?: boolean;
+  confirmationFingerprint?: string;
+  adminToken?: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayApplicationRuntimeImageWorkflowInput {
   applicationRef: string;
   manifestPath: string;
@@ -4982,6 +4998,102 @@ export async function runSlipwayAdminRetirementAdjudicateLineage(
     : body.idempotentReplay
       ? `Retirement lineage ${input.expectOperation} was already adjudicated identically.`
       : `Adjudicated retirement lineage ${input.expectOperation}.`);
+  return 0;
+}
+
+// ADR-0163: the platform-admin, manifest-bound closeout of pre-launch
+// retirement residue. The route exists only while the server flag is set, so a
+// 404 means "disabled", never "no such application".
+export async function runSlipwayAdminRetirementHistoricalCloseout(
+  input: SlipwayAdminRetirementHistoricalCloseoutInput,
+  options: SlipwayCliOptions = {}
+): Promise<number> {
+  const manifestRef = input.manifestRef?.trim();
+  const expectRetirement = input.expectRetirement?.trim();
+  const expectAssessmentDigest = input.expectAssessmentDigest?.trim();
+  const actorKind = input.actorKind?.trim();
+  const actorId = input.actorId?.trim();
+  const reason = input.reason?.trim();
+  const confirm = input.confirm === true;
+  const fingerprint = input.confirmationFingerprint?.trim();
+  if (!manifestRef || !expectRetirement || !actorKind || !actorId || !reason
+      || !/^[0-9a-f]{64}$/.test(expectAssessmentDigest ?? "")) {
+    const error = "SLIPWAY_ADMIN_RETIREMENT_HISTORICAL_CLOSEOUT_INPUT_INVALID";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      applicationUid: input.applicationUid
+    }, `Error (${error}): manifest, retirement, actor, and reason are required, and the assessment digest must be 64 lowercase hex characters.`);
+    return 1;
+  }
+  if (confirm && !fingerprint) {
+    const error = "SLIPWAY_ADMIN_RETIREMENT_HISTORICAL_CLOSEOUT_FINGERPRINT_REQUIRED";
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      applicationUid: input.applicationUid
+    }, `Error (${error}): --confirm requires --fingerprint from a prior dry-run.`);
+    return 1;
+  }
+  const request = await authenticatedSlipwayJsonRequest<SlipwayGenericResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `/api/admin/applications/${encodeURIComponent(input.applicationUid)}/retirement/historical-closeout`,
+    body: {
+      manifestRef,
+      actorId,
+      actorKind,
+      reason,
+      expectRetirement,
+      expectAssessmentDigest,
+      ...(confirm ? { confirm: true, confirmationFingerprint: fingerprint } : {})
+    },
+    authToken: resolveAdminToken({ token: input.adminToken, env: options.env ?? process.env }),
+    requestErrorCode: "SLIPWAY_ADMIN_RETIREMENT_HISTORICAL_CLOSEOUT_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not run the Liskov retirement historical closeout"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  const body = request.body;
+  const status = request.response.status;
+  if (!request.response.ok || body?.ok !== true) {
+    const serverError = typeof body?.error === "string" && body.error ? body.error : undefined;
+    const error = status === 401
+      ? "SLIPWAY_SESSION_UNAUTHORIZED"
+      : status === 404
+        ? "historical_closeout_disabled"
+        : serverError ?? "SLIPWAY_ADMIN_RETIREMENT_HISTORICAL_CLOSEOUT_FAILED";
+    const plan = body?.plan as { refusalReasons?: unknown } | null | undefined;
+    const refusals = Array.isArray(plan?.refusalReasons)
+      ? plan.refusalReasons.filter((value): value is string => typeof value === "string")
+      : [];
+    const detail = status === 404
+      ? "the historical-closeout route is not enabled on this Liskov service"
+      : `historical closeout for ${input.applicationUid} was refused${
+        refusals.length ? ` (${refusals.join(", ")})` : typeof body?.reason === "string" ? ` (${body.reason})` : ""
+      }`;
+    writeStructuredOrHuman(options, input.json, {
+      ...(body ?? {}),
+      ok: false,
+      error,
+      ...(serverError && serverError !== error ? { serverError } : {}),
+      status,
+      applicationUid: input.applicationUid,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, `Error (${error}): ${detail}.`);
+    return 1;
+  }
+  const fingerprintOut = typeof body.confirmationFingerprint === "string"
+    ? body.confirmationFingerprint
+    : "";
+  writeStructuredOrHuman(options, input.json, body, body.dryRun
+    ? `Dry run: historical closeout for ${input.applicationUid} is ${body.eligible === true ? "eligible" : "not confirmable"}${fingerprintOut ? ` (fingerprint ${fingerprintOut})` : ""}. Pass --confirm --fingerprint to apply.`
+    : body.idempotentReplay
+      ? `Historical closeout for ${input.applicationUid} was already recorded identically.`
+      : `Recorded historical closeout for ${input.applicationUid}.`);
   return 0;
 }
 
