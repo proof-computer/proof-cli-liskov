@@ -34,6 +34,7 @@ const requiredArtifacts = [
   "dist/commands/liskov/admin/executor-operation/reconcile.js",
   "dist/commands/liskov/admin/retirement.js",
   "dist/commands/liskov/admin/retirement/adjudicate-lineage.js",
+  "dist/commands/liskov/admin/retirement/historical-closeout.js",
   "dist/commands/liskov/custody.js",
   "dist/commands/liskov/custody/account.js",
   "dist/commands/liskov/custody/account/ensure.js",
