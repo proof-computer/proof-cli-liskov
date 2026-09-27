@@ -5276,6 +5276,17 @@
       "expectedPointer": "/deployment/placement/exclude"
     },
     {
+      "name": "v6/invalid/android-major-overflow-is-refused",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: expected a nonzero u32\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/minimums/androidMajor\n# The Android major is a bounded OS version, not an arbitrary integer: an\n# overflowing floor could never be satisfied.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-android-major-overflow-is-refused\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    minimums: {androidMajor: 4294967296}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/minimums/androidMajor"
+    },
+    {
       "name": "v6/invalid/cohort-is-deferred",
       "request": {
         "schema": "proof.liskov.policy-client-request.v1",
@@ -5452,6 +5463,17 @@
       "expectedPointer": "/deployment/placement/minimums/memory"
     },
     {
+      "name": "v6/invalid/native-image-lite-is-refused",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: processor_type lite cannot run native_image\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/allow/0/values/1\n# native_image needs the Cargo helper, which only Core runs; an explicit\n# either-type (or Lite-only) promise cannot be kept (ADR-0181 \u00a72).\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-native-image-lite-is-refused\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    allow: [{by: processor_type, values: [core, lite]}]\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/allow/0/values/1"
+    },
+    {
       "name": "v6/invalid/phasing-does-not-divide",
       "request": {
         "schema": "proof.liskov.policy-client-request.v1",
@@ -5494,6 +5516,50 @@
       },
       "expectedCode": "invalid_manifest",
       "expectedPointer": "/ingress/api/private/provider"
+    },
+    {
+      "name": "v6/invalid/processor-build-exclusion-is-exact",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: is not an exact Android Processor build\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/exclude/0/values/0\n# An excluded build is one exact canonical build number. A range, a\n# comparison or a padded number would read as a maximum or a band the\n# contract does not have (ADR-0181 \u00a75).\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-processor-build-exclusion-is-exact\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    exclude: [{by: acurast_processor_build, values: [\"130-140\"]}]\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/exclude/0/values/0"
+    },
+    {
+      "name": "v6/invalid/processor-build-floor-is-nonzero",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: expected a nonzero u32\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/minimums/acurastProcessorBuild\n# A zero build floor reads like a constraint and admits every build.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-processor-build-floor-is-nonzero\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    minimums: {acurastProcessorBuild: 0}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/minimums/acurastProcessorBuild"
+    },
+    {
+      "name": "v6/invalid/processor-build-is-exclude-only",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: acurast_processor_build is exclude-only\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/allow/0/by\n# A minimum build is minimums.acurastProcessorBuild; exact bad builds are\n# excluded. There is no allow list of builds.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-processor-build-is-exclude-only\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    allow: [{by: acurast_processor_build, values: [\"131\"]}]\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/allow/0/by"
+    },
+    {
+      "name": "v6/invalid/processor-type-leaves-no-type",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: leave no processor type javascript can run on\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/exclude/0\n# Excluding both Core and Lite leaves an empty effective type set: a policy\n# that no processor could ever satisfy is refused before spend.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-processor-type-leaves-no-type\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    exclude: [{by: processor_type, values: [core, lite]}]\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/exclude/0"
     },
     {
       "name": "v6/invalid/recurring-without-a-spend-rate",
@@ -5622,7 +5688,7 @@
       "schema": "proof.liskov.policy-client-request.v1",
       "operation": "validate",
       "encoding": "json",
-      "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 7, \"opaqueFutureBody\": {\"mustNotBeRead\": true}}"
+      "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"opaqueFutureBody\": {\"mustNotBeRead\": true}}"
     }
   }
 }
