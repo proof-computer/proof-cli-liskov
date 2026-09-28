@@ -911,6 +911,8 @@ export interface PublicSlipwaySession {
 export type PublicSlipwayIdentity =
   | { kind: "github_test"; githubUserId?: string; login?: string; repositories?: readonly string[] }
   | { kind: "github_app"; githubUserId?: string; login?: string; avatarUrl?: string; repositories?: readonly string[]; installations?: readonly unknown[] }
+  // An email or Google member (`liskov-rs` `google_auth/native_session.rs`): `via` names the sign-in method.
+  | { kind: "native"; email?: string; via?: string; sub?: string }
   | { kind?: string; [key: string]: unknown };
 
 interface SlipwayApiSessionResponse {
@@ -3094,14 +3096,11 @@ export async function runSlipwayApplicationSetRepository(input: SlipwayApplicati
   const body = request.body;
   if (body?.ok !== true) {
     const ambiguous = body?.error === "ambiguous_application" && Array.isArray(body.candidates);
-    const accessDenied = body?.reasonCode === "github_repository_access_denied" || body?.error === "github_repository_access_denied";
     const error = request.response.status === 401
       ? "SLIPWAY_SESSION_UNAUTHORIZED"
       : ambiguous
         ? "SLIPWAY_APPLICATION_AMBIGUOUS"
-        : accessDenied
-          ? "SLIPWAY_REPOSITORY_ACCESS_DENIED"
-          : "SLIPWAY_APPLICATION_SET_REPOSITORY_FAILED";
+        : "SLIPWAY_APPLICATION_SET_REPOSITORY_FAILED";
     writeStructuredOrHuman(options, input.json, {
       ok: false,
       error,
@@ -3601,6 +3600,7 @@ export async function runSlipwayApplicationSourceBindingSet(
     json: input.json,
     method: "PUT",
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/source-binding`,
+    wordsOwnRefusals: true,
     body,
     requestErrorCode: "SLIPWAY_APPLICATION_SOURCE_BINDING_SET_FAILED",
     notFoundMessage: "No Liskov CLI session is stored locally.",
@@ -3640,6 +3640,7 @@ export async function runSlipwayApplicationSourceBindingShow(
     slipwayUrl: input.slipwayUrl,
     json: input.json,
     path: `/api/applications/${encodeURIComponent(applicationRef)}/source-binding`,
+    wordsOwnRefusals: true,
     requestErrorCode: "SLIPWAY_APPLICATION_SOURCE_BINDING_SHOW_FAILED",
     notFoundMessage: "No Liskov CLI session is stored locally.",
     fetchFailedMessage: "could not read Liskov Application source binding"
@@ -3689,6 +3690,7 @@ export async function runSlipwayApplicationSourceBindingRevoke(
     json: input.json,
     method: "DELETE",
     path: `/api/applications/${encodeURIComponent(input.applicationRef)}/source-binding`,
+    wordsOwnRefusals: true,
     body: {
       expectedRevision: input.expectedRevision,
       reason: input.reason.trim()
@@ -3837,10 +3839,10 @@ function sourceBindingRefusal(
       human: formatApplicationAmbiguity(applicationRef, body.candidates)
     };
   }
-  if (reasonCode === "github_repository_required" || error === "github_repository_required") {
+  if (reasonCode === "application_repository_required" || error === "application_repository_required") {
     return {
       error: "SLIPWAY_APPLICATION_SOURCE_BINDING_REPOSITORY_REQUIRED",
-      human: "Error (SLIPWAY_APPLICATION_SOURCE_BINDING_REPOSITORY_REQUIRED): create the Application with --repository first."
+      human: `Error (SLIPWAY_APPLICATION_SOURCE_BINDING_REPOSITORY_REQUIRED): ${APPLICATION_REPOSITORY_REQUIRED_HUMAN}`
     };
   }
   if (
@@ -3870,7 +3872,7 @@ function sourceBindingRefusal(
       human: `Application ${applicationRef} is not bound yet.`
     };
   }
-  return undefined;
+  return liskovAuthorityRefusal(status, body, applicationRef);
 }
 
 function formatSourceBindingSet(applicationRef: string, body: SlipwayApplicationSourceBindingResponse | undefined): string {
@@ -6514,6 +6516,8 @@ async function authenticatedSlipwayRequest<T>(
     fetchFailedMessage: string;
     redactFetchError?: boolean;
     optional?: boolean;
+    /** The caller words `capability_not_granted` and `application_repository_required` itself. */
+    wordsOwnRefusals?: boolean;
   },
   options: SlipwayCliOptions
 ): Promise<
@@ -6597,6 +6601,14 @@ async function authenticatedSlipwayRequest<T>(
   if (!input.optional && !response.ok && writeOrganizationServerFailure(options, input.json, body)) {
     return { ok: false, exitCode: 1 };
   }
+  if (
+    !input.optional
+    && !input.wordsOwnRefusals
+    && !response.ok
+    && writeLiskovAuthorityRefusal(options, input.json, { path: input.path, slipwayUrl, sessionFile }, response.status, body)
+  ) {
+    return { ok: false, exitCode: 1 };
+  }
   return {
     ok: true,
     body,
@@ -6640,6 +6652,8 @@ async function authenticatedSlipwayJsonRequest<T>(
     fetchFailedMessage: string;
     requestFailureDetails?: Record<string, unknown>;
     redactFetchError?: boolean;
+    /** The caller words `capability_not_granted` and `application_repository_required` itself. */
+    wordsOwnRefusals?: boolean;
   },
   options: SlipwayCliOptions
 ): Promise<
@@ -6717,6 +6731,13 @@ async function authenticatedSlipwayJsonRequest<T>(
 
   const responseBody = await readJsonResponse<T>(response);
   if (!response.ok && writeOrganizationServerFailure(options, input.json, responseBody)) {
+    return { ok: false, exitCode: 1 };
+  }
+  if (
+    !input.wordsOwnRefusals
+    && !response.ok
+    && writeLiskovAuthorityRefusal(options, input.json, { path: input.path, slipwayUrl, sessionFile }, response.status, responseBody)
+  ) {
     return { ok: false, exitCode: 1 };
   }
   return {
@@ -6828,6 +6849,81 @@ function writeOrganizationSelectorError(
     `Error (${error.code}): ${error.message}`
   );
   return 1;
+}
+
+const APPLICATION_REPOSITORY_REQUIRED_HUMAN = "create the Application with --repository first.";
+
+/**
+ * The two refusals Liskov words the same way on every route (ADR-0164 §1).
+ * `403 capability_not_granted` means the member's Liskov roles do not grant the
+ * capability, so the fix is a role, whatever the sign-in method or GitHub
+ * access. `409 application_repository_required` is a repository-bound
+ * operation on an Application with no source repository.
+ */
+function liskovAuthorityRefusal(
+  status: number,
+  body: unknown,
+  applicationRef: string | undefined
+): { error: string; human: string } | undefined {
+  const response = objectRecord(body);
+  const reasonCode = stringValue(response.reasonCode) ?? stringValue(response.error);
+  if (status === 403 && reasonCode === "capability_not_granted") {
+    const capability = stringValue(response.capability) ?? "the capability this needs";
+    const target = applicationRef === undefined ? "" : ` on Application ${applicationRef}`;
+    const role = applicationRef === undefined ? "a role" : `a role on ${applicationRef}`;
+    return {
+      error: "SLIPWAY_ACCESS_DENIED",
+      human: `Error (SLIPWAY_ACCESS_DENIED): your Liskov roles do not grant ${capability}${target}. Ask an organization admin for ${role} that grants it.`
+    };
+  }
+  if (status === 409 && reasonCode === "application_repository_required") {
+    return {
+      error: "SLIPWAY_APPLICATION_SOURCE_BINDING_REPOSITORY_REQUIRED",
+      human: `Error (SLIPWAY_APPLICATION_SOURCE_BINDING_REPOSITORY_REQUIRED): ${APPLICATION_REPOSITORY_REQUIRED_HUMAN}`
+    };
+  }
+  return undefined;
+}
+
+function writeLiskovAuthorityRefusal(
+  options: SlipwayCliOptions,
+  json: boolean | undefined,
+  request: { path: string; slipwayUrl: string; sessionFile: string },
+  status: number,
+  body: unknown
+): boolean {
+  const applicationRef = applicationRefFromApiPath(request.path);
+  const refusal = liskovAuthorityRefusal(status, body, applicationRef);
+  if (!refusal) return false;
+  const response = objectRecord(body);
+  writeStructuredOrHuman(options, json, {
+    ok: false,
+    error: refusal.error,
+    status,
+    reasonCode: stringValue(response.reasonCode) ?? stringValue(response.error),
+    reason: stringValue(response.reason),
+    capability: stringValue(response.capability),
+    applicationRef,
+    slipwayUrl: request.slipwayUrl,
+    sessionFile: request.sessionFile
+  }, refusal.human);
+  return true;
+}
+
+/** Path segments under `/api/applications/` that name a collection, not an Application. */
+const APPLICATION_COLLECTION_SEGMENTS = new Set(["imports", "backfill-identities"]);
+
+/** The Application a request path addresses, as the CLI sent it. */
+function applicationRefFromApiPath(requestPath: string): string | undefined {
+  const match = /^\/api\/(?:admin\/)?applications\/([^/?#]+)/u.exec(requestPath);
+  if (!match) return undefined;
+  let applicationRef: string;
+  try {
+    applicationRef = decodeURIComponent(match[1]!);
+  } catch {
+    return undefined;
+  }
+  return APPLICATION_COLLECTION_SEGMENTS.has(applicationRef) ? undefined : applicationRef;
 }
 
 function writeOrganizationServerFailure(
@@ -8785,6 +8881,10 @@ function formatSessionIdentity(session: PublicSlipwaySession): string {
   if (identity?.kind === "github_app" || identity?.kind === "github_test") {
     const login = typeof identity.login === "string" ? identity.login : undefined;
     return login ? `@${login}` : identity.kind;
+  }
+  if (identity?.kind === "native") {
+    const email = typeof identity.email === "string" ? identity.email.trim() : "";
+    if (email.length > 0) return email;
   }
   return session.address ?? session.sessionId ?? "unknown";
 }

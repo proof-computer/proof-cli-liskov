@@ -576,6 +576,45 @@ describe("proof-cli Liskov runner", () => {
     })));
   });
 
+  it("labels an email or Google member by their email address", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "native_identity_whoami_token_do_not_print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+    // liskov-rs `google_auth/native_session.rs`: `{ kind: "native", email, via?, sub? }`.
+    const identities = [
+      { kind: "native", email: "ada@example.com" },
+      { kind: "native", email: "ada@example.com", via: "google", sub: "google-sub-1" }
+    ];
+    for (const identity of identities) {
+      const out = writer();
+      assert.equal(await runSlipwayWhoami({ config: sessionFile }, {
+        fetchImpl: async () => jsonResponse({
+          ok: true,
+          session: { sessionId: "session-native", identity }
+        }),
+        stdout: out.write
+      }), 0);
+      assert.match(out.text, /^Logged in to https:\/\/slipway\.test as ada@example\.com\./u);
+      assert.equal(out.text.includes(token), false);
+    }
+
+    const noEmail = writer();
+    assert.equal(await runSlipwayWhoami({ config: sessionFile }, {
+      fetchImpl: async () => jsonResponse({
+        ok: true,
+        session: { sessionId: "session-native", identity: { kind: "native", email: " " } }
+      }),
+      stdout: noEmail.write
+    }), 0);
+    assert.match(noEmail.text, /as session-native\./u);
+  });
+
   it("shows effective and persistent organizations under a whoami override", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
@@ -1882,7 +1921,7 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.error, "SLIPWAY_SET_REPOSITORY_INVALID");
   });
 
-  it("surfaces a new-repository access denial as a non-zero exit", async () => {
+  it("words a capability refusal as a missing Liskov role on the Application", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");
     const token = "slipway_repo_denied_token_do_not_print";
@@ -1892,29 +1931,152 @@ describe("proof-cli Liskov runner", () => {
       sessionToken: token,
       savedAtMs: 0
     }, { config: sessionFile });
-
-    const out = writer();
-    const code = await runSlipwayApplicationSetRepository({
+    // liskov-rs `AccessDecision::public_denied` after the role-only switch (ADR-0164 §1).
+    const refusal = {
+      ok: false,
+      error: "forbidden",
+      reasonCode: "capability_not_granted",
+      reason: "Session is not allowed to perform policy.publish",
+      capability: "policy.publish",
+      repository: "proof-computer/liskov-diagnostic"
+    };
+    const input = {
       applicationRef: "slipway-diagnostic",
       repository: "proof-computer/liskov-diagnostic",
       yes: true,
-      config: sessionFile,
-      json: true
-    }, {
+      config: sessionFile
+    };
+
+    const out = writer();
+    assert.equal(await runSlipwayApplicationSetRepository({ ...input, json: true }, {
+      fetchImpl: async () => jsonResponse(refusal, 403),
+      stdout: out.write
+    }), 1);
+    assert.equal(out.text.includes(token), false);
+    const parsed = JSON.parse(out.text) as Record<string, unknown>;
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.error, "SLIPWAY_ACCESS_DENIED");
+    assert.equal(parsed.status, 403);
+    assert.equal(parsed.reasonCode, "capability_not_granted");
+    assert.equal(parsed.capability, "policy.publish");
+    assert.equal(parsed.applicationRef, "slipway-diagnostic");
+
+    const human = writer();
+    assert.equal(await runSlipwayApplicationSetRepository(input, {
+      fetchImpl: async () => jsonResponse(refusal, 403),
+      stdout: human.write
+    }), 1);
+    assert.match(human.text, /^Error \(SLIPWAY_ACCESS_DENIED\): /u);
+    assert.match(human.text, /do not grant policy\.publish on Application slipway-diagnostic/u);
+    assert.match(human.text, /Ask an organization admin for a role on slipway-diagnostic/u);
+    assert.doesNotMatch(human.text, /GitHub/u);
+    assert.equal(human.text.includes(token), false);
+  });
+
+  it("names the capability without an Application when the route addresses none", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "slipway_list_denied_token_do_not_print",
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const out = writer();
+    assert.equal(await runSlipwayApplicationList({ config: sessionFile }, {
       fetchImpl: async () => jsonResponse({
         ok: false,
         error: "forbidden",
-        reasonCode: "github_repository_access_denied",
-        reason: "GitHub session does not include the requested repository"
+        reasonCode: "capability_not_granted",
+        capability: "application.read"
       }, 403),
       stdout: out.write
-    });
+    }), 1);
+    assert.match(out.text, /^Error \(SLIPWAY_ACCESS_DENIED\): your Liskov roles do not grant application\.read\. Ask an organization admin for a role that grants it\./u);
 
-    assert.equal(code, 1);
-    assert.equal(out.text.includes(token), false);
-    const parsed = JSON.parse(out.text) as { ok: boolean; error: string };
-    assert.equal(parsed.ok, false);
-    assert.equal(parsed.error, "SLIPWAY_REPOSITORY_ACCESS_DENIED");
+    // A collection under /api/applications/ is not an Application.
+    const backfill = writer();
+    assert.equal(await runSlipwayApplicationBackfillIdentities({ config: sessionFile, yes: true, json: true }, {
+      fetchImpl: async () => jsonResponse({
+        ok: false,
+        error: "forbidden",
+        reasonCode: "capability_not_granted",
+        capability: "application.write"
+      }, 403),
+      stdout: backfill.write
+    }), 1);
+    const parsed = JSON.parse(backfill.text) as Record<string, unknown>;
+    assert.equal(parsed.error, "SLIPWAY_ACCESS_DENIED");
+    assert.equal(parsed.capability, "application.write");
+    assert.equal("applicationRef" in parsed, false);
+  });
+
+  it("words a repository-bound precondition as the missing repository", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "slipway_repo_required_token_do_not_print",
+      savedAtMs: 0
+    }, { config: sessionFile });
+    // liskov-rs `application_repository_required_response` (ADR-0164 §1).
+    const precondition = {
+      ok: false,
+      error: "application_repository_required",
+      reason: "This operation needs the application's source repository, and the application has none"
+    };
+    const input = {
+      applicationRef: "repo-less",
+      repository: "proof-computer/liskov-diagnostic",
+      yes: true,
+      config: sessionFile
+    };
+    const out = writer();
+    assert.equal(await runSlipwayApplicationSetRepository({ ...input, json: true }, {
+      fetchImpl: async () => jsonResponse(precondition, 409),
+      stdout: out.write
+    }), 1);
+    const parsed = JSON.parse(out.text) as Record<string, unknown>;
+    assert.equal(parsed.error, "SLIPWAY_APPLICATION_SOURCE_BINDING_REPOSITORY_REQUIRED");
+    assert.equal(parsed.status, 409);
+    assert.equal(parsed.applicationRef, "repo-less");
+
+    const human = writer();
+    assert.equal(await runSlipwayApplicationSetRepository(input, {
+      fetchImpl: async () => jsonResponse(precondition, 409),
+      stdout: human.write
+    }), 1);
+    assert.match(
+      human.text,
+      /^Error \(SLIPWAY_APPLICATION_SOURCE_BINDING_REPOSITORY_REQUIRED\): create the Application with --repository first\./u
+    );
+  });
+
+  it("no longer special-cases the retired GitHub repository refusal codes", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: "slipway_retired_codes_token_do_not_print",
+      savedAtMs: 0
+    }, { config: sessionFile });
+    for (const reasonCode of ["github_repository_access_denied", "github_repository_required"]) {
+      const out = writer();
+      assert.equal(await runSlipwayApplicationSetRepository({
+        applicationRef: "slipway-diagnostic",
+        repository: "proof-computer/liskov-diagnostic",
+        yes: true,
+        config: sessionFile,
+        json: true
+      }, {
+        fetchImpl: async () => jsonResponse({ ok: false, error: "forbidden", reasonCode }, 403),
+        stdout: out.write
+      }), 1);
+      const parsed = JSON.parse(out.text) as { error: string };
+      assert.equal(parsed.error, "SLIPWAY_APPLICATION_SET_REPOSITORY_FAILED", reasonCode);
+    }
   });
 
   it("creates an Application from identity alone without printing the bearer token", async () => {

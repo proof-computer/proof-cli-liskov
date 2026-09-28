@@ -75,7 +75,7 @@ function censusPage(nextCursor: string | null = null): unknown {
           applicationName: "estate-e",
           displayName: "estate-e",
           lifecycle: "active",
-          coverage: { available: false, reason: "github_repository_required" }
+          coverage: { available: false, reason: "application_repository_required" }
         }
       ],
       nextCursor,
@@ -123,7 +123,7 @@ describe("application retirement census CLI", () => {
     assert.match(out.text, /Causes: automatic_financial_closeout 1\./u);
     assert.match(out.text, /\(3 fact\(s\) in 1 obligation\(s\)\)/u);
     // A coverage failure is reported as its own fact, never as a clean gate.
-    assert.match(out.text, /coverage unavailable \(github_repository_required\)/u);
+    assert.match(out.text, /coverage unavailable \(application_repository_required\)/u);
     assert.match(out.text, /unchanged 2d/u);
     assert.match(out.text, /No further pages\./u);
     // The bearer token never reaches output.
