@@ -380,17 +380,16 @@ describe("application retirement CLI", () => {
     assert.match(receipt.text, /Legacy post-deletion cleanup remains open/u);
   });
 
-  it("explains a repository-less 403 with the exact re-import command", async () => {
+  it("words a refused retirement read as a missing role on the Application", async () => {
     const session = await sessionFile();
+    // After the role-only switch (ADR-0164 §1) a repository-less application is
+    // authorized like any other, so a 403 is only ever a missing capability.
     const response = {
       ok: false,
       error: "forbidden",
-      reasonCode: "github_repository_required",
-      reason: "GitHub authorization requires a repository-backed Application",
-      capability: "application.read",
-      repositoryBinding: "missingByDrift",
-      lastKnownRepository: "owner/stranded",
-      nextAction: "reimport_source"
+      reasonCode: "capability_not_granted",
+      reason: "Session is not allowed to perform application.read",
+      capability: "application.read"
     };
     const human = writer();
     const humanCode = await runSlipwayApplicationRetirement({
@@ -401,12 +400,10 @@ describe("application retirement CLI", () => {
       stdout: human.write
     });
     assert.equal(humanCode, 1);
-    assert.match(human.text, /github_repository_required|forbidden/u);
-    assert.match(human.text, /import drift/u);
-    assert.match(
-      human.text,
-      /proof liskov application import --github owner\/stranded --server-fetch/u
-    );
+    assert.match(human.text, /^Error \(SLIPWAY_ACCESS_DENIED\): /u);
+    assert.match(human.text, /do not grant application\.read on Application app-uid-repo-less/u);
+    assert.match(human.text, /Ask an organization admin for a role on app-uid-repo-less/u);
+    assert.doesNotMatch(human.text, /GitHub|import --github/u);
 
     const jsonOut = writer();
     const jsonCode = await runSlipwayApplicationRetirement({
@@ -418,7 +415,11 @@ describe("application retirement CLI", () => {
       stdout: jsonOut.write
     });
     assert.equal(jsonCode, 1);
-    assert.deepEqual(JSON.parse(jsonOut.text), response);
+    const parsed = JSON.parse(jsonOut.text) as Record<string, unknown>;
+    assert.equal(parsed.error, "SLIPWAY_ACCESS_DENIED");
+    assert.equal(parsed.reasonCode, "capability_not_granted");
+    assert.equal(parsed.capability, "application.read");
+    assert.equal(parsed.applicationRef, "app-uid-repo-less");
   });
 
   it("prints the binding and repair on an admitted repository-less preview", async () => {

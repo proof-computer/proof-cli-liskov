@@ -254,7 +254,7 @@ describe("application source-binding", () => {
     assert.equal(JSON.parse(out.text).error, "SLIPWAY_APPLICATION_SOURCE_BINDING_REVOKE_INVALID");
   });
 
-  it("wording maps admin, repository, revision-conflict, and revoked refusals", async () => {
+  it("wording maps admin, capability, repository, revision-conflict, and revoked refusals", async () => {
     const sessionFile = await sessionPath();
     const out = writer();
     const cases: Array<{ body: unknown; status: number; error: string; human: RegExp }> = [
@@ -283,13 +283,23 @@ describe("application source-binding", () => {
       {
         body: {
           ok: false,
-          error: "forbidden",
-          reasonCode: "github_repository_required",
-          capability: "application.source_binding.manage"
+          error: "application_repository_required",
+          reason: "This operation needs the application's source repository, and the application has none"
         },
-        status: 403,
+        status: 409,
         error: "SLIPWAY_APPLICATION_SOURCE_BINDING_REPOSITORY_REQUIRED",
         human: /create the Application with --repository first/
+      },
+      {
+        body: {
+          ok: false,
+          error: "forbidden",
+          reasonCode: "capability_not_granted",
+          capability: "application.read"
+        },
+        status: 403,
+        error: "SLIPWAY_ACCESS_DENIED",
+        human: /do not grant application\.read on Application proof-docs\. Ask an organization admin for a role on proof-docs that grants it/
       },
       {
         body: { ok: false, error: "source_binding_revision_conflict" },
