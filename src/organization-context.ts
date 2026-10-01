@@ -7,6 +7,8 @@ import { cliAnalyticsHeaders } from "./analytics-context.js";
 export const LISKOV_ORGANIZATION_ENV = "LISKOV_ORGANIZATION";
 export const LISKOV_URL_ENV = "LISKOV_URL";
 export const LISKOV_SESSION_TOKEN_ENV = "LISKOV_SESSION_TOKEN";
+export const LISKOV_SESSION_FILE_ENV = "LISKOV_SESSION_FILE";
+export const LISKOV_ADMIN_SERVICE_TOKEN_ENV = "LISKOV_ADMIN_SERVICE_TOKEN";
 export const MAX_ORGANIZATION_SELECTOR_BYTES = 255;
 
 /** Preferred Liskov service URL flag. `--slipway-url` remains a compatibility alias. */

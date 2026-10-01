@@ -33,6 +33,8 @@ import {
 } from "./organization-output.js";
 import {
   canonicalOrganizationId,
+  LISKOV_ADMIN_SERVICE_TOKEN_ENV,
+  LISKOV_SESSION_FILE_ENV,
   organizationRequestHeaders,
   organizationSelector,
   OrganizationSelectorError
@@ -6399,7 +6401,7 @@ export async function saveSlipwaySession(
 
 export function resolveSlipwaySessionFile(input: { config?: string; env?: NodeJS.ProcessEnv } = {}): string {
   const env = input.env ?? process.env;
-  const explicit = input.config ?? env.PROOF_SLIPWAY_SESSION_FILE;
+  const explicit = input.config ?? env[LISKOV_SESSION_FILE_ENV];
   if (explicit) return path.resolve(explicit);
   const configHome = env.XDG_CONFIG_HOME ? path.resolve(env.XDG_CONFIG_HOME) : path.join(homedir(), ".config");
   return path.join(configHome, "proof", "liskov", "session.json");
@@ -6407,13 +6409,13 @@ export function resolveSlipwaySessionFile(input: { config?: string; env?: NodeJS
 
 /**
  * Resolve the bearer token for an admin (`/api/admin/*`) request: an explicit
- * `--admin-token` flag, else `PROOF_SLIPWAY_ADMIN_SERVICE_TOKEN`, else `undefined`
+ * `--admin-token` flag, else `LISKOV_ADMIN_SERVICE_TOKEN`, else `undefined`
  * so the caller falls back to the saved session token (a platform-admin GitHub
  * session also satisfies the backend admin gate).
  */
 export function resolveAdminToken(input: { token?: string; env?: NodeJS.ProcessEnv } = {}): string | undefined {
   const env = input.env ?? process.env;
-  const token = input.token ?? env.PROOF_SLIPWAY_ADMIN_SERVICE_TOKEN;
+  const token = input.token ?? env[LISKOV_ADMIN_SERVICE_TOKEN_ENV];
   return token && token.length > 0 ? token : undefined;
 }
 

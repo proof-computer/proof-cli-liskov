@@ -13,7 +13,7 @@ export default class SlipwayAdminExecutorOperationRecoverDeploySubmit extends An
     "<%= config.bin %> liskov admin executor-operation recover-deploy-submit op-123 [same exact guards] --reason \"adopt exact finalized deploy receipt\" --yes --json"
   ];
   static flags: Interfaces.FlagInput = {
-    "admin-token": Flags.string({ description: "Admin service token (else PROOF_SLIPWAY_ADMIN_SERVICE_TOKEN, else session token)." }),
+    "admin-token": Flags.string({ description: "Admin service token (else LISKOV_ADMIN_SERVICE_TOKEN, else session token)." }),
     config: Flags.string({ description: "Path to the local Liskov session file." }),
     "expect-organization": Flags.string({ description: "Required expected organization id.", required: true }),
     "expect-application": Flags.string({ description: "Required expected Application slug/id.", required: true }),

@@ -13,7 +13,7 @@ export default class SlipwayAdminRetirementHistoricalCloseout extends AnalyticsC
     "<%= config.bin %> liskov admin retirement historical-closeout app-uid [same exact guards] --confirm --fingerprint sha256:... --json"
   ];
   static flags: Interfaces.FlagInput = {
-    "admin-token": Flags.string({ description: "Admin service token (else PROOF_SLIPWAY_ADMIN_SERVICE_TOKEN, else session token)." }),
+    "admin-token": Flags.string({ description: "Admin service token (else LISKOV_ADMIN_SERVICE_TOKEN, else session token)." }),
     "actor-id": Flags.string({ required: true, description: "Required operator actor id recorded on the closeout." }),
     "actor-kind": Flags.string({
       default: "platform_admin",

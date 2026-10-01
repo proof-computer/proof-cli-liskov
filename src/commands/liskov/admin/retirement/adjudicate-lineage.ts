@@ -13,7 +13,7 @@ export default class SlipwayAdminRetirementAdjudicateLineage extends AnalyticsCo
     "<%= config.bin %> liskov admin retirement adjudicate-lineage app-uid --operation op-1 [same exact guards] --confirm --fingerprint sha256:... --json"
   ];
   static flags: Interfaces.FlagInput = {
-    "admin-token": Flags.string({ description: "Admin service token (else PROOF_SLIPWAY_ADMIN_SERVICE_TOKEN, else session token)." }),
+    "admin-token": Flags.string({ description: "Admin service token (else LISKOV_ADMIN_SERVICE_TOKEN, else session token)." }),
     "actor-id": Flags.string({ required: true, description: "Required operator actor id recorded on the resolution." }),
     "actor-kind": Flags.string({
       default: "platform_admin",

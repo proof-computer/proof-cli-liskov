@@ -12,7 +12,7 @@ export default class SlipwayAdminDeploySpendResolve extends AnalyticsCommand {
     "<%= config.bin %> liskov admin deploy-spend resolve deploy-reserve:abc --expect-organization org-1 --expect-application app-1 --expect-deployment dep-1 --expect-execution exec-1 --expect-billing-transaction deploy-spend:abc --expect-status review_required --final-usd-micros 25000 --evidence-ref case:123 --evidence-sha256 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --reason \"manual adjudication\" --json"
   ];
   static flags: Interfaces.FlagInput = {
-    "admin-token": Flags.string({ description: "Admin service token (else PROOF_SLIPWAY_ADMIN_SERVICE_TOKEN, else session token)." }),
+    "admin-token": Flags.string({ description: "Admin service token (else LISKOV_ADMIN_SERVICE_TOKEN, else session token)." }),
     config: Flags.string({ description: "Path to the local Liskov session file." }),
     "expect-organization": Flags.string({ required: true, description: "Required expected organization id." }),
     "expect-application": Flags.string({ required: true, description: "Required expected application id." }),

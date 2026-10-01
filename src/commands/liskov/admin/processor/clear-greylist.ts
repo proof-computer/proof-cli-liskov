@@ -13,7 +13,7 @@ export default class SlipwayAdminProcessorClearGreylist extends AnalyticsCommand
     "<%= config.bin %> liskov admin processor clear-greylist 0xabc --reason recovered --yes --json"
   ];
   static flags: Interfaces.FlagInput = {
-    "admin-token": Flags.string({ description: "Admin service token (else PROOF_SLIPWAY_ADMIN_SERVICE_TOKEN, else session token)." }),
+    "admin-token": Flags.string({ description: "Admin service token (else LISKOV_ADMIN_SERVICE_TOKEN, else session token)." }),
     config: Flags.string({ description: "Path to the local Liskov session file." }),
     help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Emit machine-readable JSON." }),
