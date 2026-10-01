@@ -787,6 +787,13 @@ export interface SlipwayCustodySignerStatusInput {
   json?: boolean;
 }
 
+export interface SlipwayPlacementManagerFleetInput {
+  managerId: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayCustodyEnvironmentUploadInput {
   applicationRef: string;
   secretsFile: string;
@@ -1028,6 +1035,24 @@ interface SlipwayCustodySignerStatusResponse {
   organizationId?: string;
   applicationId?: string;
   selfCustodySigner?: PublicSelfCustodySigner;
+  error?: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+/** `manager_fleet_readback_v1` (`liskov-rs` `manager_fleet.rs`): every nullable field is an explicit `null`. */
+interface SlipwayPlacementManagerFleetResponse {
+  ok?: boolean;
+  schema?: string;
+  generatedAtMs?: number;
+  managerId?: string;
+  available?: boolean;
+  unavailableReason?: string | null;
+  projectionVersion?: number | null;
+  eligibleMembers?: number | null;
+  placeableMembers?: number | null;
+  oldestManagerBasisMs?: number | null;
+  newestManagerBasisMs?: number | null;
   error?: string;
   reason?: string;
   [key: string]: unknown;
@@ -5680,6 +5705,81 @@ export async function runSlipwayCustodySignerStatus(input: SlipwayCustodySignerS
     formatSelfCustodySignerStatus(applicationId, signer)
   );
   return 0;
+}
+
+/** The server's own rule for a manager id (`manager_fleet_ports.rs`): 1–39 ASCII digits. */
+const PLACEMENT_MANAGER_ID = /^[0-9]{1,39}$/u;
+
+/**
+ * `GET /api/placement/managers/:managerId/fleet` counts the eligible processors
+ * the served placement projection knows under one manager and how many a
+ * filtered placement reaches now. It never lists a processor. `--json` prints
+ * the server's body unchanged.
+ */
+export async function runSlipwayPlacementManagerFleet(input: SlipwayPlacementManagerFleetInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!PLACEMENT_MANAGER_ID.test(input.managerId)) {
+    const error = "SLIPWAY_PLACEMENT_MANAGER_ID_REQUIRED";
+    const message = "A manager fleet read needs the processor manager id as 1 to 39 digits, as it appears on chain and in `deployment.placement` rules.";
+    writeStructuredOrHuman(options, input.json, { ok: false, error, message }, `Error (${error}): ${message}`);
+    return 1;
+  }
+  const request = await authenticatedSlipwayRequest<SlipwayPlacementManagerFleetResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/placement/managers/${encodeURIComponent(input.managerId)}/fleet`,
+    requestErrorCode: "SLIPWAY_PLACEMENT_MANAGER_FLEET_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read the manager's fleet"
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const body = request.body;
+  if (!request.response.ok || body?.ok !== true) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_PLACEMENT_MANAGER_FLEET_FAILED";
+    const reason = stringValue(body?.error) ?? stringValue(body?.reason);
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      reason,
+      managerId: input.managerId,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, `Error (${error}): Liskov could not read the fleet of manager ${input.managerId}${reason === undefined ? "" : ` (${reason})`}.`);
+    return 1;
+  }
+
+  writeStructuredOrHuman(options, input.json, body, formatPlacementManagerFleet(input.managerId, body));
+  return 0;
+}
+
+/**
+ * Only served fields, never a derived number. A `null` count is `-`, and an
+ * unavailable projection says so: neither is ever printed as `0`.
+ */
+function formatPlacementManagerFleet(requestedManagerId: string, body: SlipwayPlacementManagerFleetResponse): string {
+  const managerId = stringValue(body.managerId) ?? requestedManagerId;
+  const count = (value: unknown): string => String(numberValue(value) ?? "-");
+  const projection = `projection ${count(body.projectionVersion)}`;
+  if (body.available !== true) {
+    return [
+      `Manager ${managerId}: fleet size unavailable (${stringValue(body.unavailableReason) ?? "-"}).`,
+      "No served placement projection could answer, so the size of this manager's fleet is not known."
+    ].join("\n");
+  }
+  if (numberValue(body.eligibleMembers) === 0) {
+    return [
+      `Manager ${managerId}: no eligible processors in the served projection (${projection}).`,
+      "A placement rule naming only this manager reaches nobody."
+    ].join("\n");
+  }
+  const oldest = isoFromEpochMs(body.oldestManagerBasisMs);
+  const newest = isoFromEpochMs(body.newestManagerBasisMs);
+  return [
+    `Manager ${managerId}: ${count(body.placeableMembers)} of ${count(body.eligibleMembers)} eligible processors are placeable now (${projection}).`,
+    oldest === undefined && newest === undefined ? undefined : `Manager evidence from ${oldest ?? "-"} to ${newest ?? "-"}.`
+  ].filter((line) => line !== undefined).join("\n");
 }
 
 export async function runSlipwayCustodyEnvironmentUpload(input: SlipwayCustodyEnvironmentUploadInput, options: SlipwayCliOptions = {}): Promise<number> {

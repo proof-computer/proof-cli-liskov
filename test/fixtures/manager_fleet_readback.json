@@ -1,0 +1,41 @@
+{
+  "placeable": {
+    "ok": true,
+    "schema": "manager_fleet_readback_v1",
+    "generatedAtMs": 1754000000000,
+    "managerId": "9470",
+    "available": true,
+    "unavailableReason": null,
+    "projectionVersion": 12,
+    "eligibleMembers": 4,
+    "placeableMembers": 3,
+    "oldestManagerBasisMs": 1753999000000,
+    "newestManagerBasisMs": 1753999900000
+  },
+  "emptyFleet": {
+    "ok": true,
+    "schema": "manager_fleet_readback_v1",
+    "generatedAtMs": 1754000000000,
+    "managerId": "9470",
+    "available": true,
+    "unavailableReason": null,
+    "projectionVersion": 12,
+    "eligibleMembers": 0,
+    "placeableMembers": 0,
+    "oldestManagerBasisMs": null,
+    "newestManagerBasisMs": null
+  },
+  "unavailable": {
+    "ok": true,
+    "schema": "manager_fleet_readback_v1",
+    "generatedAtMs": 1754000000000,
+    "managerId": "9470",
+    "available": false,
+    "unavailableReason": "placement_projection_unavailable",
+    "projectionVersion": null,
+    "eligibleMembers": null,
+    "placeableMembers": null,
+    "oldestManagerBasisMs": null,
+    "newestManagerBasisMs": null
+  }
+}
