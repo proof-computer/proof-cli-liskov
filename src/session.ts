@@ -787,6 +787,13 @@ export interface SlipwayCustodySignerStatusInput {
   json?: boolean;
 }
 
+export interface SlipwayApplicationSignerInput {
+  applicationRef: string;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
 export interface SlipwayPlacementManagerFleetInput {
   managerId: string;
   slipwayUrl?: string;
@@ -1035,6 +1042,24 @@ interface SlipwayCustodySignerStatusResponse {
   organizationId?: string;
   applicationId?: string;
   selfCustodySigner?: PublicSelfCustodySigner;
+  error?: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * `application_custody_signer_v1` (`liskov-rs` `application_custody_signer.rs`):
+ * every nullable field is an explicit `null`. `executedFunding` is the absence
+ * envelope while customer-funded execution is unbuilt; it is never a figure.
+ */
+interface SlipwayApplicationSignerResponse {
+  ok?: boolean;
+  schema?: string;
+  applicationId?: string;
+  activePolicyDigest?: string | null;
+  generatedAtMs?: number;
+  signerReadback?: Record<string, unknown>;
+  executedFunding?: { available?: boolean; unavailableReason?: string; [key: string]: unknown };
   error?: string;
   reason?: string;
   [key: string]: unknown;
@@ -5705,6 +5730,123 @@ export async function runSlipwayCustodySignerStatus(input: SlipwayCustodySignerS
     formatSelfCustodySignerStatus(applicationId, signer)
   );
   return 0;
+}
+
+/**
+ * `GET /api/applications/:ref/custody/signer` reads the application's own
+ * self-custody signer standing, open sign requests and executed funding as the
+ * server observed them. `--json` prints the server's body unchanged. This is the
+ * customer's read; the operator's `/custody` block is `custody signer status`.
+ */
+export async function runSlipwayApplicationSigner(input: SlipwayApplicationSignerInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const request = await authenticatedSlipwayRequest<SlipwayApplicationSignerResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/custody/signer`,
+    requestErrorCode: "SLIPWAY_APPLICATION_SIGNER_FAILED",
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read the application's self-custody signer"
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const body = request.body;
+  const readback = body?.signerReadback;
+  const readbackIsObject = readback !== null && typeof readback === "object" && !Array.isArray(readback);
+  if (!request.response.ok || body?.ok !== true || !readbackIsObject) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_SIGNER_FAILED";
+    const missingReadback = request.response.ok && body?.ok === true && !readbackIsObject;
+    const reason = missingReadback ? "signer_readback_missing" : stringValue(body?.error) ?? stringValue(body?.reason);
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: request.response.status,
+      reason,
+      applicationRef: input.applicationRef,
+      slipwayUrl: request.slipwayUrl,
+      sessionFile: request.sessionFile
+    }, `Error (${error}): Liskov could not read the self-custody signer for ${input.applicationRef}${reason === undefined ? "" : ` (${reason})`}.`);
+    return 1;
+  }
+
+  writeStructuredOrHuman(options, input.json, body, formatApplicationSigner(input.applicationRef, body));
+  return 0;
+}
+
+/**
+ * Only served fields. Liveness is the served `online`, never `connected` or a
+ * heartbeat age; every served count prints, `0` included; and executed funding
+ * is never a figure or a unit — declared caps are the `/policy` read's.
+ */
+function formatApplicationSigner(requestedApplicationRef: string, body: SlipwayApplicationSignerResponse): string {
+  const readback = objectRecord(body.signerReadback);
+  const signers = arrayValue(readback.signers).map(objectRecord);
+  const requests = arrayValue(readback.openRequests).map(objectRecord);
+  const counts = objectRecord(readback.counts);
+  const lag = objectRecord(readback.dispatchLag);
+  const funding = objectRecord(body.executedFunding);
+  const value = (served: unknown): string => String(numberValue(served) ?? "-");
+  const ms = (served: unknown): string => numberValue(served) === undefined ? "-" : `${value(served)} ms`;
+  const truncated = "(list truncated; counts below are complete)";
+  const lastSuccess = numberValue(lag.lastSuccessAgeMs) === undefined ? "-" : `${ms(lag.lastSuccessAgeMs)} ago`;
+  return [
+    `Self-custody signer for ${stringValue(body.applicationId) ?? requestedApplicationRef}`,
+    `Policy: ${stringValue(body.activePolicyDigest) ?? "none"}`,
+    `Standing: ${applicationSignerStanding(signers, counts, lag, readback.stallAfterMs)}`,
+    ...(signers.length === 0
+      ? ["No signer is paired to this application."]
+      : ["Signers:", ...signers.map((signer) => [
+          stringValue(signer.signerAddress) ?? "-",
+          signer.online === true ? "online" : "offline",
+          signer.connected === true ? "connected" : "disconnected",
+          `heartbeat ${ms(signer.heartbeatAgeMs)}`,
+          `protocol ${value(signer.protocolVersion)}`
+        ].join("\t"))]),
+    readback.signersTruncated === true ? truncated : undefined,
+    ...(requests.length === 0
+      ? ["No open sign requests."]
+      : ["Open requests:", ...requests.map((request) => [
+          stringValue(request.operationId) ?? "-",
+          stringValue(request.status) ?? "-",
+          stringValue(request.signerAddress) ?? "-",
+          `sent ${request.sent === true ? "yes" : "no"}`,
+          `attempt ${value(request.attemptSeq)}`,
+          `deadline ${isoFromEpochMs(request.deadlineMs) ?? "-"}`
+        ].join("\t"))]),
+    readback.openRequestsTruncated === true ? truncated : undefined,
+    `Counts: bound ${value(counts.boundSigners)}, online ${value(counts.onlineSigners)}, open ${value(counts.openRequests)}, pending ${value(counts.pending)}, claimed ${value(counts.claimed)}, completed ${value(counts.completed)}, signed ${value(counts.signed)}, refused ${value(counts.refused)}, expired ${value(counts.expired)}, ambiguous ${value(counts.ambiguous)}`,
+    `Dispatch lag: oldest unclaimed ${ms(lag.oldestUnclaimedAgeMs)}, oldest claimed ${ms(lag.oldestClaimedAgeMs)}, last success ${lastSuccess}`,
+    `Last signature: ${isoFromEpochMs(readback.lastSuccessAtMs) ?? "none"}`,
+    funding.available === true
+      ? "Observed funding: reported by the server; this CLI does not render it yet."
+      : `Observed funding: not reported (${stringValue(funding.unavailableReason) ?? "-"}).`
+  ].filter((line) => line !== undefined).join("\n");
+}
+
+/** The first standing that applies, in the order the Console agreed (`driw`). */
+function applicationSignerStanding(
+  signers: Record<string, unknown>[],
+  counts: Record<string, unknown>,
+  lag: Record<string, unknown>,
+  stallAfterMs: unknown
+): string {
+  if (signers.length === 0) return "unpaired";
+  const offline = signers.find((signer) => signer.online !== true);
+  if (offline) {
+    return offline.connected === true
+      ? `offline (connected, heartbeat ${numberValue(offline.heartbeatAgeMs) ?? "-"} ms ago; online after ${numberValue(stallAfterMs) ?? "-"} ms of silence is not assumed)`
+      : "offline (disconnected)";
+  }
+  const oldProtocol = signers.find((signer) => {
+    const protocol = numberValue(signer.protocolVersion);
+    return protocol !== undefined && protocol < 2;
+  });
+  if (oldProtocol) return `signer protocol ${numberValue(oldProtocol.protocolVersion)} is below 2`;
+  const ambiguous = numberValue(counts.ambiguous) ?? 0;
+  if (ambiguous > 0) return `${ambiguous} sent request(s) with no legible outcome`;
+  const pending = numberValue(counts.pending) ?? 0;
+  if (pending > 0) return `${pending} request(s) waiting ${numberValue(lag.oldestUnclaimedAgeMs) ?? "-"} ms for a signer`;
+  return "online";
 }
 
 /** The server's own rule for a manager id (`manager_fleet_ports.rs`): 1–39 ASCII digits. */
