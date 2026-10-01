@@ -5066,7 +5066,7 @@ describe("proof-cli Liskov runner", () => {
     const token = "slipway_run_one_fallback_token_do_not_print";
     const secretValue = "run-one-secret-value-do-not-print";
     const bootstrapValue = "{\"v\":1,\"u\":\"https://slipway.test\",\"a\":\"alpha\",\"p\":\"policy-digest-1\",\"d\":\"777\"}";
-    await writeFile(secretsFile, `SECRET_VALUE=${secretValue}\nPROOF_SLIPWAY_BOOTSTRAP=${bootstrapValue}\n`, "utf8");
+    await writeFile(secretsFile, `SECRET_VALUE=${secretValue}\nLISKOV_BOOTSTRAP=${bootstrapValue}\n`, "utf8");
     await saveSlipwaySession({
       version: 1,
       slipwayUrl: "https://slipway.test",
@@ -5079,7 +5079,7 @@ describe("proof-cli Liskov runner", () => {
     const out = writer();
     const variables = [
       { name: "SECRET_VALUE", source: "secret", required: true },
-      { name: "PROOF_SLIPWAY_BOOTSTRAP", source: "switchboard", required: true }
+      { name: "LISKOV_BOOTSTRAP", source: "switchboard", required: true }
     ];
     const code = await runSlipwayCustodyExecutionRunOne({
       applicationRef: "alpha",
@@ -5098,7 +5098,7 @@ describe("proof-cli Liskov runner", () => {
         assert.equal(input.action.actionId, "set-env-1");
         assert.deepEqual(input.variables, [
           { key: "SECRET_VALUE", value: secretValue },
-          { key: "PROOF_SLIPWAY_BOOTSTRAP", value: bootstrapValue }
+          { key: "LISKOV_BOOTSTRAP", value: bootstrapValue }
         ]);
         return handoff;
       },

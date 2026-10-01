@@ -10,7 +10,7 @@ export default class SlipwayAdminProcessorList extends AnalyticsCommand {
     "<%= config.bin %> liskov admin processor list --greylisted"
   ];
   static flags: Interfaces.FlagInput = {
-    "admin-token": Flags.string({ description: "Admin service token (else PROOF_SLIPWAY_ADMIN_SERVICE_TOKEN, else session token)." }),
+    "admin-token": Flags.string({ description: "Admin service token (else LISKOV_ADMIN_SERVICE_TOKEN, else session token)." }),
     config: Flags.string({ description: "Path to the local Liskov session file." }),
     greylisted: Flags.boolean({ description: "Only return greylisted processors." }),
     help: Flags.help({ char: "h" }),

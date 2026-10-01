@@ -13,7 +13,7 @@ export default class SlipwayAdminExecutorOperationReconcile extends AnalyticsCom
     "<%= config.bin %> liskov admin executor-operation reconcile op-123 --expect-application slipway-diagnostic --expect-kind runtime_replacement --expect-deployment dep-123 --expect-job job-123 --expect-status pending --reason \"terminalize unsubmitted replacement\" --yes --json"
   ];
   static flags: Interfaces.FlagInput = {
-    "admin-token": Flags.string({ description: "Admin service token (else PROOF_SLIPWAY_ADMIN_SERVICE_TOKEN, else session token)." }),
+    "admin-token": Flags.string({ description: "Admin service token (else LISKOV_ADMIN_SERVICE_TOKEN, else session token)." }),
     config: Flags.string({ description: "Path to the local Liskov session file." }),
     "expect-application": Flags.string({ description: "Required expected Application id.", required: true }),
     "expect-deployment": Flags.string({ description: "Required expected canonical deployment id.", required: true }),
