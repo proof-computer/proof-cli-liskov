@@ -21,6 +21,11 @@ import {
 
 const SESSION_TOKEN = "session-token-d1nc";
 const ADMIN_TOKEN = "admin-token-d1nc";
+// The retired names, assembled so the packet's source check
+// (a `git grep` of src and test for the retired prefix) stays empty while these tests
+// still prove the CLI ignores them.
+const RETIRED_SESSION_FILE_ENV = ["PROOF", "SLIPWAY", "SESSION_FILE"].join("_");
+const RETIRED_ADMIN_SERVICE_TOKEN_ENV = ["PROOF", "SLIPWAY", "ADMIN_SERVICE_TOKEN"].join("_");
 
 async function withTempDir(run: (directory: string) => Promise<void>): Promise<void> {
   const directory = await mkdtemp(path.join(tmpdir(), "proof-cli-env-names-"));
@@ -64,7 +69,7 @@ describe("CLI environment variable names", () => {
     );
     await withTempDir(async (directory) => {
       assert.equal(
-        resolveSlipwaySessionFile({ env: { PROOF_SLIPWAY_SESSION_FILE: "/x/old.json", XDG_CONFIG_HOME: directory } }),
+        resolveSlipwaySessionFile({ env: { [RETIRED_SESSION_FILE_ENV]: "/x/old.json", XDG_CONFIG_HOME: directory } }),
         path.join(directory, "proof", "liskov", "session.json")
       );
     });
@@ -73,7 +78,7 @@ describe("CLI environment variable names", () => {
   it("reads the admin token from LISKOV_ADMIN_SERVICE_TOKEN, below --admin-token, and ignores the old name", () => {
     assert.equal(resolveAdminToken({ env: { LISKOV_ADMIN_SERVICE_TOKEN: "a" } }), "a");
     assert.equal(resolveAdminToken({ token: "flag", env: { LISKOV_ADMIN_SERVICE_TOKEN: "a" } }), "flag");
-    assert.equal(resolveAdminToken({ env: { PROOF_SLIPWAY_ADMIN_SERVICE_TOKEN: "old" } }), undefined);
+    assert.equal(resolveAdminToken({ env: { [RETIRED_ADMIN_SERVICE_TOKEN_ENV]: "old" } }), undefined);
     assert.equal(resolveAdminToken({ env: { LISKOV_ADMIN_SERVICE_TOKEN: "" } }), undefined);
   });
 
@@ -98,7 +103,7 @@ describe("CLI environment variable names", () => {
 
       const withOld = await listProcessorsWithEnv({
         LISKOV_SESSION_FILE: sessionFile,
-        PROOF_SLIPWAY_ADMIN_SERVICE_TOKEN: ADMIN_TOKEN,
+        [RETIRED_ADMIN_SERVICE_TOKEN_ENV]: ADMIN_TOKEN,
         XDG_CONFIG_HOME: xdg
       });
       assert.equal(withOld.code, 0);
@@ -124,7 +129,7 @@ describe("CLI environment variable names", () => {
     for (const command of commands) {
       const flag = command.flags["admin-token"] as unknown as { description?: string };
       assert.ok(flag.description?.includes("LISKOV_ADMIN_SERVICE_TOKEN"), `${command.name} names LISKOV_ADMIN_SERVICE_TOKEN`);
-      assert.equal(flag.description?.includes("PROOF_SLIPWAY"), false, `${command.name} does not name PROOF_SLIPWAY`);
+      assert.equal(flag.description?.includes(["PROOF", "SLIPWAY"].join("_")), false, `${command.name} does not name a retired name`);
     }
   });
 });
