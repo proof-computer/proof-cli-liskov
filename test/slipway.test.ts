@@ -2464,6 +2464,119 @@ describe("proof-cli Liskov runner", () => {
     }
   });
 
+  it("explains the over-cap job-slot refusal with its own sentence and three ways back, and keeps the generic arm for any other cap", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    try {
+      const token = "slipway_job_slots_secret_token_do_not_print";
+      const sessionFile = await applicationRunSession(directory, token);
+      // ADR-0197: the same refusal names the organization's job-slot pool, and
+      // `used` is the usage after the change the door refused.
+      const reason = "This organization's active applications would use 3 job slots and its plan allows 2.";
+      const doorBody = { ok: false, error: "organization_over_plan_caps", reason, feature: "organization_job_slots", used: 3, limit: 2 };
+      const runBody = applicationRunResponse({
+        ok: false,
+        settledGeneration: 1,
+        availableServiceCreditMicros: null,
+        refusal: { code: "organization_over_plan_caps", detail: reason, feature: "organization_job_slots", used: 3, limit: 2 }
+      });
+      const preflight = jsonResponse({ ok: true, publicationReady: true, authoredDigest: "a".repeat(64) });
+      const publishFetch = (body: unknown) => async (url: URL | RequestInfo) => String(url).endsWith("/publish/preflight")
+        ? preflight.clone()
+        : jsonResponse(body, 403);
+      const doors: Array<{ name: string; refused: RegExp; run: (json: boolean, out: (line: string) => void) => Promise<number> }> = [{
+        name: "publish",
+        refused: /Liskov did not publish Application proof-docs: /u,
+        run: (json, stdout) => runSlipwayApplicationPublish({ applicationRef: "proof-docs", yes: true, json, config: sessionFile }, { fetchImpl: publishFetch(doorBody), stdout })
+      }, {
+        name: "resume",
+        refused: /Liskov did not resume Application proof-docs: /u,
+        run: (json, stdout) => runSlipwayApplicationStatusTransition({ applicationRef: "proof-docs", status: "active", yes: true, json, config: sessionFile }, {
+          fetchImpl: async () => jsonResponse(doorBody, 403),
+          stdout
+        })
+      }, {
+        name: "run",
+        refused: /Liskov did not authorize a run of Application proof-docs: /u,
+        run: (json, stdout) => runSlipwayApplicationRun({ applicationRef: "proof-docs", yes: true, json, config: sessionFile }, {
+          fetchImpl: async () => jsonResponse(runBody),
+          stdout
+        })
+      }];
+
+      for (const door of doors) {
+        const human = writer();
+        assert.equal(await door.run(false, human.write), 1, door.name);
+        assert.match(human.text, /^Error \(organization_over_plan_caps\): /u, door.name);
+        assert.match(human.text, door.refused, door.name);
+        assert.match(human.text, /the organization's active applications would use 3 job slots and its plan allows 2 \(organization_job_slots\)\./u, door.name);
+        assert.match(human.text, /To start new work, free at least 1 job slot: publish a lower `deployment\.jobs`, pause or retire applications you do not need running, or add or restore payment for a plan that allows 3 or more\./u, door.name);
+        assert.match(human.text, /A paused application releases its job slots and keeps its application slot\. Work that is already running is not stopped\./u, door.name);
+        // Neither the application-slot sentence nor the generic arm.
+        assert.doesNotMatch(human.text, /application slots and its plan allows/u, door.name);
+        assert.doesNotMatch(human.text, /pausing frees none/u, door.name);
+        assert.doesNotMatch(human.text, /over its plan's/u, door.name);
+        assert.doesNotMatch(human.text, /disabled|(has been|was|were) stopped/iu, door.name);
+        assert.equal(human.text.includes(token), false, door.name);
+        assert.equal(human.text.includes(reason), false, door.name);
+        assert.equal(human.text.includes("{"), false, door.name);
+
+        const structured = writer();
+        assert.equal(await door.run(true, structured.write), 1, door.name);
+        assert.equal(structured.text.includes(token), false, door.name);
+        const parsed = JSON.parse(structured.text) as Record<string, unknown>;
+        assert.deepEqual(parsed, door.name === "run" ? runBody : doorBody, door.name);
+        const fields = (door.name === "run" ? parsed.refusal : parsed) as Record<string, unknown>;
+        assert.equal(fields.feature, "organization_job_slots", door.name);
+      }
+
+      // More than one slot over reads in the plural.
+      const plural = writer();
+      assert.equal(await runSlipwayApplicationPublish({ applicationRef: "proof-docs", yes: true, config: sessionFile }, {
+        fetchImpl: publishFetch({ ...doorBody, used: 5, limit: 2 }),
+        stdout: plural.write
+      }), 1);
+      assert.match(plural.text, /free at least 3 job slots: /u);
+      assert.match(plural.text, /a plan that allows 5 or more\./u);
+
+      // Counts that do not arrive typed are left out, never read from the prose.
+      const untyped = writer();
+      assert.equal(await runSlipwayApplicationStatusTransition({ applicationRef: "proof-docs", status: "active", yes: true, config: sessionFile }, {
+        fetchImpl: async () => jsonResponse({ ...doorBody, used: "3", limit: null }, 403),
+        stdout: untyped.write
+      }), 1);
+      assert.match(untyped.text, /would use more job slots than its plan allows \(organization_job_slots\)\./u);
+      assert.match(untyped.text, /To start new work, free job slots: publish a lower `deployment\.jobs`, pause or retire applications you do not need running, or add or restore payment for a plan that allows them\./u);
+      assert.match(untyped.text, /releases its job slots/u);
+      assert.doesNotMatch(untyped.text, /[23]/u);
+
+      // A count that is not over keeps the counts it was sent but never asks to free "at least 0".
+      const notOver = writer();
+      assert.equal(await runSlipwayApplicationStatusTransition({ applicationRef: "proof-docs", status: "active", yes: true, config: sessionFile }, {
+        fetchImpl: async () => jsonResponse({ ...doorBody, used: 2, limit: 2 }, 403),
+        stdout: notOver.write
+      }), 1);
+      assert.match(notOver.text, /would use 2 job slots and its plan allows 2 \(organization_job_slots\)\./u);
+      assert.match(notOver.text, /To start new work, free job slots: .* a plan that allows them\./u);
+      assert.doesNotMatch(notOver.text, /at least/u);
+
+      // Any other cap keeps the generic arm, unchanged.
+      const generic = writer();
+      assert.equal(await runSlipwayApplicationStatusTransition({ applicationRef: "proof-docs", status: "active", yes: true, config: sessionFile }, {
+        fetchImpl: async () => jsonResponse({ ...doorBody, feature: "secrets_per_app" }, 403),
+        stdout: generic.write
+      }), 1);
+      assert.equal(
+        generic.text.trimEnd(),
+        [
+          "Error (organization_over_plan_caps): Liskov did not resume Application proof-docs: the organization is over its plan's secrets_per_app cap (3 used, 2 allowed).",
+          "Bring usage within the cap, or add or restore payment for a plan that allows it. Work that is already running is not stopped."
+        ].join("\n")
+      );
+    } finally {
+      await rmdir(directory, { recursive: true });
+    }
+  });
+
   it("reads Application status with the stored session bearer without printing it", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");

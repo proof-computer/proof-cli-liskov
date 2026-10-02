@@ -8892,10 +8892,28 @@ function organizationOverPlanCaps(value: unknown, codeField: "error" | "code"): 
  * allows them. A paused application keeps its slot, so pausing is named only to
  * rule it out. Nothing here says an application stopped: only new starts are
  * refused.
+ *
+ * The job-slot pool (ADR-0197) has its own sentence and three ways back,
+ * because there pausing does release slots: a lower `deployment.jobs`, pausing
+ * or retiring, or a plan with a larger pool. Its `used` is the usage after the
+ * change the door refused.
  */
 function formatOrganizationOverPlanCaps(refused: string, over: OrganizationOverPlanCaps): string {
   const counted = over.used !== undefined && over.limit !== undefined;
   const feature = over.feature ?? "a plan cap";
+  if (over.feature === "organization_job_slots") {
+    const excess = counted ? over.used! - over.limit! : undefined;
+    const ways = "publish a lower `deployment.jobs`, pause or retire applications you do not need running, or add or restore payment for a plan that allows";
+    return [
+      counted
+        ? `Error (${ORGANIZATION_OVER_PLAN_CAPS}): ${refused}: the organization's active applications would use ${over.used} job slots and its plan allows ${over.limit} (organization_job_slots).`
+        : `Error (${ORGANIZATION_OVER_PLAN_CAPS}): ${refused}: the organization's active applications would use more job slots than its plan allows (organization_job_slots).`,
+      excess !== undefined && excess > 0
+        ? `To start new work, free at least ${excess} job ${excess === 1 ? "slot" : "slots"}: ${ways} ${over.used} or more.`
+        : `To start new work, free job slots: ${ways} them.`,
+      "A paused application releases its job slots and keeps its application slot. Work that is already running is not stopped."
+    ].join("\n");
+  }
   if (over.feature !== undefined && over.feature !== "max_applications") {
     return [
       `Error (${ORGANIZATION_OVER_PLAN_CAPS}): ${refused}: the organization is over its plan's ${feature} cap${counted ? ` (${over.used} used, ${over.limit} allowed)` : ""}.`,
