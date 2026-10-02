@@ -3,8 +3,8 @@
   "abiVersion": 1,
   "artifact": {
     "file": "policy-client-contract.wasm.gz",
-    "sha256": "sha256:51f85c3235a4fffa7b36be2199ea2ec184cd0a3c10fa8fc3e7ac3bf313b31b81",
-    "uncompressedSha256": "sha256:807f59f09aedb9cc1fb1c05c5b8c60c99d832d8fc2c5cae4063aa081cd34144d"
+    "sha256": "sha256:1f2a1f3683217ade5fa649135ea3f26cc1ecf4344e7e4c5d001d4854b2521296",
+    "uncompressedSha256": "sha256:c36fc0d36e6bd4bde59b4874a0c2312f2309f29e0c791665c56b1b33fd2b2830"
   },
   "adapter": {
     "file": "policy-client.cjs",
@@ -16,7 +16,7 @@
   },
   "conformance": {
     "file": "policy-client-conformance.json",
-    "sha256": "sha256:ccf0fcbaf359c9bc501ece10150ffa9c52059dbd8c2fdfc60839244bae8daa37"
+    "sha256": "sha256:1992061eb64eafeaaeaf62b86ff7383a22eb5f4d563a608e9efc905002018055"
   },
   "supportedPairs": [
     {
@@ -59,6 +59,6 @@
       "releaseMode": "source"
     }
   ],
-  "sourceDigest": "sha256:351c96ba49d4ffeb75ff4c18dbdcc61b4717bac4a8b0ac46317594cc01467e70",
+  "sourceDigest": "sha256:7242db5ceee5a75e15d26e40f94145f59364d2e08145d3b1e3fe3f55fe1f4322",
   "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)"
 }

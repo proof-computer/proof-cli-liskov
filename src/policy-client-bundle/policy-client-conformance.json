@@ -4989,6 +4989,105 @@
       }
     },
     {
+      "name": "v7/acurast-public-http",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## V7 dark fixture (BKLG-20260926-k7no). Not publishable: no production\n## generation lists the V7 pair.\n##\n## One JavaScript HTTP service published to the internet through the\n## processor's own Acurast Tunnel, deliberately open. The provider has no\n## authored field \u2014 its hostname is platform-derived and not stable across\n## jobs \u2014 and protection is stated, because a tunnel is not protection\n## (ADR-0071). JavaScript can publish only through `acurast_tunnel`: it needs\n## no supervised connector.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 7\n\napplicationId: webserver-static\n\nmetadata:\n  description: A static site served to anyone, through the processor's tunnel.\n  labels: [liskov, example, javascript, service, public]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\n\nexecution:\n  mode: continuous\n\ndeployment:\n  schedule:\n    duration: 6h\n  spend:\n    unit: service_credit_micros\n    perJob: \"1000000\"\n    rate:\n      amount: \"4000000\"\n      window: 1d\n\ningress:\n  http:\n    - name: http\n      localPort: 8080\n      endpoints:\n        - name: public\n          provider:\n            kind: acurast_tunnel\n          protection: public_unauthenticated\n\nstate:\n  mode: off\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 7
+        },
+        "authoredDigest": "c346a0e2076373036ff4154275241a43251f372aab3f5b50661f716d67af526e",
+        "releaseIntentDigest": "afefcbe40c2a7eff54654133b70dd0cd9eccf2a1d6cc1cdb7a06b777a0a94af2"
+      }
+    },
+    {
+      "name": "v7/materialize/acurast-public-http",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## V7 dark fixture (BKLG-20260926-k7no). Not publishable: no production\n## generation lists the V7 pair.\n##\n## One JavaScript HTTP service published to the internet through the\n## processor's own Acurast Tunnel, deliberately open. The provider has no\n## authored field \u2014 its hostname is platform-derived and not stable across\n## jobs \u2014 and protection is stated, because a tunnel is not protection\n## (ADR-0071). JavaScript can publish only through `acurast_tunnel`: it needs\n## no supervised connector.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 7\n\napplicationId: webserver-static\n\nmetadata:\n  description: A static site served to anyone, through the processor's tunnel.\n  labels: [liskov, example, javascript, service, public]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\n\nexecution:\n  mode: continuous\n\ndeployment:\n  schedule:\n    duration: 6h\n  spend:\n    unit: service_credit_micros\n    perJob: \"1000000\"\n    rate:\n      amount: \"4000000\"\n      window: 1d\n\ningress:\n  http:\n    - name: http\n      localPort: 8080\n      endpoints:\n        - name: public\n          provider:\n            kind: acurast_tunnel\n          protection: public_unauthenticated\n\nstate:\n  mode: off\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "ipfs_bundle",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/acurast-public-http",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 7
+        },
+        "authoredDigest": "c346a0e2076373036ff4154275241a43251f372aab3f5b50661f716d67af526e",
+        "releaseIntentDigest": "afefcbe40c2a7eff54654133b70dd0cd9eccf2a1d6cc1cdb7a06b777a0a94af2",
+        "policyDigest": "d353d56d0ec2de07b375121e6814b02944708abd1aa663e6904f6fc700574dbf"
+      }
+    },
+    {
+      "name": "v7/cloudflare-provider-gated",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## V7 dark fixture (BKLG-20260926-k7no). Not publishable: no production\n## generation lists the V7 pair.\n##\n## One native-image HTTP service published through the organization's\n## Cloudflare Tunnel at an authored hostname, behind a Cloudflare Access\n## application. `provider_gated` is Cloudflare-only, and the server verifies it\n## fail-closed before any effect (`6f4f`); until that verdict is bound it is the\n## author's claim and nothing publishes. The same document on `javascript` is\n## refused at the provider: the Cargo helper supervises `cloudflared`.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 7\n\napplicationId: webserver\n\nmetadata:\n  description: An internal dashboard behind Cloudflare Access.\n  labels: [liskov, example, cargo, service, public]\n\nintegrations:\n  cloudflare_tunnel: int_0123456789abcdef0123456789abcdef\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image:\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [/app/start.sh]\n\nexecution:\n  mode: continuous\n\ndeployment:\n  schedule:\n    duration: 6h\n  spend:\n    unit: service_credit_micros\n    perJob: \"3000000\"\n    rate:\n      amount: \"12000000\"\n      window: 1d\n\ningress:\n  http:\n    - name: http\n      localPort: 8080\n      health:\n        ready:\n          http: /healthz\n      endpoints:\n        - name: edge\n          provider:\n            kind: cloudflare_tunnel\n            hostname: dashboard.example.com\n          protection: provider_gated\n\nstate:\n  mode: off\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 7
+        },
+        "authoredDigest": "eea563d0e7369f872f960f8eb48a1a04148eb490b75de51c5df722fb969b2d45",
+        "releaseIntentDigest": "18acf3e7558a861153146b8cb9a718853194946ba1677f0132990c3a03d9d15c"
+      }
+    },
+    {
+      "name": "v7/private-and-public",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "## V7 dark fixture (BKLG-20260926-k7no). Not publishable: no production\n## generation lists the V7 pair.\n##\n## Every provider on one service: the private tailnet endpoint V6 already\n## authors, with its derived protection; an Acurast Tunnel endpoint behind an\n## auth sidecar (native image only); and a Cloudflare Tunnel endpoint whose\n## application checks its own callers, overriding the declared integration.\n## Several endpoints are simultaneous attachments, never a fallback chain.\n## Tailscale SSH shares the tailnet integration, as in V6.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 7\n\napplicationId: meilisearch\n\nmetadata:\n  description: A search engine on the tailnet, with a public read endpoint.\n  labels: [liskov, reference, cargo, service, public, private]\n\nintegrations:\n  tailscale: int_00000000000000000000000000000000\n  cloudflare_tunnel: int_11111111111111111111111111111111\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image:\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [/app/start.sh]\n\nexecution:\n  mode: continuous\n\ndeployment:\n  schedule:\n    duration: 6h\n  spend:\n    unit: service_credit_micros\n    perJob: \"3000000\"\n    rate:\n      amount: \"12000000\"\n      window: 1d\n\ningress:\n  http:\n    - name: search\n      localPort: 7700\n      health:\n        live:\n          http: /health\n      endpoints:\n        - name: private\n          provider:\n            kind: tailscale\n        - name: tunnel\n          provider:\n            kind: acurast_tunnel\n          protection: sidecar_gated\n        - name: edge\n          provider:\n            kind: cloudflare_tunnel\n            integrationId: int_22222222222222222222222222222222\n            hostname: search.example.com\n          protection: application_managed\n\naccess:\n  ssh:\n    provider:\n      kind: tailscale\n\nstate:\n  mode: off\n"
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 7
+        },
+        "authoredDigest": "93053fc2e5205e4dea81cef7239f4fab09b232933d3a3ab53aa4545c6c4bf2f1",
+        "releaseIntentDigest": "a17d8122bcfcd536b336803d0f3bc4675b0441973bd536dddc25edc65e2e3755"
+      }
+    },
+    {
       "name": "v4/golden",
       "request": {
         "schema": "proof.liskov.policy-client-request.v1",
@@ -5659,6 +5758,171 @@
       },
       "expectedCode": "invalid_manifest",
       "expectedPointer": "/runtime"
+    },
+    {
+      "name": "v7/invalid/acurast-hostname-is-platform-derived",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown field `hostname`\n# EXPECT-CODE: unknown_field\n# EXPECT-POINTER: /ingress/http/0/endpoints/0/provider/hostname\n# The Acurast host is derived per job and V7 promises no stable public URL\n# across jobs, so there is nothing for an author to name.\nschema: proof.liskov.application-manifest\nschemaVersion: 7\napplicationId: bad-acurast-hostname\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints:\n        - {name: public, provider: {kind: acurast_tunnel, hostname: webserver.acu.run}, protection: public_unauthenticated}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/ingress/http/0/endpoints/0/provider/hostname"
+    },
+    {
+      "name": "v7/invalid/acurast-suffix-is-not-authored",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown field `suffix`\n# EXPECT-CODE: unknown_field\n# EXPECT-POINTER: /ingress/http/0/endpoints/0/provider/suffix\n# No authored domain suffix: the shared certificate budget behind it is\n# `uh9f`'s, and it blocks the live driver, not the schema.\nschema: proof.liskov.application-manifest\nschemaVersion: 7\napplicationId: bad-acurast-suffix\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints:\n        - {name: public, provider: {kind: acurast_tunnel, suffix: acu.run}, protection: public_unauthenticated}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/ingress/http/0/endpoints/0/provider/suffix"
+    },
+    {
+      "name": "v7/invalid/acurast-tunnel-is-never-provider-gated",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: provider_gated is Cloudflare-only\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/api/public/protection\n# `provider_gated` means a provider gates every request, and only a Cloudflare\n# Access application the server can verify does that. The Acurast tunnel gates\n# nothing, so it takes application_managed, sidecar_gated or\n# public_unauthenticated (ADR-0071).\nschema: proof.liskov.application-manifest\nschemaVersion: 7\napplicationId: bad-acurast-provider-gated\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints:\n        - {name: public, provider: {kind: acurast_tunnel}, protection: provider_gated}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/api/public/protection"
+    },
+    {
+      "name": "v7/invalid/acurast-tunnel-is-not-an-integration",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown field `acurast_tunnel`\n# EXPECT-CODE: unknown_field\n# EXPECT-POINTER: /integrations/acurast_tunnel\n# Acurast Tunnel is the processor's, not an organization-owned integration.\nschema: proof.liskov.application-manifest\nschemaVersion: 7\napplicationId: bad-acurast-integration\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {acurast_tunnel: int_0123456789abcdef0123456789abcdef}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints:\n        - {name: public, provider: {kind: acurast_tunnel}, protection: public_unauthenticated}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/integrations/acurast_tunnel"
+    },
+    {
+      "name": "v7/invalid/client-access-is-refused",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown field `clientAccess`\n# EXPECT-CODE: unknown_field\n# EXPECT-POINTER: /ingress/http/0/endpoints/0/clientAccess\n# Client allow-lists belong to named-client TCP, a later V7 slice.\nschema: proof.liskov.application-manifest\nschemaVersion: 7\napplicationId: bad-client-access\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints:\n        - {name: public, provider: {kind: acurast_tunnel}, protection: application_managed, clientAccess: {allow: [laptop]}}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/ingress/http/0/endpoints/0/clientAccess"
+    },
+    {
+      "name": "v7/invalid/cloudflare-hostname-is-a-host-not-a-url",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: a hostname must be lowercase\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/http/0/endpoints/0/provider\n# The author names the host the Access application is resolved for, exactly\n# as the Cloudflare Access verdict reads it: lowercase, at most 253 bytes, and\n# neither a path nor a scheme.\nschema: proof.liskov.application-manifest\nschemaVersion: 7\napplicationId: bad-cloudflare-hostname\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {cloudflare_tunnel: int_0123456789abcdef0123456789abcdef}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints:\n        - {name: public, provider: {kind: cloudflare_tunnel, hostname: \"https://App.example.com/\"}, protection: provider_gated}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/http/0/endpoints/0/provider"
+    },
+    {
+      "name": "v7/invalid/cloudflare-tunnel-on-javascript",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: cloudflare_tunnel ingress is native_image only\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/api/public/provider\n# The Cargo helper supervises `cloudflared`, so a JavaScript runtime has no\n# connector to publish through Cloudflare Tunnel (ADR-0071). The same document\n# on `native_image` is `corpus/cloudflare-provider-gated.yaml`'s shape and valid.\nschema: proof.liskov.application-manifest\nschemaVersion: 7\napplicationId: bad-cloudflare-on-javascript\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {cloudflare_tunnel: int_0123456789abcdef0123456789abcdef}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints:\n        - {name: public, provider: {kind: cloudflare_tunnel, hostname: app.example.com}, protection: provider_gated}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/api/public/provider"
+    },
+    {
+      "name": "v7/invalid/cloudflare-without-an-integration",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: no `integrations.cloudflare_tunnel` is declared\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/api/public/provider\n# A Cloudflare Tunnel endpoint runs through an organization-owned integration.\n# Its `integrationId` may be omitted only when `integrations.cloudflare_tunnel`\n# declares one; otherwise nothing names the tunnel.\nschema: proof.liskov.application-manifest\nschemaVersion: 7\napplicationId: bad-cloudflare-no-integration\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints:\n        - {name: public, provider: {kind: cloudflare_tunnel, hostname: app.example.com}, protection: provider_gated}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/api/public/provider"
+    },
+    {
+      "name": "v7/invalid/ingress-tcp-is-refused",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown field `tcp`\n# EXPECT-CODE: unknown_field\n# EXPECT-POINTER: /ingress/tcp\n# The first public chain is HTTP. Anonymous public raw TCP stays declined\n# (ADR-0058), and named-client TCP is a later V7 slice, not this grammar.\nschema: proof.liskov.application-manifest\nschemaVersion: 7\napplicationId: bad-ingress-tcp\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\ningress:\n  tcp:\n    - name: wire\n      localPort: 9000\n      endpoints: [{name: public, provider: {kind: acurast_tunnel}, protection: public_unauthenticated}]\nstate: {mode: off}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/ingress/tcp"
+    },
+    {
+      "name": "v7/invalid/ingress-udp-is-refused",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown field `udp`\n# EXPECT-CODE: unknown_field\n# EXPECT-POINTER: /ingress/udp\n# Public UDP stays declined (ADR-0058); `cja0` is the evidence item for game\n# servers.\nschema: proof.liskov.application-manifest\nschemaVersion: 7\napplicationId: bad-ingress-udp\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\ningress:\n  udp:\n    - name: game\n      localPort: 27015\n      endpoints: [{name: public, provider: {kind: acurast_tunnel}, protection: public_unauthenticated}]\nstate: {mode: off}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/ingress/udp"
+    },
+    {
+      "name": "v7/invalid/liskov-operated-tunnel-is-refused",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown variant `liskov_tunnel`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/http/0/endpoints/0/provider/kind\n# Liskov operates no gateway and no tunnel node (ADR-0045, ADR-0059,\n# superseded). The provider owns the data plane.\nschema: proof.liskov.application-manifest\nschemaVersion: 7\napplicationId: bad-liskov-tunnel\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints:\n        - {name: public, provider: {kind: liskov_tunnel}, protection: public_unauthenticated}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/http/0/endpoints/0/provider/kind"
+    },
+    {
+      "name": "v7/invalid/public-endpoint-without-protection",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: a tunnel is not protection\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/api/public/protection\n# A public endpoint states what stands between a reacher and the data. It is\n# never inferred from the provider and never defaulted: an unprotected database\n# must not reach the internet without the manifest saying so (ADR-0060).\nschema: proof.liskov.application-manifest\nschemaVersion: 7\napplicationId: bad-public-without-protection\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints:\n        - {name: public, provider: {kind: acurast_tunnel}}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/api/public/protection"
+    },
+    {
+      "name": "v7/invalid/sidecar-gated-on-javascript",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: sidecar_gated protection, which is native_image only\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/api/public/protection\n# An auth sidecar runs beside the service under the Cargo helper, which a\n# JavaScript runtime does not have.\nschema: proof.liskov.application-manifest\nschemaVersion: 7\napplicationId: bad-sidecar-on-javascript\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints:\n        - {name: public, provider: {kind: acurast_tunnel}, protection: sidecar_gated}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/api/public/protection"
+    },
+    {
+      "name": "v7/invalid/ssh-provider-acurast-tunnel-is-refused",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown variant `acurast_tunnel`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /access/ssh/provider/kind\n# Acurast Tunnel SSH needs one owner for the attachment an HTTP endpoint also\n# uses (`t8kr`). Until that arm is authored, V7 keeps V6's SSH union.\nschema: proof.liskov.application-manifest\nschemaVersion: 7\napplicationId: bad-ssh-acurast-tunnel\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\naccess: {ssh: {provider: {kind: acurast_tunnel}}}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/access/ssh/provider/kind"
+    },
+    {
+      "name": "v7/invalid/tailscale-protection-is-derived-not-authored",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown field `protection`\n# EXPECT-CODE: unknown_field\n# EXPECT-POINTER: /ingress/http/0/endpoints/0/protection\n# On the private provider protection derives to `network_gated` \u2014 reach\n# implies the gate \u2014 so authoring it is refused as the unknown field it is in\n# V6, at the same pointer.\nschema: proof.liskov.application-manifest\nschemaVersion: 7\napplicationId: bad-tailscale-protection\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {tailscale: int_0123456789abcdef0123456789abcdef}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints:\n        - {name: private, provider: {kind: tailscale}, protection: application_managed}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/ingress/http/0/endpoints/0/protection"
     },
     {
       "name": "v4/duration-below-acurast-minimum",
