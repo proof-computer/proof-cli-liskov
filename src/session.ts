@@ -7563,24 +7563,13 @@ function assertEnvironmentHandoffHasNoPlaintext(
 ): void {
   const serialized = JSON.stringify(handoff);
   for (const variable of variables) {
-    if (variable.value.length === 0 || PUBLIC_LOCKBOX_BOOTSTRAP_ENVIRONMENT_VARIABLES.has(variable.key)) continue;
+    if (variable.value.length === 0) continue;
     const encodedValue = JSON.stringify(variable.value);
     if (serialized.includes(encodedValue) || (variable.value.length >= 8 && serialized.includes(variable.value))) {
       throw new Error(`Refusing to submit encrypted handoff for ${actionId}: plaintext value for ${variable.key} is present in payload`);
     }
   }
 }
-
-const PUBLIC_LOCKBOX_BOOTSTRAP_ENVIRONMENT_VARIABLES = new Set([
-  "PROOF_LOCKBOX_URL",
-  "PROOF_LOCKBOX_APPLICATION_ID",
-  "PROOF_LOCKBOX_GRANT_ID",
-  "PROOF_LOCKBOX_POLICY_DIGEST",
-  "PROOF_LOCKBOX_DEPLOYMENT_ID",
-  "PROOF_LOCKBOX_SECRET_IDS",
-  "PROOF_LOCKBOX_REQUESTED_SECRET_IDS",
-  "PROOF_LOCKBOX_FILE_BASE_DIR"
-]);
 
 function auditEnvironmentVariables(variables: readonly { key: string; value: string }[], actionId: string): void {
   const violations: string[] = [];
