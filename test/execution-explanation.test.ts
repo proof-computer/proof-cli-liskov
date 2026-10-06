@@ -19,13 +19,9 @@ import {
   executionTerminal,
   executionView,
   formatCoverageStatusLine,
-  formatExecutionConvergence,
   formatExecutionExplanation,
   formatExecutionStatusLine,
   formatIntervalSchedule,
-  parseExecutionConvergence,
-  QUIET_CONVERGENCE_CORPUS,
-  executionConvergencePath,
   readIntervalSchedule,
   spendView,
   type ApplicationSchedule
@@ -511,56 +507,6 @@ describe("typed-spine execution view", () => {
   });
 });
 
-describe("execution convergence decoder (6v4t / t89g corpus)", () => {
-  it("accepts the quiet corpus and pins the seven Console states", () => {
-    const quiet = parseExecutionConvergence(QUIET_CONVERGENCE_CORPUS);
-    assert.equal(quiet.ok, true);
-    if (!quiet.ok) return;
-    assert.equal(quiet.view.progress, "quiet");
-    assert.match(formatExecutionConvergence(quiet), /Quiet is not stalled/);
-
-    const withheld = parseExecutionConvergence({ refusal: { code: "execution_convergence_unauthorized" } });
-    assert.equal(withheld.ok, false);
-    if (withheld.ok) return;
-    assert.equal(withheld.withheld, true);
-
-    const pending = parseExecutionConvergence({
-      ...QUIET_CONVERGENCE_CORPUS,
-      progress: "in_flight",
-      pending: { draining: false, openReserveCount: 1, truncated: false }
-    });
-    assert.equal(pending.ok, true);
-    if (pending.ok) assert.match(formatExecutionConvergence(pending), /in flight/);
-
-    const unknown = parseExecutionConvergence({ ...QUIET_CONVERGENCE_CORPUS, progress: "unknown", completeness: "unknown" });
-    assert.equal(unknown.ok, true);
-    if (unknown.ok) assert.match(formatExecutionConvergence(unknown), /unknown/);
-
-    const ended = parseExecutionConvergence({ ...QUIET_CONVERGENCE_CORPUS, progress: "ended_unsettled" });
-    assert.equal(ended.ok, true);
-    if (ended.ok) assert.match(formatExecutionConvergence(ended), /ended and a charge is still open/);
-
-    const partial = parseExecutionConvergence({
-      ...QUIET_CONVERGENCE_CORPUS,
-      completeness: "incomplete",
-      pending: { draining: false, openReserveCount: 0, truncated: true }
-    });
-    assert.equal(partial.ok, true);
-    if (partial.ok) assert.match(formatExecutionConvergence(partial), /partial history/);
-
-    const disagreement = parseExecutionConvergence({
-      ...QUIET_CONVERGENCE_CORPUS,
-      selected: { label: "selected", kind: null, reason: "incumbent_walk", mismatchClass: null },
-      proposed: { label: "proposed", kind: "renew", reason: "update", mismatchClass: "expected_correction" }
-    });
-    assert.equal(disagreement.ok, true);
-    if (disagreement.ok) {
-      assert.equal(disagreement.view.mismatchClass, "expected_correction");
-      assert.match(formatExecutionConvergence(disagreement), /mismatch: expected_correction/);
-    }
-  });
-});
-
 describe("application execution show", () => {
   it("reads the canonical envelope once and prints the verbatim body with --json", async () => {
     await withSession(async (sessionFile) => {
@@ -577,12 +523,10 @@ describe("application execution show", () => {
       assert.equal(code, 0);
       assert.deepEqual(requests, [
         `https://liskov.test${policyExplanationPath("app_1")}`,
-        `https://liskov.test/api/applications/app_1/policy?view=convergence`,
         `https://liskov.test${applicationCoveragePath("app_1")}`
       ]);
-      const printed = JSON.parse(out.text) as { explanation: unknown; convergence: unknown; schedule: unknown };
+      const printed = JSON.parse(out.text) as { explanation: unknown; schedule: unknown };
       assert.deepEqual(printed.explanation, body, "existing explanation fields stay on --json");
-      assert.ok(printed.convergence, "adjacent t89g document is present");
       assert.equal(printed.schedule, null, "an unreadable Coverage read is a null schedule, not a failure");
       assert.equal(out.text.includes(TOKEN), false);
     });
@@ -601,7 +545,6 @@ describe("application execution show", () => {
       assert.match(out.text, /stage: .*\[effect_observed\]/);
       assert.match(out.text, /job 155065/);
       assert.match(out.text, /lineage v5-reserve:app_1:g1:r6: reserved 0 service_credit_micros; open_reserve$/m);
-      assert.match(out.text, /Convergence \(proof\.liskov\.execution-convergence\.v1\)/);
       assert.equal(out.text.includes(TOKEN), false);
     });
   });
@@ -767,10 +710,8 @@ describe("shipped execution show command over a real HTTP server", () => {
       });
       assert.deepEqual(requests, [
         policyExplanationPath("app_1"),
-        executionConvergencePath("app_1"),
         applicationCoveragePath("app_1"),
         policyExplanationPath("app_1"),
-        executionConvergencePath("app_1"),
         applicationCoveragePath("app_1")
       ]);
     } finally {
@@ -934,7 +875,7 @@ describe("pinned interval schedule (BKLG-20260908-xxtj)", () => {
     application: { applicationId: "app_1", status: "active", ...fields }
   });
 
-  /** Serves each read by its path; the convergence document carries an executor deadline that must never render. */
+  /** Serves each read by its path. */
   async function show(
     coverage: unknown,
     app: unknown = application(),
@@ -949,7 +890,6 @@ describe("pinned interval schedule (BKLG-20260908-xxtj)", () => {
           const target = String(url);
           requests.push(target.replace("https://liskov.test", ""));
           if (target.includes("view=explanation")) return Response.json(typedSpineEnvelope());
-          if (target.includes("view=convergence")) return Response.json({ ...QUIET_CONVERGENCE_CORPUS, nextDueAtMs: READ_AT + 60_000 });
           if (target.endsWith("/coverage")) {
             return coverage instanceof Response ? coverage : Response.json(coverage);
           }
@@ -963,7 +903,6 @@ describe("pinned interval schedule (BKLG-20260908-xxtj)", () => {
   }
 
   const iso = (ms: number) => new Date(ms).toISOString();
-  const EXECUTOR_DEADLINE = iso(READ_AT + 60_000);
 
   describe("the reading", () => {
     it("hourly-next: reports each pinned boundary as served and never recomputes one", () => {
@@ -1051,11 +990,9 @@ describe("pinned interval schedule (BKLG-20260908-xxtj)", () => {
       const result = await show(coverageRead({ schedule: { mode: "interval", overlap: null, nextDueAtMs: READ_AT + HOUR, gridOriginAtMs: 0 } }));
       assert.equal(result.code, 0);
       assert.match(result.text, new RegExp(`^schedule: next run at ${iso(READ_AT + HOUR)}$`, "m"));
-      assert.equal(result.text.includes(EXECUTOR_DEADLINE), false, "the convergence nextDueAtMs never renders as the next run");
       assert.doesNotMatch(result.text, /state was not read/);
       assert.deepEqual(result.requests, [
         policyExplanationPath("app_1"),
-        executionConvergencePath("app_1"),
         applicationCoveragePath("app_1"),
         "/api/applications/app_1"
       ]);
@@ -1112,12 +1049,12 @@ describe("pinned interval schedule (BKLG-20260908-xxtj)", () => {
       assert.match(result.text, /^schedule: next run at .*\n {2}the application's state was not read, so a pause would not show here$/m);
     });
 
-    it("--json adds the decoded block beside the explanation and convergence and drops nothing", async () => {
+    it("--json adds the decoded schedule beside the explanation and drops nothing", async () => {
       const block = { mode: "interval", overlap: null, nextDueAtMs: READ_AT + HOUR, gridOriginAtMs: 0 };
       const result = await show(coverageRead({ schedule: block }), application(), true);
       assert.equal(result.code, 0);
       const printed = JSON.parse(result.text) as Record<string, unknown>;
-      assert.deepEqual(Object.keys(printed).sort(), ["convergence", "explanation", "schedule"]);
+      assert.deepEqual(Object.keys(printed).sort(), ["explanation", "schedule"]);
       assert.deepEqual(printed.explanation, typedSpineEnvelope());
       assert.deepEqual(printed.schedule, block);
       assert.equal(result.text.includes(TOKEN), false);
