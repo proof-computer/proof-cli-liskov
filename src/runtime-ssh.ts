@@ -4,6 +4,7 @@ import { chmod, lstat, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "n
 import path from "node:path";
 import { emitKeypressEvents } from "node:readline";
 import { createInterface } from "node:readline/promises";
+import { localIdentityPaths, localSshDirectory, privateIdentityPublicKey } from "./ssh-identity.js";
 
 import { isOrganizationListResponse, organizationListPath } from "./organization-client.js";
 import {
@@ -103,6 +104,7 @@ export interface RuntimeSshConnectionInput extends RuntimeSshCommandInput {
   cliBin?: string;
   deploymentId?: string;
   identity?: string;
+  key?: string;
   jobId?: string;
   printCommand?: boolean;
 }
@@ -817,6 +819,9 @@ export async function runRuntimeSshConnection(
   if (!selected.ok) {
     return localFailure(input.json, options, selected.error, selected.message);
   }
+  if (connection.provider === "tailscale" && input.key !== undefined) {
+    return localFailure(input.json, options, "RUNTIME_SSH_KEY_PROVIDER_UNSUPPORTED", "--key selects a managed Runtime SSH operator key. Tailscale SSH uses your Tailscale identity.");
+  }
 
   return connection.provider === "tailscale"
     ? await runTailscaleConnection(input, options, connection)
@@ -871,15 +876,10 @@ async function runManagedConnection(
   options: RuntimeSshCliOptions,
   connection: ManagedConnection
 ): Promise<number> {
-  const identity = input.identity?.trim();
-  if (!identity) {
-    return localFailure(input.json, options, "RUNTIME_SSH_IDENTITY_REQUIRED", "Managed Runtime SSH requires --identity with a customer-owned Ed25519 private key path.");
-  }
   const runner = options.runProcess ?? defaultProcessRunner;
-  const selectedKey = await readIdentityPublicKey(identity, runner);
-  if (!selectedKey.ok) {
-    return localFailure(input.json, options, selectedKey.error, selectedKey.message);
-  }
+  const selectedKey = await selectManagedIdentity(input, options, connection, runner);
+  if (!selectedKey.ok) return selectedKey.exitCode;
+  const identity = selectedKey.identity;
   const selectedFingerprint = sshFingerprint(selectedKey.publicKey);
   if (!connection.authorizedKeyFingerprints.includes(selectedFingerprint)) {
     return localFailure(input.json, options, "RUNTIME_SSH_IDENTITY_NOT_AUTHORIZED", `The selected identity fingerprint ${selectedFingerprint} is not in this attachment's authorized set. V4 still lists keys in the deployed policy; V5 registers them with \`proof liskov runtime-ssh operator-key add\` so the next attachment snapshot includes them.`);
@@ -908,12 +908,16 @@ async function runManagedConnection(
         jobId: connection.jobId,
         hostFingerprint: connection.host.fingerprint,
         selectedIdentityFingerprint: selectedFingerprint,
+        selectedIdentity: identity,
+        selectedKeyName: selectedKey.name,
         trust: connection.trust
       },
       command: "managed Runtime SSH (one-time ticket minted only when connecting)"
-    }, `managed Runtime SSH root@${connection.applicationUid} (${connection.deploymentId}/${connection.jobId}); one-time ticket not minted`);
+    }, `managed Runtime SSH root@${connection.applicationUid} (${connection.deploymentId}/${connection.jobId}); identity ${identity}${selectedKey.name ? ` (${selectedKey.name})` : ""} ${selectedFingerprint}; one-time ticket not minted`);
     return 0;
   }
+
+  if (!input.json) (options.stderr ?? console.error)(`Using SSH identity ${identity}${selectedKey.name ? ` (${selectedKey.name})` : ""} ${selectedFingerprint}`);
 
   if (!known.exists) {
     if (known.rotated) {
@@ -1002,6 +1006,79 @@ async function runManagedConnection(
     removeSignalCleanup();
     await rm(ticketDirectory, { recursive: true, force: true });
   }
+}
+
+async function selectManagedIdentity(
+  input: RuntimeSshConnectionInput,
+  options: RuntimeSshCliOptions,
+  connection: ManagedConnection,
+  runner: RuntimeSshProcessRunner
+): Promise<{ ok: true; identity: string; publicKey: string; name?: string } | { ok: false; exitCode: number }> {
+  const fail = (error: string, message: string) => ({ ok: false as const, exitCode: localFailure(input.json, options, error, message) });
+  let fingerprints = connection.authorizedKeyFingerprints;
+  let name: string | undefined;
+  if (input.key !== undefined) {
+    name = input.key.trim();
+    if (!name || [...name].length > 120) return fail("RUNTIME_SSH_KEY_NAME_INVALID", "Provide an organization key name of 1–120 characters with --key.");
+    // /api/session uses the same request-scoped organization as the application
+    // connection request, including the persistent session default.
+    const session = await runtimeSshRequest<{ ok?: boolean; organization?: { id?: string }; organizationContext?: { effective?: { id?: string } }; error?: string }>(input, options, {
+      method: "GET", path: "/api/session"
+    });
+    if (!session.ok) return session;
+    const organizationId = session.body?.organizationContext?.effective?.id ?? session.body?.organization?.id;
+    if (!session.response.ok || session.body?.ok !== true || typeof organizationId !== "string" || !organizationId) {
+      return fail("RUNTIME_SSH_KEY_ORGANIZATION_FAILED", "Could not resolve the effective organization for --key. Check `proof liskov whoami` or provide --organization.");
+    }
+    const registry = await runtimeSshRequest<OperatorKeyResponse>(input, options, {
+      method: "GET", path: operatorKeyCollectionPath(organizationId), organizationSelector: null
+    });
+    if (!registry.ok) return registry;
+    if (!registry.response.ok || registry.body?.ok !== true || !Array.isArray(registry.body.keys)) {
+      return { ok: false, exitCode: apiFailure(input.json, options, registry.response.status, registry.body?.error) };
+    }
+    const keys = registry.body.keys.filter((key) => key?.name === name);
+    if (keys.length === 0) return fail("RUNTIME_SSH_KEY_NOT_FOUND", `No SSH key named ${name} is registered in this organization. Run \`proof liskov runtime-ssh operator-key list --organization ${organizationId}\`.`);
+    if (keys.length !== 1) return fail("RUNTIME_SSH_KEY_RESPONSE_INVALID", "Liskov returned more than one key with the selected name.");
+    try {
+      const key = keys[0];
+      if (sshFingerprint(normalizeEd25519PublicKey(key.publicKey)) !== key.fingerprint) throw new Error("fingerprint mismatch");
+      if (!fingerprints.includes(key.fingerprint)) return fail("RUNTIME_SSH_IDENTITY_NOT_AUTHORIZED", `SSH key ${name} (${key.fingerprint}) is not authorized by this attachment. Registering a key authorizes new attachments; use a job whose attachment includes this key.`);
+      fingerprints = [key.fingerprint];
+    } catch {
+      return fail("RUNTIME_SSH_KEY_RESPONSE_INVALID", "Liskov returned an invalid public key or fingerprint for the selected name.");
+    }
+  }
+  const explicit = input.identity?.trim();
+  if (input.identity !== undefined && !explicit) return fail("RUNTIME_SSH_IDENTITY_REQUIRED", "Provide a private-key path with --identity.");
+  const directory = localSshDirectory(options.env);
+  let identities: string[];
+  try {
+    identities = explicit ? [explicit] : await localIdentityPaths(directory);
+  } catch {
+    return fail("RUNTIME_SSH_IDENTITY_DISCOVERY_FAILED", `Could not read ${directory}. Provide the private key with --identity FILE.`);
+  }
+  const matches = new Map<string, { identity: string; publicKey: string }>();
+  for (const identity of identities) {
+    let publicKey: string;
+    try {
+      publicKey = normalizeEd25519PublicKey(await privateIdentityPublicKey(identity, runner));
+    } catch {
+      if (explicit) return fail("RUNTIME_SSH_IDENTITY_UNREADABLE", `Could not read an Ed25519 private key at ${identity}. A .pub file alone is insufficient; provide the matching OpenSSH private key with --identity FILE.`);
+      continue;
+    }
+    const fingerprint = sshFingerprint(publicKey);
+    if (fingerprints.includes(fingerprint)) {
+      if (!matches.has(fingerprint)) matches.set(fingerprint, { identity, publicKey });
+    } else if (explicit) {
+      return fail("RUNTIME_SSH_IDENTITY_NOT_AUTHORIZED", name
+        ? `The selected identity fingerprint ${fingerprint} does not match SSH key ${name}. Use the matching private key or select another authorized key.`
+        : `The selected identity fingerprint ${fingerprint} is not in this attachment's authorized set. V4 lists keys in the deployed policy; V5 registers them with \`proof liskov runtime-ssh operator-key add\` so the next attachment snapshot includes them.`);
+    }
+  }
+  if (matches.size === 0) return fail("RUNTIME_SSH_IDENTITY_MISSING", `No matching local private key was found in ${directory}${name ? ` for SSH key ${name}` : ""}. Required fingerprint(s): ${fingerprints.join(", ")}. Restore the matching private key or provide --identity FILE. A public key alone cannot open a session.`);
+  if (matches.size > 1) return fail("RUNTIME_SSH_IDENTITY_AMBIGUOUS", `Multiple authorized local SSH keys were found: ${[...matches].map(([fingerprint, key]) => `${key.identity} (${fingerprint})`).join(", ")}. Select one with --key NAME or --identity FILE.`);
+  return { ok: true, ...[...matches.values()][0], name };
 }
 
 async function runtimeSshRequest<T>(

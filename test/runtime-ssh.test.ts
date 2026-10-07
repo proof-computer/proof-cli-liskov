@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
-import { lstat, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { createHash, createPrivateKey, createPublicKey } from "node:crypto";
+import { lstat, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -348,14 +349,35 @@ test("connect launches the server-validated Tailscale argument array", async () 
   });
 });
 
+const identityFixtures = new Map<string, string>();
+
+function sshString(value: Buffer | string): Buffer {
+  const bytes = Buffer.from(value);
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(bytes.length);
+  return Buffer.concat([length, bytes]);
+}
+
 function ed25519PublicKey(byte: number): string {
-  const algorithm = Buffer.from("ssh-ed25519", "ascii");
-  const blob = Buffer.alloc(4 + algorithm.length + 4 + 32);
-  blob.writeUInt32BE(algorithm.length, 0);
-  algorithm.copy(blob, 4);
-  blob.writeUInt32BE(32, 4 + algorithm.length);
-  blob.fill(byte, 4 + algorithm.length + 4);
-  return `ssh-ed25519 ${blob.toString("base64")}`;
+  const seed = Buffer.alloc(32, byte);
+  const key = createPrivateKey({ key: Buffer.concat([Buffer.from("302e020100300506032b657004220420", "hex"), seed]), format: "der", type: "pkcs8" });
+  const publicBytes = createPublicKey(key).export({ format: "der", type: "spki" }).subarray(-32);
+  const publicBlob = Buffer.concat([sshString("ssh-ed25519"), sshString(publicBytes)]);
+  const publicKey = `ssh-ed25519 ${publicBlob.toString("base64")}`;
+  let payload = Buffer.concat([Buffer.from("1234567812345678", "hex"), sshString("ssh-ed25519"), sshString(publicBytes), sshString(Buffer.concat([seed, publicBytes])), sshString("fixture")]);
+  const padding = 8 - (payload.length % 8);
+  payload = Buffer.concat([payload, Buffer.from(Array.from({ length: padding }, (_, i) => i + 1))]);
+  const envelope = Buffer.concat([Buffer.from("openssh-key-v1\0"), sshString("none"), sshString("none"), sshString(""), Buffer.from("00000001", "hex"), sshString(publicBlob), sshString(payload)]);
+  identityFixtures.set(publicKey, `-----BEGIN OPENSSH PRIVATE KEY-----\n${envelope.toString("base64")}\n-----END OPENSSH PRIVATE KEY-----\n`);
+  return publicKey;
+}
+
+async function writeIdentityCompanion(file: string, value: string, options: { mode: number }): Promise<void> {
+  const publicKey = value.trim().split(/\s+/u).slice(0, 2).join(" ");
+  const privateKey = identityFixtures.get(publicKey);
+  assert.ok(privateKey);
+  await writeFile(file.slice(0, -4), privateKey, { mode: 0o600 });
+  await writeFile(file, value, options);
 }
 
 function fingerprint(publicKey: string): string {
@@ -449,7 +471,7 @@ async function prepareV5Identity(sessionFile: string): Promise<{ identity: strin
   const identity = path.join(path.dirname(sessionFile), "customer-identity");
   const identityKey = ed25519PublicKey(7);
   const hostKey = ed25519PublicKey(9);
-  await writeFile(`${identity}.pub`, `${identityKey} customer-comment\n`, { mode: 0o644 });
+  await writeIdentityCompanion(`${identity}.pub`, `${identityKey} customer-comment\n`, { mode: 0o644 });
   return { identity, identityKey, hostKey };
 }
 
@@ -458,7 +480,7 @@ test("managed access pins host trust, mints one ticket, launches strict OpenSSH,
     const identity = path.join(path.dirname(sessionFile), "customer-identity");
     const identityKey = ed25519PublicKey(7);
     const hostKey = ed25519PublicKey(9);
-    await writeFile(`${identity}.pub`, `${identityKey} customer-comment\n`, { mode: 0o644 });
+    await writeIdentityCompanion(`${identity}.pub`, `${identityKey} customer-comment\n`, { mode: 0o644 });
     const connection = managedConnection(identityKey, hostKey);
     const ticketSecret = "ticket.header.signature-that-must-not-be-printed";
     const output: string[] = [];
@@ -542,7 +564,7 @@ test("managed print-command is redacted and never mints a ticket", async () => {
   await withSession(async (sessionFile) => {
     const identity = path.join(path.dirname(sessionFile), "customer-identity");
     const identityKey = ed25519PublicKey(7);
-    await writeFile(`${identity}.pub`, identityKey, { mode: 0o644 });
+    await writeIdentityCompanion(`${identity}.pub`, identityKey, { mode: 0o644 });
     let requests = 0;
     const output: string[] = [];
     const code = await runRuntimeSshConnection({
@@ -570,7 +592,7 @@ test("managed access fails closed on a substituted pinned host key before ticket
   await withSession(async (sessionFile) => {
     const identity = path.join(path.dirname(sessionFile), "customer-identity");
     const identityKey = ed25519PublicKey(7);
-    await writeFile(`${identity}.pub`, identityKey, { mode: 0o644 });
+    await writeIdentityCompanion(`${identity}.pub`, identityKey, { mode: 0o644 });
     await writeFile(
       path.join(path.dirname(sessionFile), "runtime-ssh-known-hosts"),
       `liskov-runtime-ssh-att_1234567890abcdef ${ed25519PublicKey(8)}\n`,
@@ -618,7 +640,7 @@ test("managed access re-pins a host key that rotated with a runtime restart, wit
   await withSession(async (sessionFile) => {
     const identity = path.join(path.dirname(sessionFile), "customer-identity");
     const identityKey = ed25519PublicKey(7);
-    await writeFile(`${identity}.pub`, identityKey, { mode: 0o644 });
+    await writeIdentityCompanion(`${identity}.pub`, identityKey, { mode: 0o644 });
     const knownHosts = path.join(path.dirname(sessionFile), "runtime-ssh-known-hosts");
     const otherPin = `liskov-runtime-ssh-att_other ${ed25519PublicKey(3)}`;
     await writeFile(knownHosts, `${otherPin}\n${rotationAlias} ${ed25519PublicKey(8)}\n`, { mode: 0o600 });
@@ -653,7 +675,7 @@ test("managed access accepts a rotated host key non-interactively only with --ac
   await withSession(async (sessionFile) => {
     const identity = path.join(path.dirname(sessionFile), "customer-identity");
     const identityKey = ed25519PublicKey(7);
-    await writeFile(`${identity}.pub`, identityKey, { mode: 0o644 });
+    await writeIdentityCompanion(`${identity}.pub`, identityKey, { mode: 0o644 });
     const knownHosts = path.join(path.dirname(sessionFile), "runtime-ssh-known-hosts");
     const pinned = `${rotationAlias} ${ed25519PublicKey(8)}\n`;
     await writeFile(knownHosts, pinned, { mode: 0o600 });
@@ -684,7 +706,7 @@ test("managed access still fails closed when the pinned key is not the one the r
   await withSession(async (sessionFile) => {
     const identity = path.join(path.dirname(sessionFile), "customer-identity");
     const identityKey = ed25519PublicKey(7);
-    await writeFile(`${identity}.pub`, identityKey, { mode: 0o644 });
+    await writeIdentityCompanion(`${identity}.pub`, identityKey, { mode: 0o644 });
     const knownHosts = path.join(path.dirname(sessionFile), "runtime-ssh-known-hosts");
     const pinned = `${rotationAlias} ${ed25519PublicKey(6)}\n`;
     await writeFile(knownHosts, pinned, { mode: 0o600 });
@@ -704,7 +726,7 @@ test("managed access refuses rotation evidence that is half present or names the
   await withSession(async (sessionFile) => {
     const identity = path.join(path.dirname(sessionFile), "customer-identity");
     const identityKey = ed25519PublicKey(7);
-    await writeFile(`${identity}.pub`, identityKey, { mode: 0o644 });
+    await writeIdentityCompanion(`${identity}.pub`, identityKey, { mode: 0o644 });
     const base = managedConnection(identityKey, ed25519PublicKey(9));
     for (const host of [
       { ...base.host, previousFingerprint: fingerprint(ed25519PublicKey(8)) },
@@ -724,7 +746,7 @@ test("managed access refuses rotation evidence that is half present or names the
 });
 
 test("proof liskov ssh still exposes the exact-job flag surface", () => {
-  for (const flag of ["job", "deployment", "identity", "accept-host-key", "print-command", "json"]) {
+  for (const flag of ["job", "deployment", "key", "identity", "accept-host-key", "print-command", "json"]) {
     assert.ok(LiskovSsh.flags[flag], flag);
   }
 });
@@ -1702,4 +1724,168 @@ test("connectionRefusalAdvice is silent on codes it has nothing to add to", () =
   assert.equal(connectionRefusalAdvice("runtime_ssh_attachment_not_ready", undefined), "");
   assert.equal(connectionRefusalAdvice("runtime_ssh_request_invalid", "something_new"), "");
   assert.match(connectionRefusalAdvice("runtime_ssh_attachment_not_ready", "job_terminal"), /has ended/u);
+});
+
+async function withLocalSshKeys(run: (sessionFile: string, directory: string, identity: string) => Promise<void>): Promise<void> {
+  await withSession(async (sessionFile) => {
+    const directory = path.join(path.dirname(sessionFile), ".ssh");
+    await mkdir(directory);
+    await run(sessionFile, directory, path.join(directory, "work-laptop"));
+  });
+}
+
+test("plain ssh discovers the actual authorized private key, ignoring a stale .pub companion", async () => {
+  await withLocalSshKeys(async (sessionFile, directory, identity) => {
+    const key = ed25519PublicKey(7);
+    await writeIdentityCompanion(`${identity}.pub`, key, { mode: 0o644 });
+    await writeFile(`${identity}.pub`, ed25519PublicKey(8));
+    await writeIdentityCompanion(`${directory}/unrelated.pub`, ed25519PublicKey(9), { mode: 0o644 });
+    const output: string[] = [];
+    const code = await runRuntimeSshConnection({ applicationRef: "app", config: sessionFile, printCommand: true, json: true }, {
+      env: { HOME: path.dirname(sessionFile) },
+      stdout: (line) => output.push(line), stderr: (line) => output.push(line),
+      runProcess: async () => assert.fail("OpenSSH public envelopes need no process or passphrase prompt"),
+      fetchImpl: async (url) => {
+        assert.ok(String(url).endsWith("/connection-requests"), "discovery never mints a ticket");
+        return Response.json({ ok: true, connection: managedConnection(key, ed25519PublicKey(10)) });
+      }
+    });
+    assert.equal(code, 0);
+    assert.equal(JSON.parse(output[0]).connection.selectedIdentity, identity);
+    assert.equal(JSON.parse(output[0]).connection.selectedIdentityFingerprint, fingerprint(key));
+  });
+});
+
+test("named ssh resolves the effective organization's key and uses its exact fingerprint", async () => {
+  await withLocalSshKeys(async (sessionFile, directory, identity) => {
+    const key = ed25519PublicKey(7);
+    await writeIdentityCompanion(`${identity}.pub`, key, { mode: 0o644 });
+    await writeIdentityCompanion(`${directory}/other.pub`, ed25519PublicKey(13), { mode: 0o644 });
+    const output: string[] = [];
+    const requests: string[] = [];
+    const code = await runRuntimeSshConnection({ applicationRef: "app", config: sessionFile, key: "work-laptop", printCommand: true, json: true }, {
+      organization: "organization-one",
+      env: { HOME: path.dirname(sessionFile) },
+      stdout: (line) => output.push(line), stderr: (line) => output.push(line),
+      fetchImpl: async (url, init) => {
+        const pathname = new URL(String(url)).pathname;
+        requests.push(pathname);
+        if (pathname === "/api/session") {
+          assert.equal((init?.headers as Record<string, string>)["x-liskov-organization"], "organization-one");
+          return Response.json({ ok: true, organization: { id: "wrong-default" }, organizationContext: { effective: { id: "org_1" } } });
+        }
+        if (pathname.endsWith("/operator-keys")) {
+          assert.equal(pathname, "/api/organizations/org_1/runtime-ssh/operator-keys");
+          return Response.json({ ok: true, keys: [{ ...operatorKeyRow(key), name: "work-laptop" }] });
+        }
+        assert.ok(pathname.endsWith("/connection-requests"));
+        return Response.json({ ok: true, connection: v5ManagedConnection(key, ed25519PublicKey(10)) });
+      }
+    });
+    assert.equal(code, 0);
+    assert.equal(requests.length, 3);
+    assert.equal(JSON.parse(output[0]).connection.selectedKeyName, "work-laptop");
+    assert.equal(JSON.parse(output[0]).connection.selectedIdentity, identity);
+  });
+});
+
+for (const scenario of ["public-only", "missing-directory", "ambiguous", "duplicate-copy", "explicit-missing", "explicit-wrong"] as const) {
+  test(`ssh local identity discovery: ${scenario}`, async () => {
+    await withLocalSshKeys(async (sessionFile, directory, identity) => {
+      const key = ed25519PublicKey(7);
+      const other = ed25519PublicKey(8);
+      const connection = managedConnection(key, ed25519PublicKey(10));
+      if (scenario === "public-only") await writeFile(`${identity}.pub`, key);
+      if (scenario === "missing-directory") await rm(directory, { recursive: true });
+      if (scenario === "ambiguous" || scenario === "duplicate-copy") {
+        await writeIdentityCompanion(`${identity}.pub`, key, { mode: 0o644 });
+        await writeIdentityCompanion(`${directory}/other.pub`, scenario === "ambiguous" ? other : key, { mode: 0o644 });
+        if (scenario === "ambiguous") (connection.authorizedKeyFingerprints as string[]).push(fingerprint(other));
+      }
+      if (scenario === "explicit-wrong") await writeIdentityCompanion(`${identity}.pub`, other, { mode: 0o644 });
+      const output: string[] = [];
+      const code = await runRuntimeSshConnection({ applicationRef: "app", config: sessionFile, printCommand: true, json: true, identity: scenario.startsWith("explicit") ? identity : undefined }, {
+        env: { HOME: path.dirname(sessionFile) }, stdout: (line) => output.push(line), stderr: (line) => output.push(line),
+        fetchImpl: async (url) => {
+          assert.ok(String(url).endsWith("/connection-requests"));
+          return Response.json({ ok: true, connection });
+        }
+      });
+      const body = JSON.parse(output[0]);
+      if (scenario === "duplicate-copy") { assert.equal(code, 0); return; }
+      assert.equal(code, 1);
+      const error = scenario === "ambiguous" ? "RUNTIME_SSH_IDENTITY_AMBIGUOUS"
+        : scenario === "explicit-missing" ? "RUNTIME_SSH_IDENTITY_UNREADABLE"
+        : scenario === "explicit-wrong" ? "RUNTIME_SSH_IDENTITY_NOT_AUTHORIZED" : "RUNTIME_SSH_IDENTITY_MISSING";
+      assert.equal(body.error, error);
+      assert.doesNotMatch(output.join("\n"), /PRIVATE KEY|session-token-that/u);
+    });
+  });
+}
+
+for (const scenario of ["unknown", "unauthorized", "corrupt-fingerprint", "wrong-private", "missing-private", "registry-denied"] as const) {
+  test(`named ssh refuses before ticket mint: ${scenario}`, async () => {
+    await withLocalSshKeys(async (sessionFile, _directory, identity) => {
+      const key = ed25519PublicKey(7);
+      const other = ed25519PublicKey(8);
+      if (scenario !== "missing-private") await writeIdentityCompanion(`${identity}.pub`, scenario === "wrong-private" ? other : key, { mode: 0o644 });
+      const output: string[] = [];
+      const row = { ...operatorKeyRow(scenario === "unauthorized" ? other : key), name: "work-laptop" };
+      if (scenario === "corrupt-fingerprint") row.fingerprint = fingerprint(other);
+      const code = await runRuntimeSshConnection({ applicationRef: "app", config: sessionFile, key: "work-laptop", identity: scenario === "wrong-private" ? identity : undefined, printCommand: true, json: true }, {
+        env: { HOME: path.dirname(sessionFile) }, stdout: (line) => output.push(line), stderr: (line) => output.push(line),
+        fetchImpl: async (url) => {
+          const pathname = new URL(String(url)).pathname;
+          if (pathname === "/api/session") return Response.json({ ok: true, organization: { id: "org_1" } });
+          if (pathname.endsWith("/operator-keys")) return scenario === "registry-denied"
+            ? Response.json({ ok: false, error: "runtime_ssh_admin_required" }, { status: 403 })
+            : Response.json({ ok: true, keys: scenario === "unknown" ? [] : [row] });
+          assert.ok(pathname.endsWith("/connection-requests"));
+          return Response.json({ ok: true, connection: managedConnection(key, ed25519PublicKey(10)) });
+        }
+      });
+      assert.equal(code, 1);
+      const expected = scenario === "unknown" ? "RUNTIME_SSH_KEY_NOT_FOUND"
+        : scenario === "corrupt-fingerprint" ? "RUNTIME_SSH_KEY_RESPONSE_INVALID"
+        : scenario === "missing-private" ? "RUNTIME_SSH_IDENTITY_MISSING"
+        : scenario === "registry-denied" ? "runtime_ssh_admin_required" : "RUNTIME_SSH_IDENTITY_NOT_AUTHORIZED";
+      assert.equal(JSON.parse(output[0]).error, expected);
+    });
+  });
+}
+
+test("encrypted OpenSSH private key is discovered without a .pub file and passed to OpenSSH", async () => {
+  await withLocalSshKeys(async (sessionFile, _directory, identity) => {
+    const key = ed25519PublicKey(7);
+    await writeIdentityCompanion(`${identity}.pub`, key, { mode: 0o644 });
+    assert.equal(execFileSync("ssh-keygen", ["-y", "-P", "", "-f", identity], { encoding: "utf8" }).trim().split(/\s/u).slice(0, 2).join(" "), key);
+    execFileSync("ssh-keygen", ["-p", "-P", "", "-N", "test-only-passphrase", "-f", identity]);
+    await rm(`${identity}.pub`);
+    let ticketCount = 0;
+    let opensshCount = 0;
+    const output: string[] = [];
+    const code = await runRuntimeSshConnection({ applicationRef: "app", config: sessionFile, acceptHostKey: true }, {
+      env: { HOME: path.dirname(sessionFile) }, stdout: (line) => output.push(line), stderr: (line) => output.push(line),
+      runProcess: async (executable, args, mode) => {
+        assert.equal(executable, "ssh", "discovery must not prompt through ssh-keygen");
+        assert.equal(mode, "inherit");
+        assert.equal(args[args.indexOf("-i") + 1], identity);
+        opensshCount += 1;
+        return { exitCode: 0, stdout: "", stderr: "" };
+      },
+      fetchImpl: async (url, init) => {
+        if (String(url).endsWith("/tickets")) {
+          ticketCount += 1;
+          assert.equal(JSON.parse(String(init?.body)).selectedPublicKey, key);
+          return Response.json({ ok: true, ticket: v5Ticket("test-ticket-token") });
+        }
+        return Response.json({ ok: true, connection: v5ManagedConnection(key, ed25519PublicKey(10)) });
+      }
+    });
+    assert.equal(code, 0);
+    assert.equal(ticketCount, 1);
+    assert.equal(opensshCount, 1);
+    assert.deepEqual(await leftoverTicketDirs(sessionFile), []);
+    assert.doesNotMatch(output.join("\n"), /test-only-passphrase|test-ticket-token|PRIVATE KEY/u);
+  });
 });

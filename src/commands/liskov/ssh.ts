@@ -10,14 +10,16 @@ export default class LiskovSsh extends OrganizationScopedCommand {
     "<%= config.bin %> liskov ssh my-app",
     "<%= config.bin %> liskov ssh my-app --deployment deploy_123 --print-command",
     "<%= config.bin %> liskov ssh my-app --job job_123",
-    "<%= config.bin %> liskov ssh my-app --job 155468"
+    "<%= config.bin %> liskov ssh my-app --job 155468",
+    "<%= config.bin %> liskov ssh my-app --key work-laptop"
   ];
   static flags: Interfaces.FlagInput = {
     "accept-host-key": Flags.boolean({ description: "Accept and pin a first-use managed runtime host key without prompting." }),
     config: Flags.string({ description: "Path to the local Liskov session file." }),
     deployment: Flags.string({ description: "Select an exact deployment id." }),
     help: Flags.help({ char: "h" }),
-    identity: Flags.string({ description: "Customer-owned Ed25519 private key for managed Runtime SSH." }),
+    identity: Flags.string({ description: "Ed25519 private-key path. Defaults to an authorized local key in ~/.ssh; with --key, must match that named key." }),
+    key: Flags.string({ description: "Select an exact organization operator-key name and find its matching local private key." }),
     job: Flags.string({ description: "Select an exact job id, or a provider job sequence (a V5 job\u2019s number)." }),
     json: Flags.boolean({ description: "Emit machine-readable JSON (most useful with --print-command)." }),
     "print-command": Flags.boolean({ description: "Resolve and verify the connection without opening SSH." }),
@@ -34,6 +36,7 @@ export default class LiskovSsh extends OrganizationScopedCommand {
       deploymentId: flags.deployment as string | undefined,
       jobId: flags.job as string | undefined,
       identity: flags.identity as string | undefined,
+      key: flags.key as string | undefined,
       printCommand: flags["print-command"] as boolean | undefined,
       config: flags.config as string | undefined,
       json: flags.json as boolean | undefined,
