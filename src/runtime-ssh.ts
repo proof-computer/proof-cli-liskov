@@ -98,6 +98,27 @@ export interface RuntimeSshAttachmentEndpointsInput extends RuntimeSshCommandInp
   attachmentId?: string;
 }
 
+/** One OpenSSH forward argument, in the order the user wrote it. `-N` takes no spec. */
+export type RuntimeSshForwardDirective =
+  | { kind: "L" | "D"; spec: string }
+  | { kind: "N" };
+
+/**
+ * Forward arguments shared by the live managed argv and `--print-command`.
+ * `ExitOnForwardFailure` is set only when at least one `-L` or `-D` is present.
+ * The result never contains `ClearAllForwardings`.
+ */
+export function managedForwardArguments(directives: readonly RuntimeSshForwardDirective[] | undefined): string[] {
+  const items = directives ?? [];
+  const args: string[] = [];
+  if (items.some((item) => item.kind !== "N")) args.push("-o", "ExitOnForwardFailure=yes");
+  for (const item of items) {
+    if (item.kind === "N") args.push("-N");
+    else args.push(item.kind === "L" ? "-L" : "-D", item.spec);
+  }
+  return args;
+}
+
 export interface RuntimeSshConnectionInput extends RuntimeSshCommandInput {
   acceptHostKey?: boolean;
   applicationRef: string;
@@ -107,6 +128,8 @@ export interface RuntimeSshConnectionInput extends RuntimeSshCommandInput {
   key?: string;
   jobId?: string;
   printCommand?: boolean;
+  /** Managed OpenSSH only. Tailscale keeps the server-supplied command. */
+  forwards?: readonly RuntimeSshForwardDirective[];
 }
 
 export interface RuntimeSshProcessResult {
@@ -895,6 +918,10 @@ async function runManagedConnection(
   }
 
   if (input.printCommand) {
+    // The live argv's ProxyCommand embeds a one-time token file. Print only the
+    // forward arguments, which do not require minting that ticket.
+    const forwardArgv = managedForwardArguments(input.forwards);
+    const forwardText = forwardArgv.length > 0 ? ` ${forwardArgv.join(" ")}` : "";
     writeOutput(input.json, options, {
       ok: true,
       connection: {
@@ -912,8 +939,9 @@ async function runManagedConnection(
         selectedKeyName: selectedKey.name,
         trust: connection.trust
       },
-      command: "managed Runtime SSH (one-time ticket minted only when connecting)"
-    }, `managed Runtime SSH root@${connection.applicationUid} (${connection.deploymentId}/${connection.jobId}); identity ${identity}${selectedKey.name ? ` (${selectedKey.name})` : ""} ${selectedFingerprint}; one-time ticket not minted`);
+      command: "managed Runtime SSH (one-time ticket minted only when connecting)",
+      sshArguments: forwardArgv
+    }, `managed Runtime SSH root@${connection.applicationUid} (${connection.deploymentId}/${connection.jobId}); identity ${identity}${selectedKey.name ? ` (${selectedKey.name})` : ""} ${selectedFingerprint}; one-time ticket not minted${forwardText}`);
     return 0;
   }
 
@@ -979,6 +1007,9 @@ async function runManagedConnection(
     "--tunnel-id", ticket.tunnelId,
     "--token-file", ticketFile
   ].map(shellQuote).join(" ");
+  // ADR-0045: pass -L and -D through. Never set ClearAllForwardings. Agent,
+  // X11, and PermitLocalCommand stay off. User specs stay discrete argv
+  // elements and are not interpolated into ProxyCommand.
   const sshArgs = [
     "-F", "/dev/null",
     "-i", identity,
@@ -987,15 +1018,15 @@ async function runManagedConnection(
     "-o", `UserKnownHostsFile=${knownHostsFile}`,
     "-o", "GlobalKnownHostsFile=/dev/null",
     "-o", `HostKeyAlias=${alias}`,
-    "-o", "ClearAllForwardings=yes",
     "-o", "ForwardAgent=no",
     "-o", "ForwardX11=no",
     "-o", "ForwardX11Trusted=no",
     "-o", "PermitLocalCommand=no",
     "-o", `ProxyCommand=${proxyCommand}`,
     "-p", "22",
+    ...managedForwardArguments(input.forwards),
     "root@127.0.0.1"
-  ] as const;
+  ];
   const removeSignalCleanup = installSignalCleanup(ticketDirectory);
   try {
     const result = await runner("ssh", sshArgs, "inherit");

@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import LiskovSsh from "../src/commands/liskov/ssh.js";
+import LiskovSsh, { sshForwardDirectivesFromArgv } from "../src/commands/liskov/ssh.js";
 import {
   connectionRefusalAdvice,
   runRuntimeSshAttachmentList,
@@ -19,6 +19,7 @@ import {
   runRuntimeSshWithdrawnKeyAdd,
   runRuntimeSshWithdrawnKeyList,
   runRuntimeSshWithdrawnKeyRemove,
+  type RuntimeSshForwardDirective,
   type RuntimeSshProcessRunner
 } from "../src/runtime-ssh.js";
 
@@ -524,7 +525,7 @@ test("managed access pins host trust, mints one ticket, launches strict OpenSSH,
         calls.push({ executable, args, mode });
         assert.equal(executable, "ssh");
         assert.equal(mode, "inherit");
-        assert.deepEqual(args.slice(0, 18), [
+        assert.deepEqual(args.slice(0, 16), [
           "-F", "/dev/null",
           "-i", identity,
           "-o", "IdentitiesOnly=yes",
@@ -532,9 +533,14 @@ test("managed access pins host trust, mints one ticket, launches strict OpenSSH,
           "-o", `UserKnownHostsFile=${path.join(path.dirname(sessionFile), "runtime-ssh-known-hosts")}`,
           "-o", "GlobalKnownHostsFile=/dev/null",
           "-o", "HostKeyAlias=liskov-runtime-ssh-att_1234567890abcdef",
-          "-o", "ClearAllForwardings=yes",
           "-o", "ForwardAgent=no"
         ]);
+        assert.equal(args.some((arg) => arg.includes("ClearAllForwardings")), false);
+        assert.equal(args.includes("ExitOnForwardFailure=yes"), false);
+        assert.equal(args.includes("-L"), false);
+        assert.equal(args.includes("-D"), false);
+        assert.equal(args.includes("-N"), false);
+        assert.equal(args.at(-1), "root@127.0.0.1");
         const proxy = args.find((arg) => arg.startsWith("ProxyCommand="));
         assert.ok(proxy);
         assert.doesNotMatch(proxy, new RegExp(ticketSecret));
@@ -585,7 +591,225 @@ test("managed print-command is redacted and never mints a ticket", async () => {
     assert.equal(code, 0);
     assert.equal(requests, 1);
     assert.match(output[0], /one-time ticket not minted/u);
+    assert.doesNotMatch(output[0], /-L|-D|ExitOnForwardFailure/u);
   });
+});
+
+const acceptanceForwards: RuntimeSshForwardDirective[] = [
+  { kind: "L", spec: "127.0.0.1:9222:127.0.0.1:9222" },
+  { kind: "L", spec: "8080:example.com:80" },
+  { kind: "D", spec: "1080" },
+  { kind: "N" }
+];
+
+function assertManagedForwardSuffix(args: readonly string[], expected: readonly string[]): void {
+  assert.equal(args.some((arg) => arg.includes("ClearAllForwardings")), false);
+  for (const option of ["ForwardAgent=no", "ForwardX11=no", "ForwardX11Trusted=no", "PermitLocalCommand=no"]) {
+    assert.ok(args.includes(option), option);
+  }
+  assert.equal(args.at(-1), "root@127.0.0.1");
+  assert.deepEqual(args.slice(args.length - 1 - expected.length, -1), [...expected]);
+}
+
+async function captureManagedArgv(sessionFile: string, forwards?: readonly RuntimeSshForwardDirective[]): Promise<readonly string[]> {
+  const identity = path.join(path.dirname(sessionFile), "customer-identity");
+  const identityKey = ed25519PublicKey(7);
+  const hostKey = ed25519PublicKey(9);
+  await writeIdentityCompanion(`${identity}.pub`, `${identityKey} customer-comment\n`, { mode: 0o644 });
+  let captured: readonly string[] = [];
+  const code = await runRuntimeSshConnection({
+    acceptHostKey: true,
+    applicationRef: "app",
+    cliBin: "proof",
+    config: sessionFile,
+    identity,
+    forwards
+  }, {
+    fetchImpl: async (url) => {
+      if (String(url).endsWith("/connection-requests")) {
+        return Response.json({ ok: true, connection: managedConnection(identityKey, hostKey) });
+      }
+      return Response.json({
+        ok: true,
+        ticket: {
+          gatewayUrl: "wss://gateway.example",
+          tunnelId: "tun_1234567890abcdef",
+          protocol: "liskov-access.v1",
+          bearerToken: "ticket.header.signature-that-must-not-be-printed",
+          expiresAtMs: Date.now() + 60_000,
+          limits: { maxFrameBytes: 65_536, maxBytesPerDirection: 1_073_741_824, maxDurationMs: 7_200_000 }
+        }
+      });
+    },
+    runProcess: async (_executable, args) => {
+      captured = args;
+      const proxy = args.find((arg) => arg.startsWith("ProxyCommand=")) ?? "";
+      assert.equal(proxy.includes("8080:example.com:80"), false);
+      assert.equal(proxy.includes("1080"), false);
+      return { exitCode: 0, stdout: "", stderr: "" };
+    },
+    stderr: () => {}
+  });
+  assert.equal(code, 0);
+  return captured;
+}
+
+test("managed ssh passes -L and -D through in order and fails the session if a forward cannot open", async () => {
+  await withSession(async (sessionFile) => {
+    const args = await captureManagedArgv(sessionFile, acceptanceForwards);
+    assertManagedForwardSuffix(args, [
+      "-o", "ExitOnForwardFailure=yes",
+      "-L", "127.0.0.1:9222:127.0.0.1:9222",
+      "-L", "8080:example.com:80",
+      "-D", "1080",
+      "-N"
+    ]);
+  });
+});
+
+test("managed ssh accepts a non-loopback forward and does not set ExitOnForwardFailure for -N alone", async () => {
+  await withSession(async (sessionFile) => {
+    const forwarded = await captureManagedArgv(sessionFile, [
+      { kind: "D", spec: "1080" },
+      { kind: "L", spec: "9.9.9.9:1:example.com:443" }
+    ]);
+    assertManagedForwardSuffix(forwarded, [
+      "-o", "ExitOnForwardFailure=yes",
+      "-D", "1080",
+      "-L", "9.9.9.9:1:example.com:443"
+    ]);
+    const noCommand = await captureManagedArgv(sessionFile, [{ kind: "N" }]);
+    assertManagedForwardSuffix(noCommand, ["-N"]);
+    assert.equal(noCommand.includes("ExitOnForwardFailure=yes"), false);
+  });
+});
+
+test("managed print-command prints the forward argv and still does not mint a ticket", async () => {
+  await withSession(async (sessionFile) => {
+    const identity = path.join(path.dirname(sessionFile), "customer-identity");
+    const identityKey = ed25519PublicKey(7);
+    await writeIdentityCompanion(`${identity}.pub`, identityKey, { mode: 0o644 });
+    let requests = 0;
+    const output: string[] = [];
+    const code = await runRuntimeSshConnection({
+      applicationRef: "app",
+      config: sessionFile,
+      identity,
+      json: true,
+      printCommand: true,
+      forwards: acceptanceForwards
+    }, {
+      fetchImpl: async () => {
+        requests += 1;
+        return Response.json({ ok: true, connection: managedConnection(identityKey, ed25519PublicKey(9)) });
+      },
+      runProcess: async () => {
+        throw new Error("no subprocess expected");
+      },
+      stdout: (line) => output.push(line)
+    });
+    assert.equal(code, 0);
+    assert.equal(requests, 1);
+    const parsed = JSON.parse(output[0] ?? "{}") as { command: string; sshArguments: string[] };
+    assert.match(parsed.command, /one-time ticket minted only when connecting/u);
+    assert.deepEqual(parsed.sshArguments, [
+      "-o", "ExitOnForwardFailure=yes",
+      "-L", "127.0.0.1:9222:127.0.0.1:9222",
+      "-L", "8080:example.com:80",
+      "-D", "1080",
+      "-N"
+    ]);
+    assert.equal(JSON.stringify(parsed).includes("ticket.header"), false);
+
+    const human: string[] = [];
+    const humanCode = await runRuntimeSshConnection({
+      applicationRef: "app",
+      config: sessionFile,
+      identity,
+      printCommand: true,
+      forwards: acceptanceForwards
+    }, {
+      fetchImpl: async () => {
+        requests += 1;
+        return Response.json({ ok: true, connection: managedConnection(identityKey, ed25519PublicKey(9)) });
+      },
+      runProcess: async () => {
+        throw new Error("no subprocess expected");
+      },
+      stdout: (line) => human.push(line)
+    });
+    assert.equal(humanCode, 0);
+    assert.match(human[0] ?? "", /one-time ticket not minted -o ExitOnForwardFailure=yes -L 127\.0\.0\.1:9222:127\.0\.0\.1:9222 -L 8080:example\.com:80 -D 1080 -N$/u);
+  });
+});
+
+test("tailscale ssh ignores -L and -D and keeps the server command", async () => {
+  await withSession(async (sessionFile) => {
+    const calls: Array<{ executable: string; args: readonly string[]; mode: string }> = [];
+    const code = await runRuntimeSshConnection({
+      applicationRef: "app",
+      config: sessionFile,
+      forwards: acceptanceForwards
+    }, {
+      fetchImpl: connectionFetch,
+      runProcess: async (executable, args, mode) => {
+        calls.push({ executable, args, mode });
+        if (mode === "capture") {
+          return { exitCode: 0, stdout: JSON.stringify({ CurrentTailnet: { Name: "example.com" } }), stderr: "" };
+        }
+        return { exitCode: 17, stdout: "", stderr: "" };
+      }
+    });
+    assert.equal(code, 17);
+    assert.deepEqual(calls, [
+      { executable: "tailscale", args: ["status", "--json"], mode: "capture" },
+      { executable: "tailscale", args: ["ssh", "root@runtime.example.com"], mode: "inherit" }
+    ]);
+  });
+});
+
+test("ssh argv order keeps interleaved -D before -L, and -R is not a flag", async () => {
+  const argv = ["app", "-D", "1080", "-L", "8080:example.com:80", "-N"];
+  assert.deepEqual(sshForwardDirectivesFromArgv(argv), [
+    { kind: "D", spec: "1080" },
+    { kind: "L", spec: "8080:example.com:80" },
+    { kind: "N" }
+  ]);
+  assert.deepEqual(sshForwardDirectivesFromArgv(["app", "-L127.0.0.1:9222:127.0.0.1:9222", "--dynamic-forward=1080"]), [
+    { kind: "L", spec: "127.0.0.1:9222:127.0.0.1:9222" },
+    { kind: "D", spec: "1080" }
+  ]);
+  assert.equal(LiskovSsh.flags["local-forward"]?.char, "L");
+  assert.equal(LiskovSsh.flags["local-forward"]?.multiple, true);
+  assert.equal(LiskovSsh.flags["dynamic-forward"]?.char, "D");
+  assert.equal(LiskovSsh.flags["dynamic-forward"]?.multiple, true);
+  assert.equal(LiskovSsh.flags["no-remote-command"]?.char, "N");
+  assert.equal(LiskovSsh.flags.R, undefined);
+  assert.equal(LiskovSsh.flags.o, undefined);
+  const { Parser } = await import("@oclif/core");
+  const parsed = await Parser.parse(argv, {
+    strict: true,
+    flags: { ...LiskovSsh.baseFlags, ...LiskovSsh.flags },
+    args: LiskovSsh.args
+  });
+  assert.deepEqual(parsed.flags["dynamic-forward"], ["1080"]);
+  assert.deepEqual(parsed.flags["local-forward"], ["8080:example.com:80"]);
+  assert.equal(parsed.flags["no-remote-command"], true);
+  await assert.rejects(() => Parser.parse(["app", "-R", "127.0.0.1:9:127.0.0.1:9"], {
+    strict: true,
+    flags: { ...LiskovSsh.baseFlags, ...LiskovSsh.flags },
+    args: LiskovSsh.args
+  }));
+  await assert.rejects(() => Parser.parse(["app", "-o", "ForwardAgent=yes"], {
+    strict: true,
+    flags: { ...LiskovSsh.baseFlags, ...LiskovSsh.flags },
+    args: LiskovSsh.args
+  }));
+  await assert.rejects(() => Parser.parse(["app", "--", "-o", "ForwardAgent=yes"], {
+    strict: true,
+    flags: { ...LiskovSsh.baseFlags, ...LiskovSsh.flags },
+    args: LiskovSsh.args
+  }));
 });
 
 test("managed access fails closed on a substituted pinned host key before ticket issuance", async () => {
