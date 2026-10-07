@@ -70,6 +70,7 @@ proof liskov runtime-ssh attachment revoke org-123 att_123
 proof liskov ssh proof-docs --print-command
 proof liskov ssh proof-docs --deployment dep-123 --job job-123
 proof liskov ssh proof-docs --job 155468
+proof liskov ssh proof-docs --key patrick-mbp
 proof liskov application backfill-identities
 # Deprecated clean-only compatibility bridge; use application retire.
 proof liskov application delete proof-docs
@@ -81,6 +82,24 @@ proof liskov admin retirement historical-closeout app-uid --manifest-ref docs/ra
 proof liskov whoami --json
 proof liskov logout
 ```
+
+Managed `proof liskov ssh APP` automatically matches the attachment's authorized
+SHA256 public-key fingerprints to Ed25519 private-key files directly in `~/.ssh`.
+`--key NAME` selects the exact name registered with `runtime-ssh operator-key add
+--name NAME` in the effective organization. `--identity FILE` selects a path
+instead (or supplies a named key stored outside `~/.ssh`). A named key must also
+be authorized by the selected attachment. Key names never replace fingerprint
+checks, and private keys never leave this computer.
+
+Discovery reads the public envelope of actual OpenSSH private-key files,
+including encrypted keys, without prompting for a passphrase. OpenSSH handles
+the passphrase when connecting. A `.pub` file alone does not count. If no key
+matches, the error lists the required fingerprints; if multiple distinct keys
+match, select one with `--key` or `--identity`. Copies of the same key use the
+first path in sorted order. Other private-key formats must be readable by
+noninteractive `ssh-keygen`; use OpenSSH format for encrypted keys. SSH config
+aliases and agent-only keys are not searched. `--print-command --json` reports
+the selected path, fingerprint, and requested name without minting a ticket.
 
 Liskov builder login is designed as a browser-confirmed GitHub device-style
 flow. The CLI stores the local bearer token under an XDG-style config path and

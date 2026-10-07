@@ -55,6 +55,7 @@ export default class LiskovSsh extends OrganizationScopedCommand {
     "<%= config.bin %> liskov ssh my-app --deployment deploy_123 --print-command",
     "<%= config.bin %> liskov ssh my-app --job job_123",
     "<%= config.bin %> liskov ssh my-app --job 155468",
+    "<%= config.bin %> liskov ssh my-app --key work-laptop",
     "<%= config.bin %> liskov ssh my-app -L 127.0.0.1:9222:127.0.0.1:9222 -L 8080:example.com:80 -D 1080 -N"
   ];
   static flags: Interfaces.FlagInput = {
@@ -67,7 +68,8 @@ export default class LiskovSsh extends OrganizationScopedCommand {
       multiple: true
     }),
     help: Flags.help({ char: "h" }),
-    identity: Flags.string({ description: "Customer-owned Ed25519 private key for managed Runtime SSH." }),
+    identity: Flags.string({ description: "Ed25519 private-key path. Defaults to an authorized local key in ~/.ssh; with --key, must match that named key." }),
+    key: Flags.string({ description: "Select an exact organization operator-key name and find its matching local private key." }),
     job: Flags.string({ description: "Select an exact job id, or a provider job sequence (a V5 job\u2019s number)." }),
     json: Flags.boolean({ description: "Emit machine-readable JSON (most useful with --print-command)." }),
     "local-forward": Flags.string({
@@ -102,6 +104,7 @@ export default class LiskovSsh extends OrganizationScopedCommand {
       deploymentId: flags.deployment as string | undefined,
       jobId: flags.job as string | undefined,
       identity: flags.identity as string | undefined,
+      key: flags.key as string | undefined,
       printCommand: flags["print-command"] as boolean | undefined,
       config: flags.config as string | undefined,
       json: flags.json as boolean | undefined,
