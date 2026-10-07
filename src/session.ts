@@ -58,17 +58,14 @@ import {
   coverageScheduleFrom,
   coverageSummaryFrom,
   executionChanges,
-  executionConvergencePath,
   executionDigest,
   executionStableBlocker,
   executionTerminal,
   formatCoverageStatusLine,
   formatExecutionChange,
-  formatExecutionConvergence,
   formatExecutionExplanation,
   formatExecutionStatusLine,
   formatIntervalSchedule,
-  parseExecutionConvergence,
   readIntervalSchedule
 } from "./execution-explanation.js";
 import {
@@ -2037,19 +2034,6 @@ export async function runSlipwayApplicationExecutionShow(
     return 1;
   }
   if (input.watch !== true) {
-    const convergenceRequest = await authenticatedSlipwayRequest<unknown>({
-      config: input.config,
-      slipwayUrl: input.slipwayUrl,
-      json: input.json,
-      path: executionConvergencePath(input.applicationId),
-      requestErrorCode: "SLIPWAY_APPLICATION_EXECUTION_CONVERGENCE_FAILED",
-      notFoundMessage: "No Liskov CLI session is stored locally.",
-      fetchFailedMessage: "could not read Liskov Application execution convergence",
-      optional: true
-    }, options);
-    const convergence = convergenceRequest.ok
-      ? parseExecutionConvergence(convergenceRequest.body)
-      : parseExecutionConvergence({ refusal: { code: "execution_convergence_owner_unavailable" } });
     // The pinned interval schedule is Coverage's (`BKLG-20260908-xxtj`). A
     // failed, absent or legacy read is the quiet absent reading and never
     // fails the command; only an interval schedule asks whether the operator
@@ -2086,20 +2070,18 @@ export async function runSlipwayApplicationExecutionShow(
         { typed: coverage.typed, stoppedKnown: stopped !== undefined }
       );
     // `--json` keeps the explanation envelope's existing fields and adds the
-    // adjacent t89g document and the decoded schedule block without dropping
-    // IDs. Old servers decode as a typed refusal or a null schedule, never as
-    // invented quiet.
+    // decoded schedule block without dropping IDs. Old servers decode as a
+    // null schedule, never as invented quiet.
     writeStructuredOrHuman(
       options,
       input.json,
       input.json
         ? {
           explanation: first.body,
-          convergence: convergence.ok ? convergence.document : { refusal: { code: convergence.error } },
           schedule: coverage?.schedule ?? null
         }
         : first.body,
-      [formatExecutionExplanation(parsed.explanation), scheduleLine, formatExecutionConvergence(convergence)]
+      [formatExecutionExplanation(parsed.explanation), scheduleLine]
         .filter((line): line is string => line !== undefined)
         .join("\n")
     );
