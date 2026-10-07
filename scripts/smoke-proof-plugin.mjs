@@ -24,6 +24,10 @@ try {
   const plugins = run(process.execPath, [proofDevBin, "plugins"], { cwd: proofCliRoot, env });
   assertIncludes(plugins.stdout, "@proof-computer/proof-cli-liskov");
 
+  const sshHelp = run(process.execPath, [proofDevBin, "liskov", "ssh", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(sshHelp.stdout, "--key");
+  assertIncludes(sshHelp.stdout, "--identity");
+
   const help = run(process.execPath, [proofDevBin, "liskov", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(help.stdout, "Liskov application deployment commands");
   assertIncludes(help.stdout.replace(/\s+/g, " "), "Live custody commands are operator-only and hidden");
