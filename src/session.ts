@@ -1001,6 +1001,7 @@ interface PublicSlipwayApplicationSummary {
   lifecycleState?: string;
   /** `safe_retirement` or `legacy_immediate_tombstone`, once a receipt exists. */
   receiptKind?: string;
+  deploymentProjectionDegraded?: boolean;
 }
 
 interface PublicSlipwayApplicationRefCandidate {
@@ -8364,6 +8365,7 @@ function formatApplicationList(body: SlipwayApplicationListResponse): string {
       application.receiptKind === "safe_retirement" ? "safe-retirement receipt"
         : application.receiptKind === "legacy_immediate_tombstone" ? "legacy tombstone receipt"
         : undefined,
+      application.deploymentProjectionDegraded === true ? "deployment state unavailable" : undefined,
       typeof application.replicas === "number" ? `${application.replicas} replica(s)` : undefined,
       application.artifact?.status ? `artifact ${application.artifact.status}` : undefined,
       policyVersionId ? `policy ${policyVersionId}` : undefined,

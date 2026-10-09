@@ -489,6 +489,52 @@ describe("the lifecycle every surface shares", () => {
     assert.doesNotMatch(out.text, /: deleted \(/u);
   });
 
+  it("prints unavailable deployment state only for the flagged row and preserves JSON", async () => {
+    const session = await sessionFile();
+    for (const otherFlag of [undefined, false]) {
+      const response = {
+        ok: true,
+        count: 2,
+        applications: [
+          {
+            applicationId: "gone",
+            status: "deleted",
+            lifecycleState: "deleted",
+            receiptKind: "safe_retirement",
+            deploymentProjectionDegraded: true,
+            replicas: 0
+          },
+          {
+            applicationId: "live",
+            status: "active",
+            lifecycleState: "active",
+            replicas: 1,
+            ...(otherFlag === undefined ? {} : { deploymentProjectionDegraded: otherFlag })
+          }
+        ]
+      };
+      const out = writer();
+      assert.equal(await runSlipwayApplicationList({ config: session.file }, {
+        fetchImpl: async () => jsonResponse(response),
+        stdout: out.write
+      }), 0);
+      const lines = out.text.split("\n");
+      const flaggedLine = lines.find((line) => line.startsWith("- gone:"));
+      const otherLine = lines.find((line) => line.startsWith("- live:"));
+      assert.equal(flaggedLine,
+        "- gone: Retired (status deleted, safe-retirement receipt, deployment state unavailable, 0 replica(s))");
+      assert.equal(otherLine, "- live: Current (status active, 1 replica(s))");
+      assert.doesNotMatch(otherLine, /deployment state unavailable/u);
+
+      const jsonOut = writer();
+      assert.equal(await runSlipwayApplicationList({ config: session.file, json: true }, {
+        fetchImpl: async () => jsonResponse(response),
+        stdout: jsonOut.write
+      }), 0);
+      assert.deepEqual(JSON.parse(jsonOut.text), response);
+    }
+  });
+
   it("falls back to the stored status only when the server did not say", async () => {
     // A server older than BKLG-20260902-e7l1 sends no `lifecycleState`; the row
     // must still read truthfully rather than printing `deleted` at a customer.
