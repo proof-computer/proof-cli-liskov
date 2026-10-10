@@ -3324,13 +3324,17 @@ export async function runSlipwayApplicationPublish(input: SlipwayApplicationPubl
     return 1;
   }
   if (input.dryRun) {
+    const ready = preflight.body.publicationReady === true;
     writeStructuredOrHuman(
       options,
       input.json,
       preflight.body,
-      `Publication preflight for ${input.applicationRef}: ${preflight.body.publicationReady === true ? "ready" : "blocked"}.`
+      [
+        `Publication preflight for ${input.applicationRef}: ${ready ? "ready" : "blocked"}.`,
+        ...formatPublicationPreflightErrors(preflight.body)
+      ].join("\n")
     );
-    return preflight.body.publicationReady === true ? 0 : 1;
+    return ready ? 0 : 1;
   }
   if (preflight.body.publicationReady !== true || typeof preflight.body.authoredDigest !== "string") {
     writeStructuredOrHuman(options, input.json, {
@@ -3338,7 +3342,10 @@ export async function runSlipwayApplicationPublish(input: SlipwayApplicationPubl
       ok: false,
       error: "SLIPWAY_APPLICATION_PUBLISH_NOT_READY",
       applicationRef: input.applicationRef
-    }, `Error (SLIPWAY_APPLICATION_PUBLISH_NOT_READY): publication preflight for ${input.applicationRef} is blocked.`);
+    }, [
+      `Error (SLIPWAY_APPLICATION_PUBLISH_NOT_READY): publication preflight for ${input.applicationRef} is blocked.`,
+      ...formatPublicationPreflightErrors(preflight.body)
+    ].join("\n"));
     return 1;
   }
   const publishBody: Record<string, unknown> = {
@@ -9073,6 +9080,26 @@ function formatReplacementHoldSummary(hold: PublicSlipwayReplacementHold): strin
     hold.policyDigest ? `policy ${hold.policyDigest}` : undefined
   ].filter((item): item is string => item !== undefined);
   return `Hold: ${details.length > 0 ? details.join(", ") : "replacement spend requires review"}.`;
+}
+
+// A blocked publication preflight prints every server error it carries, one
+// `  <code>: <message> (<pointer>)` line each, instead of a bare "blocked"
+// (BKLG-20261008-p9zt). The body is the server's `errors: [{ code, message,
+// pointer }]`; every code renders the same way, so a new refusal such as
+// `v4_publication_disabled` needs no client change. The `--json` body is
+// untouched.
+function formatPublicationPreflightErrors(body: SlipwayGenericResponse): string[] {
+  if (!Array.isArray(body.errors)) return [];
+  const lines: string[] = [];
+  for (const entry of body.errors) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const { code, message, pointer } = entry as { code?: unknown; message?: unknown; pointer?: unknown };
+    const label = typeof code === "string" && code !== "" ? code : "error";
+    const text = typeof message === "string" && message !== "" ? message : "no message";
+    const where = typeof pointer === "string" && pointer !== "" ? ` (${pointer})` : "";
+    lines.push(`  ${label}: ${text}${where}`);
+  }
+  return lines;
 }
 
 function formatApplicationAmbiguity(applicationRef: string, candidates: PublicSlipwayApplicationRefCandidate[]): string {

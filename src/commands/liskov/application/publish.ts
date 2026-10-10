@@ -7,7 +7,7 @@ export default class SlipwayApplicationPublish extends OrganizationScopedCommand
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true })
   };
-  static description = "Publish the current Liskov Application draft.";
+  static description = "Publish the current Liskov Application draft. Manifest V4 publication is closed: author a retained V5 manifest (proof.liskov.application-manifest) and publish it with `proof liskov application policy publish`.";
   static examples = [
     "<%= config.bin %> liskov application publish proof-docs --yes",
     "<%= config.bin %> liskov application publish proof-docs --artifact-version av-... --dry-run",
