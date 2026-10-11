@@ -8,8 +8,8 @@ import {
   isRegisteredSourcePublicationPair
 } from "../src/application-policy.js";
 
-// Documents come from the owner's vendored corpus, never from this side: a
-// fixture written by the reader proves nothing about what liskov-rs accepts.
+// Base documents and refusal expectations come from the owner's corpus;
+// authored placement additions are validated through the owner's Wasm.
 interface CorpusRequest {
   encoding: "json" | "yaml";
   document: string;
@@ -80,6 +80,75 @@ describe("V6 application-manifest validation through the vendored contract", () 
       assert.deepEqual(result.errors, []);
       assert.equal(result.pair?.schemaVersion, 6);
       assert.deepEqual((result.document as { deployment?: { placement?: unknown } })?.deployment?.placement, choice.expected);
+      assert.equal(isRegisteredSourcePublicationPair(result), false);
+    });
+  }
+
+  const placementChoices = [
+    {
+      name: "country allow and exclude rules",
+      base: "v6/fetch",
+      placement: [
+        "    allow: [{by: country, values: [DE, CH]}]",
+        "    exclude: [{by: country, values: [US]}]"
+      ].join("\n"),
+      expected: {
+        allow: [{ by: "country", values: ["DE", "CH"] }],
+        exclude: [{ by: "country", values: ["US"] }]
+      }
+    },
+    {
+      name: "required manager and preferred country spread",
+      base: "v6/puppeteer",
+      placement: "    spread: [{by: manager, strength: required}, {by: country, minimumDistinct: 2, strength: preferred}]",
+      expected: {
+        spread: [
+          { by: "manager", strength: "required" },
+          { by: "country", minimumDistinct: 2, strength: "preferred" }
+        ]
+      }
+    }
+  ];
+
+  for (const choice of placementChoices) {
+    it(`accepts and preserves ${choice.name} without enabling publication`, () => {
+      const sample = corpusCase(choice.base);
+      const document = sample.request.document.replace("  spend:", `  placement:\n${choice.placement}\n  spend:`);
+      assert.notEqual(document, sample.request.document);
+      const result = evaluateApplicationManifestText(document, sample.request.encoding);
+      assert.equal(result.disposition, "supported");
+      assert.equal(result.valid, true);
+      assert.deepEqual(result.errors, []);
+      assert.equal(result.pair?.schemaVersion, 6);
+      assert.deepEqual((result.document as { deployment?: { placement?: unknown } })?.deployment?.placement, choice.expected);
+      assert.equal(isRegisteredSourcePublicationPair(result), false);
+    });
+  }
+
+  const placementRefusals = corpus.invalid.filter((sample) =>
+    sample.name.startsWith("v6/") && [
+      "/deployment/placement/spread",
+      "/deployment/placement/allow",
+      "/deployment/placement/exclude"
+    ].some((pointer) => sample.expectedPointer.startsWith(pointer))
+  );
+
+  it("vendors the owner contract that accepts country and spread", () => {
+    assert.ok(placementRefusals.length > 0, "vendored corpus has no V6 placement refusals");
+    assert.equal(corpus.invalid.some((sample) => sample.name === "v6/invalid/placement-spread-is-deferred"), false);
+    const deferredDimension = corpus.invalid.find((sample) => sample.name === "v6/invalid/filter-dimension-beyond-manager-is-deferred");
+    assert.ok(deferredDimension, "vendored corpus has no deferred filter dimension case");
+    assert.equal(deferredDimension.request.document.includes("by: country"), false);
+    assert.ok(deferredDimension.request.document.includes("by: region"));
+  });
+
+  for (const sample of placementRefusals) {
+    it(`reports the owner's ${sample.name} placement error`, () => {
+      const result = evaluate(sample);
+      assert.equal(result.valid, false);
+      assert.ok(result.errors.some((error) =>
+        error.code === sample.expectedCode && error.pointer === sample.expectedPointer
+      ), `missing owner error ${sample.expectedCode} at ${sample.expectedPointer}`);
       assert.equal(isRegisteredSourcePublicationPair(result), false);
     });
   }

@@ -5397,6 +5397,28 @@
       "expectedPointer": "/cohort"
     },
     {
+      "name": "v6/invalid/country-code-is-two-uppercase-letters",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: country \"de\" must be two uppercase letters, ISO 3166-1 alpha-2\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/allow/0/values/0\n# A country value is exactly two uppercase ASCII letters (ADR-0154). V6 does\n# not case-fold: `de` is refused, not normalized. No assigned-code table is\n# consulted, so the same rule refuses `DEU` and `D1` and accepts `ZZ`.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-country-code\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    allow: [{by: country, values: [\"de\"]}]\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/allow/0/values/0"
+    },
+    {
+      "name": "v6/invalid/country-is-both-allowed-and-excluded",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: country [\"DE\"] is both allowed and excluded\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/exclude\n# One code may not appear in both lists for the same dimension. Allowing and\n# excluding the same country is a contradiction that would otherwise resolve\n# by whichever rule the allocator happened to apply last.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-country-both\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    allow: [{by: country, values: [\"DE\", \"CH\"]}]\n    exclude: [{by: country, values: [\"DE\"]}]\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/exclude"
+    },
+    {
       "name": "v6/invalid/duplicate-allow-dimension",
       "request": {
         "schema": "proof.liskov.policy-client-request.v1",
@@ -5468,7 +5490,7 @@
         "schema": "proof.liskov.policy-client-request.v1",
         "operation": "validate",
         "encoding": "yaml",
-        "document": "# EXPECT: unknown variant `country`, expected `manager`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/allow/0/by\n# Own-fleet targeting filters by the customer's own manager id, and nothing\n# else: `operator` was withdrawn before publication because on chain the\n# owning account is the manager (BKLG-20260907-547n).\n# Geography (`country`, `region`) reads a server-observed WAN IP that exists\n# only for processors Liskov has already contacted, and returns with\n# EPIC-20260907-7hzo; `wan_ip` is never filterable at all.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-filter-dimension-deferred\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    allow: [{by: country, values: [DE]}]\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
+        "document": "# EXPECT: unknown variant `region`, expected `manager`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/allow/0/by\n# `operator` was withdrawn before publication because on chain the owning\n# account is the manager (BKLG-20260907-547n). `country` is authored\n# (ADR-0154). `region` stays deferred (EPIC-20260907-7hzo). `wan_ip` is\n# never filterable at all.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-filter-dimension-deferred\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    allow: [{by: region, values: [DE]}]\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
       },
       "expectedCode": "invalid_manifest",
       "expectedPointer": "/deployment/placement/allow/0/by"
@@ -5584,6 +5606,17 @@
       "expectedPointer": "/deployment/schedule/phasing/jobsPerPhase"
     },
     {
+      "name": "v6/invalid/placement-distribution-is-deferred",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown field `distribution`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/distribution\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-placement-distribution-is-deferred\nrelease: {mode: source}\nruntime:\n  kind: native_image\n  image: {name: debian-trixie, version: \"0.1\"}\n  entrypoint: {executable: /bin/sh, args: [/app/start.sh]}\nexecution: {mode: continuous}\ndeployment:\n  jobs: 2\n  schedule: {duration: 6h}\n  placement:\n    distribution: []\n  spend:\n    unit: service_credit_micros\n    perJob: \"1200000\"\n    rate: {amount: \"30000000\", window: 1d}\n\nstate:\n  mode: off\n\nobservability:\n  logs: {enabled: true}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/deployment/placement/distribution"
+    },
+    {
       "name": "v6/invalid/placement-evidence-is-platform-owned",
       "request": {
         "schema": "proof.liskov.policy-client-request.v1",
@@ -5593,17 +5626,6 @@
       },
       "expectedCode": "unknown_field",
       "expectedPointer": "/deployment/placement/evidence"
-    },
-    {
-      "name": "v6/invalid/placement-spread-is-deferred",
-      "request": {
-        "schema": "proof.liskov.policy-client-request.v1",
-        "operation": "validate",
-        "encoding": "yaml",
-        "document": "# EXPECT: unknown field `spread`, expected one of `minimums`, `processorSelection`, `allow`, `exclude`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/spread\n# V6 reintroduces `allow` and `exclude` (own-fleet targeting) and nothing else\n# of ADR-0082 \u00a73.e: `placement` is closed to exactly `minimums`,\n# `processorSelection`, `allow` and `exclude`. Spread and distribution wait for\n# the joint allocator (EPIC-20260906-6eld), and the same closure refuses both,\n# so this one fixture pins that vocabulary.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-placement-spread-is-deferred\nrelease: {mode: source}\nruntime:\n  kind: native_image\n  image: {name: debian-trixie, version: \"0.1\"}\n  entrypoint: {executable: /bin/sh, args: [/app/start.sh]}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 6h}\n  placement:\n    spread:\n      - by: country\n        minimumDistinct: 3\n        strength: required\n  spend:\n    unit: service_credit_micros\n    perJob: \"1200000\"\n    rate: {amount: \"30000000\", window: 1d}\n\nstate:\n  mode: off\n\nobservability:\n  logs: {enabled: true}\n"
-      },
-      "expectedCode": "unknown_field",
-      "expectedPointer": "/deployment/placement/spread"
     },
     {
       "name": "v6/invalid/private-endpoint-on-javascript",
@@ -5692,6 +5714,50 @@
       },
       "expectedCode": "unknown_field",
       "expectedPointer": "/deployment/lifecycle/recovery"
+    },
+    {
+      "name": "v6/invalid/spread-dimension-is-deferred",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown variant `region`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/spread/0/by\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-spread-dimension-is-deferred\nrelease: {mode: source}\nruntime:\n  kind: native_image\n  image: {name: debian-trixie, version: \"0.1\"}\n  entrypoint: {executable: /bin/sh, args: [/app/start.sh]}\nexecution: {mode: continuous}\ndeployment:\n  jobs: 2\n  schedule: {duration: 6h}\n  placement:\n    spread: [{by: region, strength: required}]\n  spend:\n    unit: service_credit_micros\n    perJob: \"1200000\"\n    rate: {amount: \"30000000\", window: 1d}\n\nstate:\n  mode: off\n\nobservability:\n  logs: {enabled: true}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/spread/0/by"
+    },
+    {
+      "name": "v6/invalid/spread-minimum-exceeds-jobs",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: minimumDistinct must be at least 2\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/spread/0/minimumDistinct\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-spread-minimum-exceeds-jobs\nrelease: {mode: source}\nruntime:\n  kind: native_image\n  image: {name: debian-trixie, version: \"0.1\"}\n  entrypoint: {executable: /bin/sh, args: [/app/start.sh]}\nexecution: {mode: continuous}\ndeployment:\n  jobs: 2\n  schedule: {duration: 6h}\n  placement:\n    spread: [{by: manager, strength: required, minimumDistinct: 3}]\n  spend:\n    unit: service_credit_micros\n    perJob: \"1200000\"\n    rate: {amount: \"30000000\", window: 1d}\n\nstate:\n  mode: off\n\nobservability:\n  logs: {enabled: true}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/spread/0/minimumDistinct"
+    },
+    {
+      "name": "v6/invalid/spread-minimum-too-small",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: minimumDistinct must be at least 2\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/spread/0/minimumDistinct\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-spread-minimum-too-small\nrelease: {mode: source}\nruntime:\n  kind: native_image\n  image: {name: debian-trixie, version: \"0.1\"}\n  entrypoint: {executable: /bin/sh, args: [/app/start.sh]}\nexecution: {mode: continuous}\ndeployment:\n  jobs: 2\n  schedule: {duration: 6h}\n  placement:\n    spread: [{by: manager, strength: required, minimumDistinct: 1}]\n  spend:\n    unit: service_credit_micros\n    perJob: \"1200000\"\n    rate: {amount: \"30000000\", window: 1d}\n\nstate:\n  mode: off\n\nobservability:\n  logs: {enabled: true}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/spread/0/minimumDistinct"
+    },
+    {
+      "name": "v6/invalid/spread-needs-two-jobs",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: spread needs at least two deployment jobs\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/jobs\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-spread-needs-two-jobs\nrelease: {mode: source}\nruntime:\n  kind: native_image\n  image: {name: debian-trixie, version: \"0.1\"}\n  entrypoint: {executable: /bin/sh, args: [/app/start.sh]}\nexecution: {mode: continuous}\ndeployment:\n  jobs: 1\n  schedule: {duration: 6h}\n  placement:\n    spread: [{by: manager, strength: required}]\n  spend:\n    unit: service_credit_micros\n    perJob: \"1200000\"\n    rate: {amount: \"30000000\", window: 1d}\n\nstate:\n  mode: off\n\nobservability:\n  logs: {enabled: true}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/jobs"
     },
     {
       "name": "v6/invalid/ssh-provider-acurast-tunnel-is-deferred",
