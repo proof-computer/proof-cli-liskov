@@ -3265,6 +3265,79 @@ describe("proof-cli Liskov runner", () => {
     }]);
   });
 
+  it("prints every publication preflight error under the blocked line and keeps the JSON body byte-identical", async () => {
+    // BKLG-20261008-p9zt: a blocked preflight names its refusal (code, message,
+    // pointer) in human output; the V4 close (BKLG-20261008-r2vh) is one such
+    // code and is rendered like any other.
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
+    const sessionFile = path.join(dir, "session.json");
+    const token = "publish-refusal-token-do-not-print";
+    await saveSlipwaySession({
+      version: 1,
+      slipwayUrl: "https://slipway.test",
+      sessionToken: token,
+      savedAtMs: 0
+    }, { config: sessionFile });
+    const message = "new v4 publications are disabled in every mode; author a proof.liskov.application-manifest v5 and publish it through /policy-versions";
+    const preflightBody = {
+      ok: true,
+      manifestValid: true,
+      releaseResolved: true,
+      policyValid: true,
+      targetSupported: true,
+      entitled: true,
+      publicationEnabled: false,
+      publicationReady: false,
+      errors: [
+        { code: "v4_publication_disabled", message, pointer: "/schemaVersion" },
+        { code: "release_unresolved", message: "no release matches", pointer: "/release" }
+      ]
+    };
+    const urls: string[] = [];
+    const options = (stdout: (line: string) => void) => ({
+      fetchImpl: async (url: URL | RequestInfo) => {
+        urls.push(String(url));
+        if (String(url).endsWith("/publish/preflight")) return jsonResponse(preflightBody);
+        throw new Error("publish must not be attempted after a blocked preflight");
+      },
+      stdout
+    });
+    const codeLine = `  v4_publication_disabled: ${message} (/schemaVersion)`;
+    const secondLine = "  release_unresolved: no release matches (/release)";
+
+    // --dry-run: the blocked line first, then one line per error.
+    const dryRun = writer();
+    assert.equal(await runSlipwayApplicationPublish({ applicationRef: "alpha", config: sessionFile, dryRun: true }, options(dryRun.write)), 1);
+    assert.equal(dryRun.text, `Publication preflight for alpha: blocked.\n${codeLine}\n${secondLine}\n`);
+    assert.equal(dryRun.text.includes(token), false);
+
+    // --yes: the NOT_READY error line is still first, the same error lines follow.
+    const confirmed = writer();
+    assert.equal(await runSlipwayApplicationPublish({ applicationRef: "alpha", config: sessionFile, yes: true }, options(confirmed.write)), 1);
+    assert.equal(confirmed.text, `Error (SLIPWAY_APPLICATION_PUBLISH_NOT_READY): publication preflight for alpha is blocked.\n${codeLine}\n${secondLine}\n`);
+    assert.equal(confirmed.text.includes(token), false);
+
+    // --json bodies are unchanged: the preflight body itself for --dry-run, and
+    // the body under the NOT_READY envelope for --yes.
+    const dryRunJson = writer();
+    assert.equal(await runSlipwayApplicationPublish({ applicationRef: "alpha", config: sessionFile, dryRun: true, json: true }, options(dryRunJson.write)), 1);
+    assert.equal(dryRunJson.text, `${JSON.stringify(preflightBody)}\n`);
+    const confirmedJson = writer();
+    assert.equal(await runSlipwayApplicationPublish({ applicationRef: "alpha", config: sessionFile, yes: true, json: true }, options(confirmedJson.write)), 1);
+    assert.equal(confirmedJson.text, `${JSON.stringify({ ...preflightBody, ok: false, error: "SLIPWAY_APPLICATION_PUBLISH_NOT_READY", applicationRef: "alpha" })}\n`);
+
+    // Only the preflight was ever called.
+    assert.deepEqual(urls, Array.from({ length: 4 }, () => "https://slipway.test/api/applications/alpha/publish/preflight"));
+
+    // A blocked preflight without an errors array still prints the blocked line alone.
+    const bare = writer();
+    assert.equal(await runSlipwayApplicationPublish({ applicationRef: "alpha", config: sessionFile, dryRun: true }, {
+      fetchImpl: async () => jsonResponse({ ok: true, publicationReady: false }),
+      stdout: bare.write
+    }), 1);
+    assert.equal(bare.text, "Publication preflight for alpha: blocked.\n");
+  });
+
   it("publishes a validated retained V5 source document through the registered writer with exact evidence", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-liskov-v5-publish-"));
     const sessionFile = path.join(dir, "session.json");
