@@ -292,19 +292,23 @@ or non-terminal billing correlation.
 `proof liskov application runtime-image workflow APP_ID --manifest PATH`
 writes a manual GitHub Actions caller for the manifest-bound runtime-image
 pipeline at
-`proof-computer/liskov-github-actions/.github/workflows/runtime-image.yml@v1`.
-The CLI first verifies that `PATH` is a valid repo-relative V4 build manifest
-for `APP_ID`, that its artifact kind is `runtime_image`, and that its authored
-`builder.manifestPath` exactly matches `PATH`. At dispatch time the reusable
-workflow imports that manifest, downloads the supplied image URL, and binds the
-one-run Tigris upload session to the server-authoritative authored and release
-intent digests before upload and finalize. Use `--liskov-url` and
+`proof-computer/liskov-github-actions/.github/workflows/runtime-image.yml@v2`.
+This native-image path remains Internal. The CLI validates the repo-relative
+JSON document at `PATH` through its bundled policy client, requiring a registered
+source publication pair, matching `APP_ID`, `release.mode: source`,
+`runtime.kind: native_image`, and a valid authored digest. V4 documents and
+pinned releases are refused. V5 has no authored builder block.
+The generator only writes a local file; it does not configure the source
+binding or run a build. At dispatch time the reusable workflow downloads the
+supplied image URL and uploads it against the source document and matching
+server-owned source binding. Use `--liskov-url` and
 `--oidc-audience` to embed custom endpoints in the caller.
 
-The active Application policy must allow the repository/ref under
-`runtimeImageAutomation.github`; if it pins `workflowRef`, set it to the
-generated caller path, such as
+The application's server-owned source binding must authorize the repository,
+ref, manifest path and generated caller workflow identity, such as
 `<owner>/<repo>/.github/workflows/liskov-runtime-image.yml@refs/heads/<branch>`.
+The structured success key `policyWorkflowRefHint` retains that caller identity
+hint for existing consumers.
 
 ## Operator-only commands
 
