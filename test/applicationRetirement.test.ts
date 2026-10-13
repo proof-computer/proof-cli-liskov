@@ -422,6 +422,27 @@ describe("application retirement CLI", () => {
     assert.equal(parsed.applicationRef, "app-uid-repo-less");
   });
 
+  it("names the application and a repository placeholder when drift has no last known repository", async () => {
+    const session = await sessionFile();
+    for (const status of [200, 400]) {
+      const out = writer();
+      const code = await runSlipwayApplicationRetirement({
+        applicationRef: "app-uid-repo-less", config: session.file
+      }, {
+        fetchImpl: async () => jsonResponse({
+          ok: status === 200,
+          repositoryBinding: "missingByDrift",
+          lastKnownRepository: "",
+          error: status === 400 ? "retirement_unavailable" : undefined
+        }, status),
+        stdout: out.write
+      });
+      assert.equal(code, status === 200 ? 0 : 1);
+      assert.match(out.text, /Repair: proof liskov application set-repository app-uid-repo-less <owner\/repo> --yes/u);
+      assert.doesNotMatch(out.text, /application import/u);
+    }
+  });
+
   it("prints the binding and repair on an admitted repository-less preview", async () => {
     const session = await sessionFile();
     const out = writer();
@@ -454,8 +475,9 @@ describe("application retirement CLI", () => {
     assert.match(out.text, /import drift/u);
     assert.match(
       out.text,
-      /proof liskov application import --github owner\/stranded --server-fetch/u
+      /proof liskov application set-repository app-uid-repo-less owner\/stranded --yes/u
     );
+    assert.doesNotMatch(out.text, /application import/u);
   });
 });
 

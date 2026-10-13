@@ -19,7 +19,7 @@ proof liskov application policy publish lab-inference-shell --file .liskov/lab-i
 proof liskov application source-binding set proof-docs --repository proof-computer/proof-docs --allowed-ref refs/heads/main --workflow-identity proof-computer/proof-docs/.github/workflows/release.yml@refs/heads/main --manifest-path .liskov/proof-docs-v5.json --yes
 proof liskov application source-binding show proof-docs
 proof liskov application source-binding revoke proof-docs --expected-revision 1 --reason "credential exposure" --yes
-proof liskov application import --github proof-computer/docs:.slipway/application-policy.json@main --server-fetch
+# V4 manifest import is closed. For V5 use application create → application source-binding set → application policy publish.
 proof liskov application list
 proof liskov application list --organization org-123
 LISKOV_ORGANIZATION=team-slug proof liskov application status proof-docs

@@ -5437,6 +5437,94 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(out.text.includes(token), false);
   });
 
+  it("prints the server import refusal and only its error diagnostics", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-liskov-import-refusal-"));
+    const config = path.join(dir, "session.json");
+    const token = "import_refusal_secret_do_not_print";
+    await saveSlipwaySession({
+      version: 1, slipwayUrl: "https://slipway.test", sessionToken: token, savedAtMs: 0
+    }, { config });
+    const reason = "V4 manifest import is closed. Use application policy publish for V5.";
+    const diagnostics = [
+      { level: "error", code: "v4_publication_disabled", message: reason, pointer: "schemaVersion", field: "ignored" },
+      { level: "error", code: "v3_publication_disabled", message: "V3 import is closed.", field: "schemaVersion" },
+      { level: "error", code: "source_invalid", message: "Choose a supported source." },
+      { level: "warning", code: "warning_only", message: "Do not print this warning." },
+      null
+    ];
+    const out = writer();
+    const code = await runSlipwayApplicationImport({
+      github: "owner/repo:manifest.json@main", serverFetch: true, config
+    }, {
+      fetchImpl: async () => jsonResponse({ ok: false, error: "invalid_application_import", reason, diagnostics }, 400),
+      stdout: out.write
+    });
+    assert.equal(code, 1);
+    assert.equal(out.text.trimEnd(), [
+      `Error (invalid_application_import): ${reason}`,
+      `  v4_publication_disabled: ${reason} (schemaVersion)`,
+      "  v3_publication_disabled: V3 import is closed. (schemaVersion)",
+      "  source_invalid: Choose a supported source."
+    ].join("\n"));
+    assert.equal(out.text.includes(token), false);
+  });
+
+  it("adds verbatim server import details to JSON while keeping existing error and reason fields", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-liskov-import-refusal-"));
+    const config = path.join(dir, "session.json");
+    const token = "import_json_secret_do_not_print";
+    await saveSlipwaySession({
+      version: 1, slipwayUrl: "https://slipway.test", sessionToken: token, savedAtMs: 0
+    }, { config });
+    const diagnostics = [
+      { level: "error", code: "v4_publication_disabled", message: "V4 import is closed.", field: "schemaVersion", extra: { retained: true } },
+      { level: "warning", code: "source_warning", message: "Source warning." }
+    ];
+    for (const status of [400, 401]) {
+      const out = writer();
+      assert.equal(await runSlipwayApplicationImport({
+        github: "owner/repo:manifest.json@main", serverFetch: true, config, json: true
+      }, {
+        fetchImpl: async () => jsonResponse({ ok: false, error: "invalid_application_import", reason: "", diagnostics }, status),
+        stdout: out.write
+      }), 1);
+      assert.deepEqual(JSON.parse(out.text), {
+        ok: false,
+        error: status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_IMPORT_FAILED",
+        serverError: "invalid_application_import",
+        status,
+        reason: "",
+        diagnostics,
+        slipwayUrl: "https://slipway.test",
+        sessionFile: config
+      });
+      assert.equal(out.text.includes(token), false);
+    }
+  });
+
+  it("keeps the import 401 human output unchanged and falls back when server details are absent", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "proof-liskov-import-refusal-"));
+    const config = path.join(dir, "session.json");
+    await saveSlipwaySession({
+      version: 1, slipwayUrl: "https://slipway.test", sessionToken: "import_fallback_secret", savedAtMs: 0
+    }, { config });
+    for (const [status, body, expected] of [
+      [401, { ok: false, error: "unauthorized", reason: "Server detail", diagnostics: [{ level: "error", code: "hidden", message: "Hidden" }] }, "SLIPWAY_SESSION_UNAUTHORIZED"],
+      [400, { ok: false, error: "invalid_policy_import" }, "invalid_policy_import"],
+      [500, { ok: false }, "SLIPWAY_APPLICATION_IMPORT_FAILED"]
+    ] as const) {
+      const out = writer();
+      assert.equal(await runSlipwayApplicationImport({
+        github: "owner/repo:manifest.json@main", serverFetch: true, config
+      }, {
+        fetchImpl: async () => jsonResponse(body, status), stdout: out.write
+      }), 1);
+      assert.equal(out.text.trimEnd(), status === 401
+        ? "Error (SLIPWAY_SESSION_UNAUTHORIZED): Liskov rejected the stored session — it has expired or is no longer valid. Run `proof liskov login` again."
+        : `Error (${expected}): Liskov could not import the Application policy.`);
+    }
+  });
+
   it("imports a GitHub Application manifest through server fetch without publishing or printing the bearer token", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "proof-slipway-cli-"));
     const sessionFile = path.join(dir, "session.json");

@@ -4,7 +4,8 @@ import { OrganizationScopedCommand } from "../../../organization-context.js";
 import { runSlipwayApplicationImport } from "../../../session.js";
 
 export default class SlipwayApplicationImport extends OrganizationScopedCommand {
-  static description = "Import a Liskov Application manifest as a draft.";
+  static description = "Import a Liskov Application manifest as a draft. V4 manifest import is closed. " +
+    "For V5, use application create → application source-binding set → application policy publish.";
   static examples = [
     "<%= config.bin %> liskov application import --github proof-computer/docs:.liskov/application-manifest.json@main --server-fetch",
     "<%= config.bin %> liskov application import --github proof-computer/docs:.liskov/application-manifest.json@main --server-fetch --json",

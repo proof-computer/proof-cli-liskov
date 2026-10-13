@@ -2584,7 +2584,8 @@ export async function runSlipwayApplicationRetirement(
       readRequest.response,
       input.json,
       options,
-      "SLIPWAY_APPLICATION_RETIREMENT_FAILED"
+      "SLIPWAY_APPLICATION_RETIREMENT_FAILED",
+      input.applicationRef
     );
   }
   if (!readRequest.body || !readRequest.response.ok || readRequest.body.ok === false) {
@@ -2593,7 +2594,8 @@ export async function runSlipwayApplicationRetirement(
       readRequest.response,
       input.json,
       options,
-      "SLIPWAY_APPLICATION_RETIREMENT_FAILED"
+      "SLIPWAY_APPLICATION_RETIREMENT_FAILED",
+      input.applicationRef
     );
   }
   const readRetirement = objectRecord(readRequest.body.retirement);
@@ -2606,7 +2608,7 @@ export async function runSlipwayApplicationRetirement(
       options,
       input.json,
       readRequest.body,
-      formatApplicationRetirement(readRequest.body)
+      formatApplicationRetirement(readRequest.body, input.applicationRef)
     );
     return 1;
   }
@@ -2627,7 +2629,8 @@ export async function runSlipwayApplicationRetirement(
     request.response,
     input.json,
     options,
-    "SLIPWAY_APPLICATION_RETIREMENT_FAILED"
+    "SLIPWAY_APPLICATION_RETIREMENT_FAILED",
+    input.applicationRef
   );
 }
 
@@ -2877,7 +2880,8 @@ export async function runSlipwayApplicationRetirementCancel(
     request.response,
     input.json,
     options,
-    "SLIPWAY_APPLICATION_RETIREMENT_CANCEL_FAILED"
+    "SLIPWAY_APPLICATION_RETIREMENT_CANCEL_FAILED",
+    input.applicationRef
   );
 }
 
@@ -5512,14 +5516,23 @@ export async function runSlipwayApplicationImport(input: SlipwayApplicationImpor
   const responseBody = request.body;
   if (responseBody?.ok !== true) {
     const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_IMPORT_FAILED";
+    const fallback = "Liskov could not import the Application policy.";
+    const human = request.response.status === 401
+      ? `Error (${error}): ${fallback}`
+      : [
+        `Error (${responseBody?.error ?? error}): ${responseBody?.reason ?? fallback}`,
+        ...formatApplicationImportDiagnostics(responseBody?.diagnostics)
+      ].join("\n");
     writeStructuredOrHuman(options, input.json, {
       ok: false,
       error,
+      serverError: responseBody?.error,
       status: request.response.status,
       reason: responseBody?.reason ?? responseBody?.error,
+      diagnostics: responseBody?.diagnostics,
       slipwayUrl: request.slipwayUrl,
       sessionFile: request.sessionFile
-    }, `Error (${error}): Liskov could not import the Application policy.`);
+    }, human);
     return 1;
   }
 
@@ -8449,7 +8462,8 @@ function writeRetirementResponse(
   response: Response,
   json: boolean | undefined,
   options: SlipwayCliOptions,
-  fallbackError: string
+  fallbackError: string,
+  applicationRef: string
 ): number {
   if (!body) return writeMalformedReadResponse(fallbackError, response, json, options);
   // The completion race. `409 retirement_already_completed` is the one refusal
@@ -8487,15 +8501,15 @@ function writeRetirementResponse(
       : "";
     emit(options, [
       sessionUnauthorizedHuman(error, `Error (${error}): ${body.reason ?? "Liskov retirement request failed."}${completion}`),
-      formatRepositoryBinding(body)
+      formatRepositoryBinding(body, applicationRef)
     ].filter(Boolean).join("\n"));
     return 1;
   }
-  emit(options, formatApplicationRetirement(body));
+  emit(options, formatApplicationRetirement(body, applicationRef));
   return 0;
 }
 
-function formatApplicationRetirement(body: SlipwayApplicationRetirementResponse): string {
+function formatApplicationRetirement(body: SlipwayApplicationRetirementResponse, applicationRef: string): string {
   const receipt = objectRecord(body.receipt);
   if (Object.keys(receipt).length > 0) {
     const lines = [formatRetirementReceipt(receipt)];
@@ -8530,7 +8544,7 @@ function formatApplicationRetirement(body: SlipwayApplicationRetirementResponse)
       header,
       formatRetirementAssessment(objectRecord(retirement.assessment)),
       formatRetirementRemediation(objectRecord(body.remediation)),
-      formatRepositoryBinding(body)
+      formatRepositoryBinding(body, applicationRef)
     ].filter(Boolean).join("\n");
   }
 
@@ -8547,24 +8561,22 @@ function formatApplicationRetirement(body: SlipwayApplicationRetirementResponse)
       "Retirement preview (read only).",
       formatRetirementAssessment(objectRecord(preview.assessment)),
       formatRetirementRemediation(objectRecord(preview.remediation)),
-      formatRepositoryBinding(body),
+      formatRepositoryBinding(body, applicationRef),
       action
     ].filter(Boolean).join("\n");
   }
-  const bindingOnly = formatRepositoryBinding(body);
+  const bindingOnly = formatRepositoryBinding(body, applicationRef);
   return bindingOnly ?? "Liskov returned application retirement state.";
 }
 
-function formatRepositoryBinding(body: SlipwayApplicationRetirementResponse): string | undefined {
+function formatRepositoryBinding(body: SlipwayApplicationRetirementResponse, applicationRef: string): string | undefined {
   const state = typeof body.repositoryBinding === "string" ? body.repositoryBinding : undefined;
   if (!state || state === "bound") return undefined;
   const lastKnown = typeof body.lastKnownRepository === "string"
     ? body.lastKnownRepository.trim()
     : "";
   if (state === "missingByDrift") {
-    const repair = lastKnown.length > 0
-      ? `proof liskov application import --github ${lastKnown} --server-fetch`
-      : "proof liskov application import --github <owner/repo> --server-fetch";
+    const repair = `proof liskov application set-repository ${applicationRef} ${lastKnown.length > 0 ? lastKnown : "<owner/repo>"} --yes`;
     return [
       "GitHub repository binding is missing (import drift, not an intentionally unbound application).",
       `Repair: ${repair}`
@@ -9073,6 +9085,22 @@ function formatReplacementHoldSummary(hold: PublicSlipwayReplacementHold): strin
     hold.policyDigest ? `policy ${hold.policyDigest}` : undefined
   ].filter((item): item is string => item !== undefined);
   return `Hold: ${details.length > 0 ? details.join(", ") : "replacement spend requires review"}.`;
+}
+
+function formatApplicationImportDiagnostics(diagnostics: unknown): string[] {
+  if (!Array.isArray(diagnostics)) return [];
+  const lines: string[] = [];
+  for (const entry of diagnostics) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const { level, code, message, pointer, field } = entry as Record<string, unknown>;
+    if (level !== "error") continue;
+    const label = typeof code === "string" && code !== "" ? code : "error";
+    const text = typeof message === "string" && message !== "" ? message : "no message";
+    const location = pointer ?? field;
+    const where = typeof location === "string" && location !== "" ? ` (${location})` : "";
+    lines.push(`  ${label}: ${text}${where}`);
+  }
+  return lines;
 }
 
 // A blocked publication preflight prints every server error it carries, one

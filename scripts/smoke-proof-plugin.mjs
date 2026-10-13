@@ -147,6 +147,11 @@ try {
   assertIncludes(applicationImportHelp.stdout, "Import a Liskov Application manifest");
   assertIncludes(applicationImportHelp.stdout, "--github");
   assertIncludes(applicationImportHelp.stdout, "--server-fetch");
+  const importHelpText = applicationImportHelp.stdout.replace(/\s+/g, " ");
+  assertIncludes(importHelpText, "V4 manifest import is closed");
+  assertIncludes(importHelpText, "application create");
+  assertIncludes(importHelpText, "application source-binding set");
+  assertIncludes(importHelpText, "application policy publish");
 
   const applicationStatusHelp = run(process.execPath, [proofDevBin, "liskov", "application", "status", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationStatusHelp.stdout, "Read Liskov Application status");
