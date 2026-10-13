@@ -7,7 +7,7 @@ export default class SlipwayApplicationRuntimeImageWorkflow extends AnalyticsCom
   static args = {
     app_id: Args.string({ description: "Liskov Application id declared by the manifest.", required: true })
   };
-  static description = "Write a GitHub Actions workflow for Liskov runtime-image uploads.";
+  static description = "Write a local GitHub Actions caller for runtime-image.yml@v2 using a V5 source/native_image JSON document. The server-owned source binding must authorize the repository, ref, caller workflow and manifest path. This command does not configure the binding or run the build.";
   static examples = [
     "<%= config.bin %> liskov application runtime-image workflow proof-docs --manifest .liskov/proof-docs.json",
     "<%= config.bin %> liskov application runtime-image workflow proof-docs --manifest .liskov/proof-docs.json --output .github/workflows/liskov-runtime-image.yml --yes",
@@ -19,7 +19,7 @@ export default class SlipwayApplicationRuntimeImageWorkflow extends AnalyticsCom
     "liskov-url": Flags.string({ description: "Liskov service URL embedded in the generated workflow." }),
     manifest: Flags.string({
       char: "m",
-      description: "Repo-relative path to the authored V4 runtime-image build manifest.",
+      description: "Repo-relative V5 JSON document with release.mode source and runtime.kind native_image.",
       required: true
     }),
     "oidc-audience": Flags.string({ description: "GitHub OIDC audience requested by the generated workflow." }),

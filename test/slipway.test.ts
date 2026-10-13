@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 
+import { evaluateApplicationManifest, isRegisteredSourcePublicationPair, setPolicyContractForTesting } from "../src/application-policy.js";
+
 import LiskovApplicationPolicyPublish from "../src/commands/liskov/application/policy/publish.js";
 import RuntimeImageWorkflowCommand from "../src/commands/liskov/application/runtime-image/workflow.js";
 import {
@@ -155,8 +157,13 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(out.text.includes("saved-legacy-token"), false);
   });
 
-  it("writes a manifest-bound @v1 runtime-image workflow without inline upload logic", async () => {
-    const { dir, manifestPath } = await runtimeImageWorkflowFixture("proof-docs");
+  it("writes a V5 source-bound @v2 runtime-image workflow without inline upload logic", async () => {
+    const { dir, manifestPath, manifest } = await runtimeImageWorkflowFixture("proof-docs");
+    const result = evaluateApplicationManifest(manifest);
+    assert.equal(result.valid, true);
+    assert.equal(isRegisteredSourcePublicationPair(result), true);
+    assert.match(result.authoredDigest!, /^[0-9a-f]{64}$/u);
+    assert.equal("builder" in (manifest.release as Record<string, unknown>), false);
     const output = path.join(dir, ".github", "workflows", "liskov-runtime-image.yml");
     const out = writer();
     const code = await runSlipwayApplicationRuntimeImageWorkflow({
@@ -188,7 +195,7 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(parsed.manifestPath, manifestPath);
     assert.equal(
       parsed.actionsRef,
-      "proof-computer/liskov-github-actions/.github/workflows/runtime-image.yml@v1"
+      "proof-computer/liskov-github-actions/.github/workflows/runtime-image.yml@v2"
     );
     assert.match(parsed.policyWorkflowRefHint, /\.github\/workflows\/liskov-runtime-image\.yml@refs\/heads\/<branch>/u);
     assert.equal(out.text.includes("secretAccessKey"), false);
@@ -201,7 +208,7 @@ describe("proof-cli Liskov runner", () => {
     assert.match(workflow, /id-token: write/u);
     assert.match(
       workflow,
-      /uses: proof-computer\/liskov-github-actions\/\.github\/workflows\/runtime-image\.yml@v1/u
+      /uses: proof-computer\/liskov-github-actions\/\.github\/workflows\/runtime-image\.yml@v2/u
     );
     assert.match(workflow, /application-id: 'proof-docs'/u);
     assert.match(workflow, new RegExp(`manifest-path: '${manifestPath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}'`, "u"));
@@ -219,12 +226,14 @@ describe("proof-cli Liskov runner", () => {
     const output = path.join(dir, "runtime-image.yml");
     await writeFile(output, "existing workflow\n", "utf8");
     const out = writer();
+    let fetches = 0;
+    const fetchImpl: typeof fetch = async () => { fetches += 1; throw new Error("unexpected fetch"); };
     const code = await runSlipwayApplicationRuntimeImageWorkflow({
       applicationRef: "proof-docs",
       json: true,
       manifestPath,
       output
-    }, { stdout: out.write });
+    }, { stdout: out.write, fetchImpl });
 
     assert.equal(code, 1);
     assert.equal(await readFile(output, "utf8"), "existing workflow\n");
@@ -240,11 +249,12 @@ describe("proof-cli Liskov runner", () => {
       manifestPath,
       output,
       yes: true
-    }, { stdout: confirmed.write });
+    }, { stdout: confirmed.write, fetchImpl });
     assert.equal(confirmedCode, 0);
+    assert.equal(fetches, 0);
     assert.match(
       await readFile(output, "utf8"),
-      /uses: proof-computer\/liskov-github-actions\/\.github\/workflows\/runtime-image\.yml@v1/u
+      /uses: proof-computer\/liskov-github-actions\/\.github\/workflows\/runtime-image\.yml@v2/u
     );
   });
 
@@ -253,104 +263,109 @@ describe("proof-cli Liskov runner", () => {
     assert.equal(manifest.required, true);
   });
 
-  it("rejects invalid, mismatched, and non-runtime-image manifests before writing", async (context) => {
-    await context.test("unsafe manifest path", async () => {
-      const output = path.join(tmpdir(), "unsafe-runtime-image.yml");
+  it("rejects invalid source documents before writing or fetching", async (context) => {
+    const base = runtimeImageSourceManifest("proof-docs");
+    const cases: Array<{ name: string; document: unknown; error: string }> = [
+      { name: "V4 build", document: runtimeImageBuildManifest("proof-docs", ".liskov/app.json"), error: "MANIFEST_INVALID" },
+      { name: "unregistered version", document: { ...base, schemaVersion: 99 }, error: "MANIFEST_INVALID" },
+      { name: "malformed JSON", document: '{"token":"workflow-secret-do-not-print",', error: "MANIFEST_INVALID" },
+      { name: "non-object JSON", document: [base], error: "MANIFEST_INVALID" },
+      { name: "policy-client error", document: { ...base, runtime: { kind: "native_image" } }, error: "MANIFEST_INVALID" },
+      { name: "wrong application", document: { ...base, applicationId: "another-app" }, error: "MANIFEST_APPLICATION_MISMATCH" },
+      { name: "pinned release", document: { ...base, release: { mode: "pinned", artifact: { digest: `sha256:${"a".repeat(64)}` } } }, error: "MANIFEST_RELEASE_INVALID" },
+      { name: "JavaScript runtime", document: { ...base, runtime: { kind: "javascript", engine: "nodejs", entrypoint: { file: "bundle.cjs" } } }, error: "MANIFEST_RELEASE_INVALID" }
+    ];
+    for (const item of cases) {
+      await context.test(item.name, async () => {
+        const { dir, manifestPath } = await runtimeImageWorkflowFixture("proof-docs");
+        await writeFile(path.resolve(manifestPath), typeof item.document === "string" ? item.document : JSON.stringify(item.document), "utf8");
+        const output = path.join(dir, "refused.yml");
+        const out = writer();
+        let fetches = 0;
+        const code = await runSlipwayApplicationRuntimeImageWorkflow({
+          applicationRef: "proof-docs", json: true, manifestPath, output
+        }, {
+          stdout: out.write,
+          fetchImpl: async () => { fetches += 1; throw new Error("unexpected fetch"); }
+        });
+        assert.equal(code, 1);
+        assert.equal(JSON.parse(out.text).error, `SLIPWAY_RUNTIME_IMAGE_${item.error}`);
+        assert.equal(fetches, 0);
+        assert.equal(out.text.includes("workflow-secret-do-not-print"), false);
+        await assert.rejects(stat(output), { code: "ENOENT" });
+      });
+    }
+  });
+
+  it("rejects unsafe manifest paths before writing or fetching", async () => {
+    const { dir } = await runtimeImageWorkflowFixture("proof-docs");
+    for (const manifestPath of ["", "../manifest.json", "/etc/passwd", "a//b.json", "a/./b.json", "a\\b.json", "a\nb.json", "a\rb.json", "a\0b.json"]) {
+      const output = path.join(dir, "unsafe.yml");
       const out = writer();
+      let fetches = 0;
       const code = await runSlipwayApplicationRuntimeImageWorkflow({
-        applicationRef: "proof-docs",
-        json: true,
-        manifestPath: "../manifest.json",
-        output
-      }, { stdout: out.write });
-
+        applicationRef: "proof-docs", json: true, manifestPath, output
+      }, {
+        stdout: out.write,
+        fetchImpl: async () => { fetches += 1; throw new Error("unexpected fetch"); }
+      });
       assert.equal(code, 1);
-      assert.equal(
-        (JSON.parse(out.text) as { error: string }).error,
-        "SLIPWAY_RUNTIME_IMAGE_MANIFEST_PATH_INVALID"
-      );
-    });
+      assert.equal(JSON.parse(out.text).error, "SLIPWAY_RUNTIME_IMAGE_MANIFEST_PATH_INVALID");
+      assert.equal(fetches, 0);
+      await assert.rejects(stat(output), { code: "ENOENT" });
+    }
+  });
 
-    await context.test("malformed manifest", async () => {
-      const { dir, manifestPath } = await runtimeImageWorkflowFixture("proof-docs");
-      await writeFile(path.resolve(manifestPath), "{not json\n", "utf8");
-      const output = path.join(dir, "malformed.yml");
+  it("requires registration and a valid authored digest from the evaluator", async () => {
+    const { dir, manifestPath, manifest } = await runtimeImageWorkflowFixture("proof-docs");
+    const result = evaluateApplicationManifest(manifest);
+    assert.equal(result.valid, true);
+    assert.equal(isRegisteredSourcePublicationPair(result), true);
+    for (const variant of [
+      { pairs: [], result },
+      ...[undefined, "", "sha256:" + "a".repeat(64), "A".repeat(64)].map((authoredDigest) => ({
+        pairs: [{ schema: "proof.liskov.application-manifest", schemaVersion: 5, releaseMode: "source" }],
+        result: { ...result, authoredDigest }
+      })),
+      { pairs: [{ schema: "proof.liskov.application-manifest", schemaVersion: 5, releaseMode: "source" }], result: { ...result, valid: false } }
+    ]) {
+      const output = path.join(dir, "invalid-contract.yml");
       const out = writer();
-      const code = await runSlipwayApplicationRuntimeImageWorkflow({
-        applicationRef: "proof-docs",
-        json: true,
-        manifestPath,
-        output
-      }, { stdout: out.write });
+      let fetches = 0;
+      try {
+        setPolicyContractForTesting({ manifest: { publicationPairs: variant.pairs }, evaluate: () => variant.result });
+        const code = await runSlipwayApplicationRuntimeImageWorkflow({
+          applicationRef: "proof-docs", json: true, manifestPath, output
+        }, {
+          stdout: out.write,
+          fetchImpl: async () => { fetches += 1; throw new Error("unexpected fetch"); }
+        });
+        assert.equal(code, 1);
+        assert.equal(JSON.parse(out.text).error, "SLIPWAY_RUNTIME_IMAGE_MANIFEST_INVALID");
+        assert.equal(fetches, 0);
+        await assert.rejects(stat(output), { code: "ENOENT" });
+      } finally {
+        setPolicyContractForTesting(undefined);
+      }
+    }
+  });
 
-      assert.equal(code, 1);
-      assert.equal(
-        (JSON.parse(out.text) as { error: string }).error,
-        "SLIPWAY_RUNTIME_IMAGE_MANIFEST_INVALID"
-      );
+  it("explains the server-owned source binding and quotes workflow scalars", async () => {
+    const { dir, manifestPath } = await runtimeImageWorkflowFixture("proof-docs");
+    const output = path.join(dir, "quoted.yml");
+    const out = writer();
+    let fetches = 0;
+    const code = await runSlipwayApplicationRuntimeImageWorkflow({
+      applicationRef: "proof-docs", manifestPath: `  ${manifestPath}  `, output, workflowName: "Builder's image"
+    }, {
+      stdout: out.write,
+      fetchImpl: async () => { fetches += 1; throw new Error("unexpected fetch"); }
     });
-
-    await context.test("application id mismatch", async () => {
-      const { dir, manifestPath } = await runtimeImageWorkflowFixture("another-app");
-      const output = path.join(dir, "application-mismatch.yml");
-      const out = writer();
-      const code = await runSlipwayApplicationRuntimeImageWorkflow({
-        applicationRef: "proof-docs",
-        json: true,
-        manifestPath,
-        output
-      }, { stdout: out.write });
-
-      assert.equal(code, 1);
-      assert.equal(
-        (JSON.parse(out.text) as { error: string }).error,
-        "SLIPWAY_RUNTIME_IMAGE_MANIFEST_APPLICATION_MISMATCH"
-      );
-    });
-
-    await context.test("non-runtime-image build", async () => {
-      const { dir, manifestPath, manifest } = await runtimeImageWorkflowFixture("proof-docs");
-      (manifest.release as { artifact: Record<string, unknown> }).artifact = {
-        kind: "ipfs_bundle",
-        encryption: { mode: "none" }
-      };
-      await writeFile(path.resolve(manifestPath), `${JSON.stringify(manifest)}\n`, "utf8");
-      const output = path.join(dir, "wrong-artifact.yml");
-      const out = writer();
-      const code = await runSlipwayApplicationRuntimeImageWorkflow({
-        applicationRef: "proof-docs",
-        json: true,
-        manifestPath,
-        output
-      }, { stdout: out.write });
-
-      assert.equal(code, 1);
-      assert.equal(
-        (JSON.parse(out.text) as { error: string }).error,
-        "SLIPWAY_RUNTIME_IMAGE_MANIFEST_RELEASE_INVALID"
-      );
-    });
-
-    await context.test("authored manifest path mismatch", async () => {
-      const { dir, manifestPath, manifest } = await runtimeImageWorkflowFixture("proof-docs");
-      ((manifest.release as { builder: Record<string, unknown> }).builder).manifestPath =
-        ".liskov/different.json";
-      await writeFile(path.resolve(manifestPath), `${JSON.stringify(manifest)}\n`, "utf8");
-      const output = path.join(dir, "path-mismatch.yml");
-      const out = writer();
-      const code = await runSlipwayApplicationRuntimeImageWorkflow({
-        applicationRef: "proof-docs",
-        json: true,
-        manifestPath,
-        output
-      }, { stdout: out.write });
-
-      assert.equal(code, 1);
-      assert.equal(
-        (JSON.parse(out.text) as { error: string }).error,
-        "SLIPWAY_RUNTIME_IMAGE_MANIFEST_PATH_MISMATCH"
-      );
-    });
+    assert.equal(code, 0);
+    assert.equal(fetches, 0);
+    assert.match(out.text, /server-owned source binding must authorize caller/u);
+    assert.doesNotMatch(out.text, /builder\.workflowRef/u);
+    assert.match(await readFile(output, "utf8"), /^name: 'Builder''s image'$/mu);
   });
 
   it("reads a saved session through /api/session without printing the bearer token", async () => {
@@ -6587,9 +6602,33 @@ async function runtimeImageWorkflowFixture(applicationId: string): Promise<{
   const dir = await mkdtemp(path.join(fixtureRoot, "runtime-image-workflow-"));
   const manifestFile = path.join(dir, "application-manifest.json");
   const manifestPath = path.relative(process.cwd(), manifestFile).split(path.sep).join("/");
-  const manifest = runtimeImageBuildManifest(applicationId, manifestPath);
+  const manifest = runtimeImageSourceManifest(applicationId);
   await writeFile(manifestFile, `${JSON.stringify(manifest)}\n`, "utf8");
   return { dir, manifestPath, manifest };
+}
+
+function runtimeImageSourceManifest(applicationId: string): Record<string, unknown> {
+  return {
+    schema: "proof.liskov.application-manifest",
+    schemaVersion: 5,
+    applicationId,
+    release: { mode: "source" },
+    runtime: {
+      kind: "native_image",
+      image: { name: "debian", version: "12" },
+      entrypoint: { executable: "/usr/local/bin/liskov-demo", args: ["lab"] }
+    },
+    execution: { mode: "continuous" },
+    deployment: {
+      schedule: { duration: "6h" },
+      spend: {
+        unit: "service_credit_micros",
+        perJob: "1000000",
+        rate: { amount: "30000000", window: "30d" }
+      }
+    },
+    state: { mode: "off" }
+  };
 }
 
 function runtimeImageBuildManifest(

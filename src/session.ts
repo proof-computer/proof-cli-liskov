@@ -92,7 +92,7 @@ const DEFAULT_RUNTIME_IMAGE_OIDC_AUDIENCE = "liskov-runtime-image-upload";
 // Long-poll hold requested per CLI login poll; the server caps waitMs at 20_000.
 const CLI_LOGIN_POLL_WAIT_MS = 20_000;
 const DEFAULT_RUNTIME_IMAGE_ACTIONS_REF =
-  "proof-computer/liskov-github-actions/.github/workflows/runtime-image.yml@v1";
+  "proof-computer/liskov-github-actions/.github/workflows/runtime-image.yml@v2";
 
 export interface SlipwayCliOptions {
   env?: NodeJS.ProcessEnv;
@@ -5154,31 +5154,34 @@ export async function runSlipwayApplicationRuntimeImageWorkflow(
       "--manifest must be a safe repo-relative path without empty, dot, parent, or backslash segments."
     );
   }
-  let manifest: unknown;
+  let contractResult: PolicyContractEvaluation;
   try {
-    manifest = JSON.parse(await readFile(path.resolve(manifestPath), "utf8")) as unknown;
-  } catch (error) {
+    const source = await readFile(path.resolve(manifestPath), "utf8");
+    JSON.parse(source);
+    contractResult = evaluateApplicationManifestText(source, "json");
+  } catch {
     return runtimeImageWorkflowFailure(
       options,
       input,
       "SLIPWAY_RUNTIME_IMAGE_MANIFEST_INVALID",
-      `Unable to read V4 manifest ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`,
+      `Unable to read or validate JSON source document ${manifestPath}.`,
       { manifestPath }
     );
   }
-  const diagnostics = validateApplicationManifestV4(manifest);
-  const errors = diagnostics.filter((diagnostic) =>
-    diagnostic.code === "invalid_manifest" || diagnostic.code === "unknown_field");
-  if (errors.length > 0) {
+  if (!contractResult.valid || contractResult.errors.length > 0
+      || contractResult.document === undefined || contractResult.document === null
+      || !isRegisteredSourcePublicationPair(contractResult)
+      || typeof contractResult.authoredDigest !== "string"
+      || !/^[0-9a-f]{64}$/u.test(contractResult.authoredDigest)) {
     return runtimeImageWorkflowFailure(
       options,
       input,
       "SLIPWAY_RUNTIME_IMAGE_MANIFEST_INVALID",
-      `${manifestPath} is not a valid V4 application manifest.`,
-      { manifestPath, errors }
+      `${manifestPath} must be a valid registered source document with an authored digest.`,
+      { manifestPath, errors: contractResult.errors }
     );
   }
-  const manifestObject = objectRecord(manifest);
+  const manifestObject = objectRecord(contractResult.document);
   if (manifestObject.applicationId !== input.applicationRef) {
     return runtimeImageWorkflowFailure(
       options,
@@ -5189,24 +5192,14 @@ export async function runSlipwayApplicationRuntimeImageWorkflow(
     );
   }
   const release = objectRecord(manifestObject.release);
-  const artifact = objectRecord(release.artifact);
-  const builder = objectRecord(release.builder);
-  if (release.mode !== "build" || artifact.kind !== "runtime_image") {
+  const runtime = objectRecord(manifestObject.runtime);
+  if (release.mode !== "source" || runtime.kind !== "native_image") {
     return runtimeImageWorkflowFailure(
       options,
       input,
       "SLIPWAY_RUNTIME_IMAGE_MANIFEST_RELEASE_INVALID",
-      `${manifestPath} must contain a build release with artifact.kind runtime_image.`,
+      `${manifestPath} must declare release.mode source and runtime.kind native_image.`,
       { manifestPath }
-    );
-  }
-  if (builder.manifestPath !== manifestPath) {
-    return runtimeImageWorkflowFailure(
-      options,
-      input,
-      "SLIPWAY_RUNTIME_IMAGE_MANIFEST_PATH_MISMATCH",
-      `${manifestPath} declares release.builder.manifestPath ${String(builder.manifestPath)}.`,
-      { manifestPath, authoredManifestPath: builder.manifestPath }
     );
   }
 
@@ -5251,7 +5244,7 @@ export async function runSlipwayApplicationRuntimeImageWorkflow(
     options,
     input.json,
     value,
-    `Wrote manifest-bound Liskov runtime-image workflow to ${output}. The authored builder.workflowRef must authorize caller ${value.policyWorkflowRefHint}.`
+    `Wrote source-bound Liskov runtime-image workflow to ${output}. The server-owned source binding must authorize caller ${value.policyWorkflowRefHint} and manifest path ${manifestPath}.`
   );
   return 0;
 }
@@ -6663,9 +6656,9 @@ async function fileExists(file: string): Promise<boolean> {
 
 function normalizeRepositoryPath(value: string): string | undefined {
   const candidate = value.trim();
-  if (!candidate || path.isAbsolute(candidate) || candidate.includes("\\")) return undefined;
+  if (candidate.length === 0 || path.isAbsolute(candidate) || /[\\\r\n\u0000]/u.test(candidate)) return undefined;
   const segments = candidate.split("/");
-  if (segments.some((segment) => !segment || segment === "." || segment === "..")) {
+  if (segments.some((segment) => segment.length === 0 || segment === "." || segment === "..")) {
     return undefined;
   }
   return segments.join("/");
