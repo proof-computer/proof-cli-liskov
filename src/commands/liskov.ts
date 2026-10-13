@@ -35,7 +35,7 @@ COMMANDS
   organization billing ORG_ID
   organization service-credits ORG_ID
   organization billing transactions ORG_ID [--limit N] [--before MS]
-  application import --github owner/repo:path@ref [--server-fetch]
+  application import   (V4 manifest import is closed; for V5 use application create → application source-binding set → application policy publish)
   application list [--retired] [--json]
   application manifest validate --file PATH [--json]
   application policy publish APP_REF --file PATH --artifact-digest SHA256 --binding-revision N --revocation-epoch N --source-ref REF --source-commit SHA --workflow-identity ID --expected-pointer-version N --yes

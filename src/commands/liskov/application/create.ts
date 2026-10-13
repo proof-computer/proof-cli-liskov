@@ -12,8 +12,8 @@ export default class SlipwayApplicationCreate extends OrganizationScopedCommand 
   };
   static description =
     "Create a Liskov Application from identity alone — no manifest of any schema version. " +
-    "Policy arrives later through a publication lane (V5 documents publish via policy versions; " +
-    "V4 callers keep `application import`). GitHub App sessions must pass --repository.";
+    "V5 policy arrives later through application source-binding set and application policy publish. " +
+    "GitHub App sessions must pass --repository.";
   static examples = [
     "<%= config.bin %> liskov application create shard-worker",
     "<%= config.bin %> liskov application create shard-worker --display-name 'Shard Worker'",
