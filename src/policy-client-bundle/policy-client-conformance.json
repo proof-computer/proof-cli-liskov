@@ -5088,6 +5088,959 @@
       }
     },
     {
+      "name": "v7/materialize/cloudflare-provider-gated",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## V7 dark fixture (BKLG-20260926-k7no). Not publishable: no production\n## generation lists the V7 pair.\n##\n## One native-image HTTP service published through the organization's\n## Cloudflare Tunnel at an authored hostname, behind a Cloudflare Access\n## application. `provider_gated` is Cloudflare-only, and the server verifies it\n## fail-closed before any effect (`6f4f`); until that verdict is bound it is the\n## author's claim and nothing publishes. The same document on `javascript` is\n## refused at the provider: the Cargo helper supervises `cloudflared`.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 7\n\napplicationId: webserver\n\nmetadata:\n  description: An internal dashboard behind Cloudflare Access.\n  labels: [liskov, example, cargo, service, public]\n\nintegrations:\n  cloudflare_tunnel: int_0123456789abcdef0123456789abcdef\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image:\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [/app/start.sh]\n\nexecution:\n  mode: continuous\n\ndeployment:\n  schedule:\n    duration: 6h\n  spend:\n    unit: service_credit_micros\n    perJob: \"3000000\"\n    rate:\n      amount: \"12000000\"\n      window: 1d\n\ningress:\n  http:\n    - name: http\n      localPort: 8080\n      health:\n        ready:\n          http: /healthz\n      endpoints:\n        - name: edge\n          provider:\n            kind: cloudflare_tunnel\n            hostname: dashboard.example.com\n          protection: provider_gated\n\nstate:\n  mode: off\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cloudflare-provider-gated",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            },
+            "integrations": [
+              {
+                "useSite": "/ingress/http/edge/provider",
+                "organizationId": "org_fixture",
+                "integrationId": "int_0123456789abcdef0123456789abcdef",
+                "kind": "cloudflare_tunnel",
+                "configurationRevision": 1,
+                "authorizationScopes": [
+                  "devices:write"
+                ],
+                "revocationEpoch": 0,
+                "authoredOverride": false,
+                "cloudflareAccess": {
+                  "hostname": "dashboard.example.com",
+                  "path": "/",
+                  "accessApplicationId": "access_app_fixture",
+                  "accessPolicyIds": [
+                    "access_policy_fixture"
+                  ],
+                  "canonicalPolicyDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                  "integrationCredentialRevision": 1,
+                  "observedAt": "2026-10-19T00:00:00Z",
+                  "revocationEpoch": 0,
+                  "acceptedPolicySubset": "identity_allow"
+                }
+              },
+              {
+                "useSite": "/integrations/cloudflare_tunnel",
+                "organizationId": "org_fixture",
+                "integrationId": "int_0123456789abcdef0123456789abcdef",
+                "kind": "cloudflare_tunnel",
+                "configurationRevision": 1,
+                "authorizationScopes": [
+                  "devices:write"
+                ],
+                "revocationEpoch": 0,
+                "authoredOverride": false
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 7
+        },
+        "authoredDigest": "eea563d0e7369f872f960f8eb48a1a04148eb490b75de51c5df722fb969b2d45",
+        "releaseIntentDigest": "18acf3e7558a861153146b8cb9a718853194946ba1677f0132990c3a03d9d15c",
+        "policyDigest": "583245224f5dcfc2ad7f4963179b7ae70d176eca56246127771f6710dd5d50bf",
+        "effective": {
+          "schema": "proof.liskov.application-policy",
+          "schemaVersion": 7,
+          "applicationId": "webserver",
+          "applicationUid": "app_0123456789abcdef",
+          "release": {
+            "mode": "source",
+            "binding": {
+              "organizationId": "org_fixture",
+              "applicationUid": "app_0123456789abcdef",
+              "revision": 1,
+              "repository": "proof-computer/cloudflare-provider-gated",
+              "allowedRefs": [
+                "refs/heads/main"
+              ],
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "manifestPath": "liskov.draft.yaml",
+              "revocationEpoch": 0
+            },
+            "sourceCommit": "0123456789abcdef",
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "artifactDigests": [
+              "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ]
+          },
+          "artifact": {
+            "kind": "runtime_image",
+            "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+          },
+          "runtime": {
+            "kind": "native_image",
+            "catalog": "liskov-runtime-images",
+            "name": "debian-trixie",
+            "version": "0.1",
+            "entrypoint": {
+              "executable": "/bin/sh",
+              "args": [
+                "/app/start.sh"
+              ]
+            }
+          },
+          "execution": {
+            "mode": "continuous"
+          },
+          "deployment": {
+            "jobs": 1,
+            "durationMs": 21600000,
+            "phasing": {
+              "mode": "simultaneous",
+              "jobsPerPhase": 1
+            },
+            "lifecycle": {
+              "renewalLead": {
+                "mode": "automatic"
+              },
+              "updateTiming": "immediate",
+              "existingJobs": "stop_when_successor_ready"
+            },
+            "spend": {
+              "unit": "service_credit_micros",
+              "perJob": "3000000",
+              "rate": {
+                "amount": "12000000",
+                "windowMs": 86400000
+              }
+            }
+          },
+          "ingress": {
+            "services": [
+              {
+                "name": "http",
+                "protocol": "http",
+                "localPort": 8080,
+                "health": {
+                  "ready": {
+                    "http": "/healthz"
+                  }
+                },
+                "endpoints": [
+                  {
+                    "name": "edge",
+                    "provider": "cloudflare_tunnel",
+                    "hostname": "dashboard.example.com",
+                    "publiclyReachable": true,
+                    "protection": "provider_gated"
+                  }
+                ]
+              }
+            ]
+          },
+          "state": {
+            "mode": "off"
+          },
+          "holdOnFailure": false,
+          "integrations": [
+            {
+              "useSite": "/ingress/http/edge/provider",
+              "organizationId": "org_fixture",
+              "integrationId": "int_0123456789abcdef0123456789abcdef",
+              "kind": "cloudflare_tunnel",
+              "configurationRevision": 1,
+              "authorizationScopes": [
+                "devices:write"
+              ],
+              "revocationEpoch": 0,
+              "authoredOverride": false,
+              "cloudflareAccess": {
+                "hostname": "dashboard.example.com",
+                "path": "/",
+                "accessApplicationId": "access_app_fixture",
+                "accessPolicyIds": [
+                  "access_policy_fixture"
+                ],
+                "canonicalPolicyDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                "integrationCredentialRevision": 1,
+                "observedAt": "2026-10-19T00:00:00Z",
+                "revocationEpoch": 0,
+                "acceptedPolicySubset": "identity_allow"
+              }
+            },
+            {
+              "useSite": "/integrations/cloudflare_tunnel",
+              "organizationId": "org_fixture",
+              "integrationId": "int_0123456789abcdef0123456789abcdef",
+              "kind": "cloudflare_tunnel",
+              "configurationRevision": 1,
+              "authorizationScopes": [
+                "devices:write"
+              ],
+              "revocationEpoch": 0,
+              "authoredOverride": false
+            }
+          ]
+        },
+        "policyDiagnostics": [
+          {
+            "severity": "info",
+            "code": "successor_overlap_default_applied",
+            "message": "existing jobs default to stop_when_successor_ready",
+            "pointer": "/deployment/lifecycle/update/existingJobs"
+          }
+        ]
+      }
+    },
+    {
+      "name": "v7/materialize/private-and-public",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## V7 dark fixture (BKLG-20260926-k7no). Not publishable: no production\n## generation lists the V7 pair.\n##\n## Every provider on one service: the private tailnet endpoint V6 already\n## authors, with its derived protection; an Acurast Tunnel endpoint behind an\n## auth sidecar (native image only); and a Cloudflare Tunnel endpoint whose\n## application checks its own callers, overriding the declared integration.\n## Several endpoints are simultaneous attachments, never a fallback chain.\n## Tailscale SSH shares the tailnet integration, as in V6.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 7\n\napplicationId: meilisearch\n\nmetadata:\n  description: A search engine on the tailnet, with a public read endpoint.\n  labels: [liskov, reference, cargo, service, public, private]\n\nintegrations:\n  tailscale: int_00000000000000000000000000000000\n  cloudflare_tunnel: int_11111111111111111111111111111111\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image:\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [/app/start.sh]\n\nexecution:\n  mode: continuous\n\ndeployment:\n  schedule:\n    duration: 6h\n  spend:\n    unit: service_credit_micros\n    perJob: \"3000000\"\n    rate:\n      amount: \"12000000\"\n      window: 1d\n\ningress:\n  http:\n    - name: search\n      localPort: 7700\n      health:\n        live:\n          http: /health\n      endpoints:\n        - name: private\n          provider:\n            kind: tailscale\n        - name: tunnel\n          provider:\n            kind: acurast_tunnel\n          protection: sidecar_gated\n        - name: edge\n          provider:\n            kind: cloudflare_tunnel\n            integrationId: int_22222222222222222222222222222222\n            hostname: search.example.com\n          protection: application_managed\n\naccess:\n  ssh:\n    provider:\n      kind: tailscale\n\nstate:\n  mode: off\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/private-and-public",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            },
+            "integrations": [
+              {
+                "useSite": "/access/ssh/provider",
+                "organizationId": "org_fixture",
+                "integrationId": "int_00000000000000000000000000000000",
+                "kind": "tailscale",
+                "configurationRevision": 1,
+                "authorizationScopes": [
+                  "devices:write"
+                ],
+                "revocationEpoch": 0,
+                "authoredOverride": false
+              },
+              {
+                "useSite": "/ingress/search/edge/provider",
+                "organizationId": "org_fixture",
+                "integrationId": "int_22222222222222222222222222222222",
+                "kind": "cloudflare_tunnel",
+                "configurationRevision": 1,
+                "authorizationScopes": [
+                  "devices:write"
+                ],
+                "revocationEpoch": 0,
+                "authoredOverride": true
+              },
+              {
+                "useSite": "/ingress/search/private/provider",
+                "organizationId": "org_fixture",
+                "integrationId": "int_00000000000000000000000000000000",
+                "kind": "tailscale",
+                "configurationRevision": 1,
+                "authorizationScopes": [
+                  "devices:write"
+                ],
+                "revocationEpoch": 0,
+                "authoredOverride": false
+              },
+              {
+                "useSite": "/integrations/cloudflare_tunnel",
+                "organizationId": "org_fixture",
+                "integrationId": "int_11111111111111111111111111111111",
+                "kind": "cloudflare_tunnel",
+                "configurationRevision": 1,
+                "authorizationScopes": [
+                  "devices:write"
+                ],
+                "revocationEpoch": 0,
+                "authoredOverride": false
+              },
+              {
+                "useSite": "/integrations/tailscale",
+                "organizationId": "org_fixture",
+                "integrationId": "int_00000000000000000000000000000000",
+                "kind": "tailscale",
+                "configurationRevision": 1,
+                "authorizationScopes": [
+                  "devices:write"
+                ],
+                "revocationEpoch": 0,
+                "authoredOverride": false
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 7
+        },
+        "authoredDigest": "93053fc2e5205e4dea81cef7239f4fab09b232933d3a3ab53aa4545c6c4bf2f1",
+        "releaseIntentDigest": "a17d8122bcfcd536b336803d0f3bc4675b0441973bd536dddc25edc65e2e3755",
+        "policyDigest": "a24c914e5864467e6098ad33ad0677744f58e14f35ae67128ca8d9b024f4d60f",
+        "effective": {
+          "schema": "proof.liskov.application-policy",
+          "schemaVersion": 7,
+          "applicationId": "meilisearch",
+          "applicationUid": "app_0123456789abcdef",
+          "release": {
+            "mode": "source",
+            "binding": {
+              "organizationId": "org_fixture",
+              "applicationUid": "app_0123456789abcdef",
+              "revision": 1,
+              "repository": "proof-computer/private-and-public",
+              "allowedRefs": [
+                "refs/heads/main"
+              ],
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "manifestPath": "liskov.draft.yaml",
+              "revocationEpoch": 0
+            },
+            "sourceCommit": "0123456789abcdef",
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "artifactDigests": [
+              "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ]
+          },
+          "artifact": {
+            "kind": "runtime_image",
+            "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+          },
+          "runtime": {
+            "kind": "native_image",
+            "catalog": "liskov-runtime-images",
+            "name": "debian-trixie",
+            "version": "0.1",
+            "entrypoint": {
+              "executable": "/bin/sh",
+              "args": [
+                "/app/start.sh"
+              ]
+            }
+          },
+          "execution": {
+            "mode": "continuous"
+          },
+          "deployment": {
+            "jobs": 1,
+            "durationMs": 21600000,
+            "phasing": {
+              "mode": "simultaneous",
+              "jobsPerPhase": 1
+            },
+            "lifecycle": {
+              "renewalLead": {
+                "mode": "automatic"
+              },
+              "updateTiming": "immediate",
+              "existingJobs": "stop_when_successor_ready"
+            },
+            "spend": {
+              "unit": "service_credit_micros",
+              "perJob": "3000000",
+              "rate": {
+                "amount": "12000000",
+                "windowMs": 86400000
+              }
+            }
+          },
+          "ingress": {
+            "services": [
+              {
+                "name": "search",
+                "protocol": "http",
+                "localPort": 7700,
+                "health": {
+                  "live": {
+                    "http": "/health"
+                  }
+                },
+                "endpoints": [
+                  {
+                    "name": "private",
+                    "provider": "tailscale",
+                    "publiclyReachable": false,
+                    "protection": "network_gated"
+                  },
+                  {
+                    "name": "tunnel",
+                    "provider": "acurast_tunnel",
+                    "publiclyReachable": true,
+                    "protection": "sidecar_gated"
+                  },
+                  {
+                    "name": "edge",
+                    "provider": "cloudflare_tunnel",
+                    "hostname": "search.example.com",
+                    "publiclyReachable": true,
+                    "protection": "application_managed"
+                  }
+                ]
+              }
+            ]
+          },
+          "access": {
+            "ssh": {
+              "provider": {
+                "kind": "tailscale"
+              }
+            }
+          },
+          "state": {
+            "mode": "off"
+          },
+          "holdOnFailure": false,
+          "integrations": [
+            {
+              "useSite": "/access/ssh/provider",
+              "organizationId": "org_fixture",
+              "integrationId": "int_00000000000000000000000000000000",
+              "kind": "tailscale",
+              "configurationRevision": 1,
+              "authorizationScopes": [
+                "devices:write"
+              ],
+              "revocationEpoch": 0,
+              "authoredOverride": false
+            },
+            {
+              "useSite": "/ingress/search/edge/provider",
+              "organizationId": "org_fixture",
+              "integrationId": "int_22222222222222222222222222222222",
+              "kind": "cloudflare_tunnel",
+              "configurationRevision": 1,
+              "authorizationScopes": [
+                "devices:write"
+              ],
+              "revocationEpoch": 0,
+              "authoredOverride": true
+            },
+            {
+              "useSite": "/ingress/search/private/provider",
+              "organizationId": "org_fixture",
+              "integrationId": "int_00000000000000000000000000000000",
+              "kind": "tailscale",
+              "configurationRevision": 1,
+              "authorizationScopes": [
+                "devices:write"
+              ],
+              "revocationEpoch": 0,
+              "authoredOverride": false
+            },
+            {
+              "useSite": "/integrations/cloudflare_tunnel",
+              "organizationId": "org_fixture",
+              "integrationId": "int_11111111111111111111111111111111",
+              "kind": "cloudflare_tunnel",
+              "configurationRevision": 1,
+              "authorizationScopes": [
+                "devices:write"
+              ],
+              "revocationEpoch": 0,
+              "authoredOverride": false
+            },
+            {
+              "useSite": "/integrations/tailscale",
+              "organizationId": "org_fixture",
+              "integrationId": "int_00000000000000000000000000000000",
+              "kind": "tailscale",
+              "configurationRevision": 1,
+              "authorizationScopes": [
+                "devices:write"
+              ],
+              "revocationEpoch": 0,
+              "authoredOverride": false
+            }
+          ]
+        },
+        "policyDiagnostics": [
+          {
+            "severity": "info",
+            "code": "successor_overlap_default_applied",
+            "message": "existing jobs default to stop_when_successor_ready",
+            "pointer": "/deployment/lifecycle/update/existingJobs"
+          }
+        ]
+      }
+    },
+    {
+      "name": "v8/materialize/payload-replace",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "{\n  \"schema\": \"proof.liskov.application-manifest\",\n  \"schemaVersion\": 8,\n  \"applicationId\": \"cargo-payload\",\n  \"release\": {\n    \"mode\": \"source\"\n  },\n  \"runtime\": {\n    \"kind\": \"native_payload\",\n    \"image\": {\n      \"name\": \"generic-cargo\",\n      \"version\": \"1.0\"\n    },\n    \"entrypoint\": {\n      \"file\": \"bin/app\",\n      \"args\": [\n        \"--serve\",\n        \"\"\n      ]\n    }\n  },\n  \"execution\": {\n    \"mode\": \"continuous\"\n  },\n  \"deployment\": {\n    \"schedule\": {\n      \"duration\": \"30m\"\n    },\n    \"spend\": {\n      \"unit\": \"service_credit_micros\",\n      \"perJob\": \"1000000\",\n      \"rate\": {\n        \"amount\": \"5000000\",\n        \"window\": \"1h\"\n      }\n    }\n  },\n  \"state\": {\n    \"mode\": \"off\"\n  }\n}\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "native_payload",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "descriptorDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/payload-replace",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            },
+            "payloadRuntime": {
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "helperDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "bootstrapDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "bootstrapCid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 8
+        },
+        "authoredDigest": "59b3db808cf32fac5e4cbfe97b3246b88f0a76e7240e5fcd5874490cf46c739c",
+        "releaseIntentDigest": "06614256cebad2da3f374460900d59b699d6aa8f1e5127ef5e358f6b6e22b624",
+        "policyDigest": "eaa9c00859d9a1a479e2c7393d9ae7cb2b5f7890457452930cf9993b08279751",
+        "effective": {
+          "schema": "proof.liskov.application-policy",
+          "schemaVersion": 8,
+          "applicationId": "cargo-payload",
+          "applicationUid": "app_0123456789abcdef",
+          "release": {
+            "mode": "source",
+            "binding": {
+              "organizationId": "org_fixture",
+              "applicationUid": "app_0123456789abcdef",
+              "revision": 1,
+              "repository": "proof-computer/payload-replace",
+              "allowedRefs": [
+                "refs/heads/main"
+              ],
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "manifestPath": "liskov.draft.yaml",
+              "revocationEpoch": 0
+            },
+            "sourceCommit": "0123456789abcdef",
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "artifactDigests": [
+              "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ]
+          },
+          "artifact": {
+            "kind": "native_payload",
+            "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "descriptorDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          "runtime": {
+            "kind": "native_payload",
+            "catalog": "liskov-runtime-images",
+            "name": "generic-cargo",
+            "version": "1.0",
+            "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "helperDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "bootstrapDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "bootstrapCid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+            "entrypoint": {
+              "file": "bin/app",
+              "args": [
+                "--serve",
+                ""
+              ]
+            }
+          },
+          "execution": {
+            "mode": "continuous"
+          },
+          "deployment": {
+            "jobs": 1,
+            "durationMs": 1800000,
+            "phasing": {
+              "mode": "simultaneous",
+              "jobsPerPhase": 1
+            },
+            "lifecycle": {
+              "renewalLead": {
+                "mode": "automatic"
+              },
+              "updateTiming": "immediate",
+              "existingJobs": "stop_when_successor_ready",
+              "updateMethod": {
+                "mode": "replace_job"
+              }
+            },
+            "spend": {
+              "unit": "service_credit_micros",
+              "perJob": "1000000",
+              "rate": {
+                "amount": "5000000",
+                "windowMs": 3600000
+              }
+            }
+          },
+          "state": {
+            "mode": "off"
+          },
+          "holdOnFailure": false
+        },
+        "policyDiagnostics": [
+          {
+            "severity": "info",
+            "code": "successor_overlap_default_applied",
+            "message": "existing jobs default to stop_when_successor_ready",
+            "pointer": "/deployment/lifecycle/update/existingJobs"
+          }
+        ]
+      }
+    },
+    {
+      "name": "v8/materialize/payload-supervised-rollback",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "{\n  \"schema\": \"proof.liskov.application-manifest\",\n  \"schemaVersion\": 8,\n  \"applicationId\": \"cargo-payload\",\n  \"release\": {\n    \"mode\": \"source\"\n  },\n  \"runtime\": {\n    \"kind\": \"native_payload\",\n    \"image\": {\n      \"name\": \"generic-cargo\",\n      \"version\": \"1.0\"\n    },\n    \"entrypoint\": {\n      \"file\": \"bin/app\",\n      \"args\": [\n        \"--serve\",\n        \"\"\n      ]\n    }\n  },\n  \"execution\": {\n    \"mode\": \"continuous\"\n  },\n  \"deployment\": {\n    \"schedule\": {\n      \"duration\": \"30m\"\n    },\n    \"lifecycle\": {\n      \"update\": {\n        \"timing\": \"immediate\",\n        \"method\": {\n          \"mode\": \"supervised_payload\",\n          \"shutdownGrace\": \"5s\",\n          \"readiness\": {\n            \"mode\": \"exec\",\n            \"file\": \"bin/readiness\",\n            \"args\": [\n              \"--check\"\n            ],\n            \"timeout\": \"2s\",\n            \"maxWait\": \"20s\"\n          },\n          \"onActivationFailure\": {\n            \"mode\": \"rollback\",\n            \"stateCompatibility\": \"backward_compatible\"\n          }\n        }\n      }\n    },\n    \"spend\": {\n      \"unit\": \"service_credit_micros\",\n      \"perJob\": \"1000000\",\n      \"rate\": {\n        \"amount\": \"5000000\",\n        \"window\": \"1h\"\n      }\n    }\n  },\n  \"state\": {\n    \"mode\": \"off\"\n  }\n}\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "native_payload",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "descriptorDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/payload-supervised-rollback",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            },
+            "payloadRuntime": {
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "helperDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "bootstrapDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "bootstrapCid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 8
+        },
+        "authoredDigest": "ab15b0bd5027d1e8464e96a7e7cab4a62a9d8d471acf1b855b468d9d32c06393",
+        "releaseIntentDigest": "06614256cebad2da3f374460900d59b699d6aa8f1e5127ef5e358f6b6e22b624",
+        "policyDigest": "b2ea53e38b2107414ea74982432a4c1dd224334f1b1e82b8b5e563d129dc514c",
+        "effective": {
+          "schema": "proof.liskov.application-policy",
+          "schemaVersion": 8,
+          "applicationId": "cargo-payload",
+          "applicationUid": "app_0123456789abcdef",
+          "release": {
+            "mode": "source",
+            "binding": {
+              "organizationId": "org_fixture",
+              "applicationUid": "app_0123456789abcdef",
+              "revision": 1,
+              "repository": "proof-computer/payload-supervised-rollback",
+              "allowedRefs": [
+                "refs/heads/main"
+              ],
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "manifestPath": "liskov.draft.yaml",
+              "revocationEpoch": 0
+            },
+            "sourceCommit": "0123456789abcdef",
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "artifactDigests": [
+              "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ]
+          },
+          "artifact": {
+            "kind": "native_payload",
+            "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "descriptorDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          "runtime": {
+            "kind": "native_payload",
+            "catalog": "liskov-runtime-images",
+            "name": "generic-cargo",
+            "version": "1.0",
+            "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "helperDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "bootstrapDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "bootstrapCid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+            "entrypoint": {
+              "file": "bin/app",
+              "args": [
+                "--serve",
+                ""
+              ]
+            }
+          },
+          "execution": {
+            "mode": "continuous"
+          },
+          "deployment": {
+            "jobs": 1,
+            "durationMs": 1800000,
+            "phasing": {
+              "mode": "simultaneous",
+              "jobsPerPhase": 1
+            },
+            "lifecycle": {
+              "renewalLead": {
+                "mode": "automatic"
+              },
+              "updateTiming": "immediate",
+              "existingJobs": "stop_when_successor_ready",
+              "updateMethod": {
+                "mode": "supervised_payload",
+                "shutdownGraceMs": 5000,
+                "readiness": {
+                  "mode": "exec",
+                  "file": "bin/readiness",
+                  "args": [
+                    "--check"
+                  ],
+                  "timeoutMs": 2000,
+                  "maxWaitMs": 20000
+                },
+                "onActivationFailure": {
+                  "mode": "rollback",
+                  "stateCompatibility": "backward_compatible"
+                }
+              }
+            },
+            "spend": {
+              "unit": "service_credit_micros",
+              "perJob": "1000000",
+              "rate": {
+                "amount": "5000000",
+                "windowMs": 3600000
+              }
+            }
+          },
+          "state": {
+            "mode": "off"
+          },
+          "holdOnFailure": false
+        },
+        "policyDiagnostics": [
+          {
+            "severity": "info",
+            "code": "successor_overlap_default_applied",
+            "message": "existing jobs default to stop_when_successor_ready",
+            "pointer": "/deployment/lifecycle/update/existingJobs"
+          }
+        ]
+      }
+    },
+    {
+      "name": "v8/materialize/payload-supervised-stop",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "{\n  \"schema\": \"proof.liskov.application-manifest\",\n  \"schemaVersion\": 8,\n  \"applicationId\": \"cargo-payload\",\n  \"release\": {\n    \"mode\": \"pinned\",\n    \"artifact\": {\n      \"digest\": \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n    }\n  },\n  \"runtime\": {\n    \"kind\": \"native_payload\",\n    \"image\": {\n      \"name\": \"generic-cargo\",\n      \"version\": \"1.0\"\n    },\n    \"entrypoint\": {\n      \"file\": \"bin/app\",\n      \"args\": [\n        \"--serve\",\n        \"\"\n      ]\n    }\n  },\n  \"execution\": {\n    \"mode\": \"continuous\"\n  },\n  \"deployment\": {\n    \"schedule\": {\n      \"duration\": \"30m\"\n    },\n    \"lifecycle\": {\n      \"update\": {\n        \"timing\": \"next_renewal\",\n        \"method\": {\n          \"mode\": \"supervised_payload\",\n          \"shutdownGrace\": \"5s\",\n          \"readiness\": {\n            \"mode\": \"exec\",\n            \"file\": \"bin/readiness\",\n            \"args\": [\n              \"--check\"\n            ],\n            \"timeout\": \"2s\",\n            \"maxWait\": \"20s\"\n          },\n          \"onActivationFailure\": {\n            \"mode\": \"stop\"\n          }\n        }\n      }\n    },\n    \"spend\": {\n      \"unit\": \"service_credit_micros\",\n      \"perJob\": \"1000000\",\n      \"rate\": {\n        \"amount\": \"5000000\",\n        \"window\": \"1h\"\n      }\n    }\n  },\n  \"state\": {\n    \"mode\": \"off\"\n  }\n}\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "native_payload",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "descriptorDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            },
+            "provenance": {
+              "mode": "pinned",
+              "authoredArtifactDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "payloadRuntime": {
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "helperDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "bootstrapDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "bootstrapCid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 8
+        },
+        "authoredDigest": "4e561e64d6533bd8332338eab3d6b5ce5e173c3ece8606bd5f80396726f8d04b",
+        "releaseIntentDigest": "986201e6e2fba2bf229e9502c6c4f898f4d23c7b012679789eb1805878cbb4ae",
+        "policyDigest": "56f93ce8e243385ff25907edb47c8973c399cd4cf71f9d6030423004f9343850",
+        "effective": {
+          "schema": "proof.liskov.application-policy",
+          "schemaVersion": 8,
+          "applicationId": "cargo-payload",
+          "applicationUid": "app_0123456789abcdef",
+          "release": {
+            "mode": "pinned",
+            "authoredArtifactDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "artifact": {
+            "kind": "native_payload",
+            "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "descriptorDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          "runtime": {
+            "kind": "native_payload",
+            "catalog": "liskov-runtime-images",
+            "name": "generic-cargo",
+            "version": "1.0",
+            "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "helperDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "bootstrapDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "bootstrapCid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+            "entrypoint": {
+              "file": "bin/app",
+              "args": [
+                "--serve",
+                ""
+              ]
+            }
+          },
+          "execution": {
+            "mode": "continuous"
+          },
+          "deployment": {
+            "jobs": 1,
+            "durationMs": 1800000,
+            "phasing": {
+              "mode": "simultaneous",
+              "jobsPerPhase": 1
+            },
+            "lifecycle": {
+              "renewalLead": {
+                "mode": "automatic"
+              },
+              "updateTiming": "next_renewal",
+              "existingJobs": "stop_when_successor_ready",
+              "updateMethod": {
+                "mode": "supervised_payload",
+                "shutdownGraceMs": 5000,
+                "readiness": {
+                  "mode": "exec",
+                  "file": "bin/readiness",
+                  "args": [
+                    "--check"
+                  ],
+                  "timeoutMs": 2000,
+                  "maxWaitMs": 20000
+                },
+                "onActivationFailure": {
+                  "mode": "stop"
+                }
+              }
+            },
+            "spend": {
+              "unit": "service_credit_micros",
+              "perJob": "1000000",
+              "rate": {
+                "amount": "5000000",
+                "windowMs": 3600000
+              }
+            }
+          },
+          "state": {
+            "mode": "off"
+          },
+          "holdOnFailure": false
+        },
+        "policyDiagnostics": [
+          {
+            "severity": "info",
+            "code": "successor_overlap_default_applied",
+            "message": "existing jobs default to stop_when_successor_ready",
+            "pointer": "/deployment/lifecycle/update/existingJobs"
+          }
+        ]
+      }
+    },
+    {
       "name": "v4/golden",
       "request": {
         "schema": "proof.liskov.policy-client-request.v1",
@@ -5991,6 +6944,269 @@
       "expectedPointer": "/ingress/http/0/endpoints/0/protection"
     },
     {
+      "name": "v7/materialize/cloudflare-provider-gated/access-absent",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## V7 dark fixture (BKLG-20260926-k7no). Not publishable: no production\n## generation lists the V7 pair.\n##\n## One native-image HTTP service published through the organization's\n## Cloudflare Tunnel at an authored hostname, behind a Cloudflare Access\n## application. `provider_gated` is Cloudflare-only, and the server verifies it\n## fail-closed before any effect (`6f4f`); until that verdict is bound it is the\n## author's claim and nothing publishes. The same document on `javascript` is\n## refused at the provider: the Cargo helper supervises `cloudflared`.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 7\n\napplicationId: webserver\n\nmetadata:\n  description: An internal dashboard behind Cloudflare Access.\n  labels: [liskov, example, cargo, service, public]\n\nintegrations:\n  cloudflare_tunnel: int_0123456789abcdef0123456789abcdef\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image:\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [/app/start.sh]\n\nexecution:\n  mode: continuous\n\ndeployment:\n  schedule:\n    duration: 6h\n  spend:\n    unit: service_credit_micros\n    perJob: \"3000000\"\n    rate:\n      amount: \"12000000\"\n      window: 1d\n\ningress:\n  http:\n    - name: http\n      localPort: 8080\n      health:\n        ready:\n          http: /healthz\n      endpoints:\n        - name: edge\n          provider:\n            kind: cloudflare_tunnel\n            hostname: dashboard.example.com\n          protection: provider_gated\n\nstate:\n  mode: off\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cloudflare-provider-gated",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            },
+            "integrations": [
+              {
+                "useSite": "/ingress/http/edge/provider",
+                "organizationId": "org_fixture",
+                "integrationId": "int_0123456789abcdef0123456789abcdef",
+                "kind": "cloudflare_tunnel",
+                "configurationRevision": 1,
+                "authorizationScopes": [
+                  "devices:write"
+                ],
+                "revocationEpoch": 0,
+                "authoredOverride": false
+              },
+              {
+                "useSite": "/integrations/cloudflare_tunnel",
+                "organizationId": "org_fixture",
+                "integrationId": "int_0123456789abcdef0123456789abcdef",
+                "kind": "cloudflare_tunnel",
+                "configurationRevision": 1,
+                "authorizationScopes": [
+                  "devices:write"
+                ],
+                "revocationEpoch": 0,
+                "authoredOverride": false
+              }
+            ]
+          }
+        }
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/http/edge/protection"
+    },
+    {
+      "name": "v7/materialize/cloudflare-provider-gated/access-hostname",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## V7 dark fixture (BKLG-20260926-k7no). Not publishable: no production\n## generation lists the V7 pair.\n##\n## One native-image HTTP service published through the organization's\n## Cloudflare Tunnel at an authored hostname, behind a Cloudflare Access\n## application. `provider_gated` is Cloudflare-only, and the server verifies it\n## fail-closed before any effect (`6f4f`); until that verdict is bound it is the\n## author's claim and nothing publishes. The same document on `javascript` is\n## refused at the provider: the Cargo helper supervises `cloudflared`.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 7\n\napplicationId: webserver\n\nmetadata:\n  description: An internal dashboard behind Cloudflare Access.\n  labels: [liskov, example, cargo, service, public]\n\nintegrations:\n  cloudflare_tunnel: int_0123456789abcdef0123456789abcdef\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image:\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [/app/start.sh]\n\nexecution:\n  mode: continuous\n\ndeployment:\n  schedule:\n    duration: 6h\n  spend:\n    unit: service_credit_micros\n    perJob: \"3000000\"\n    rate:\n      amount: \"12000000\"\n      window: 1d\n\ningress:\n  http:\n    - name: http\n      localPort: 8080\n      health:\n        ready:\n          http: /healthz\n      endpoints:\n        - name: edge\n          provider:\n            kind: cloudflare_tunnel\n            hostname: dashboard.example.com\n          protection: provider_gated\n\nstate:\n  mode: off\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cloudflare-provider-gated",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            },
+            "integrations": [
+              {
+                "useSite": "/ingress/http/edge/provider",
+                "organizationId": "org_fixture",
+                "integrationId": "int_0123456789abcdef0123456789abcdef",
+                "kind": "cloudflare_tunnel",
+                "configurationRevision": 1,
+                "authorizationScopes": [
+                  "devices:write"
+                ],
+                "revocationEpoch": 0,
+                "authoredOverride": false,
+                "cloudflareAccess": {
+                  "hostname": "other.example.com",
+                  "path": "/",
+                  "accessApplicationId": "access_app_fixture",
+                  "accessPolicyIds": [
+                    "access_policy_fixture"
+                  ],
+                  "canonicalPolicyDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                  "integrationCredentialRevision": 1,
+                  "observedAt": "2026-10-19T00:00:00Z",
+                  "revocationEpoch": 0,
+                  "acceptedPolicySubset": "identity_allow"
+                }
+              },
+              {
+                "useSite": "/integrations/cloudflare_tunnel",
+                "organizationId": "org_fixture",
+                "integrationId": "int_0123456789abcdef0123456789abcdef",
+                "kind": "cloudflare_tunnel",
+                "configurationRevision": 1,
+                "authorizationScopes": [
+                  "devices:write"
+                ],
+                "revocationEpoch": 0,
+                "authoredOverride": false
+              }
+            ]
+          }
+        }
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/http/edge/protection"
+    },
+    {
+      "name": "v7/materialize/cloudflare-provider-gated/access-path",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## V7 dark fixture (BKLG-20260926-k7no). Not publishable: no production\n## generation lists the V7 pair.\n##\n## One native-image HTTP service published through the organization's\n## Cloudflare Tunnel at an authored hostname, behind a Cloudflare Access\n## application. `provider_gated` is Cloudflare-only, and the server verifies it\n## fail-closed before any effect (`6f4f`); until that verdict is bound it is the\n## author's claim and nothing publishes. The same document on `javascript` is\n## refused at the provider: the Cargo helper supervises `cloudflared`.\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 7\n\napplicationId: webserver\n\nmetadata:\n  description: An internal dashboard behind Cloudflare Access.\n  labels: [liskov, example, cargo, service, public]\n\nintegrations:\n  cloudflare_tunnel: int_0123456789abcdef0123456789abcdef\n\nrelease:\n  mode: source\n\nruntime:\n  kind: native_image\n  image:\n    name: debian-trixie\n    version: \"0.1\"\n  entrypoint:\n    executable: /bin/sh\n    args: [/app/start.sh]\n\nexecution:\n  mode: continuous\n\ndeployment:\n  schedule:\n    duration: 6h\n  spend:\n    unit: service_credit_micros\n    perJob: \"3000000\"\n    rate:\n      amount: \"12000000\"\n      window: 1d\n\ningress:\n  http:\n    - name: http\n      localPort: 8080\n      health:\n        ready:\n          http: /healthz\n      endpoints:\n        - name: edge\n          provider:\n            kind: cloudflare_tunnel\n            hostname: dashboard.example.com\n          protection: provider_gated\n\nstate:\n  mode: off\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "runtime_image",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/cloudflare-provider-gated",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            },
+            "integrations": [
+              {
+                "useSite": "/ingress/http/edge/provider",
+                "organizationId": "org_fixture",
+                "integrationId": "int_0123456789abcdef0123456789abcdef",
+                "kind": "cloudflare_tunnel",
+                "configurationRevision": 1,
+                "authorizationScopes": [
+                  "devices:write"
+                ],
+                "revocationEpoch": 0,
+                "authoredOverride": false,
+                "cloudflareAccess": {
+                  "hostname": "dashboard.example.com",
+                  "path": "/admin",
+                  "accessApplicationId": "access_app_fixture",
+                  "accessPolicyIds": [
+                    "access_policy_fixture"
+                  ],
+                  "canonicalPolicyDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                  "integrationCredentialRevision": 1,
+                  "observedAt": "2026-10-19T00:00:00Z",
+                  "revocationEpoch": 0,
+                  "acceptedPolicySubset": "identity_allow"
+                }
+              },
+              {
+                "useSite": "/integrations/cloudflare_tunnel",
+                "organizationId": "org_fixture",
+                "integrationId": "int_0123456789abcdef0123456789abcdef",
+                "kind": "cloudflare_tunnel",
+                "configurationRevision": 1,
+                "authorizationScopes": [
+                  "devices:write"
+                ],
+                "revocationEpoch": 0,
+                "authoredOverride": false
+              }
+            ]
+          }
+        }
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/http/edge/protection"
+    },
+    {
+      "name": "v8/invalid/payload-url",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT-CODE: unknown_field\n# EXPECT-POINTER: /runtime/url\n# EXPECT: unknown field\n{\n  \"schema\": \"proof.liskov.application-manifest\",\n  \"schemaVersion\": 8,\n  \"applicationId\": \"cargo-payload\",\n  \"release\": {\n    \"mode\": \"pinned\",\n    \"artifact\": {\n      \"digest\": \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n    }\n  },\n  \"runtime\": {\n    \"kind\": \"native_payload\",\n    \"image\": {\n      \"name\": \"generic-cargo\",\n      \"version\": \"1.0\"\n    },\n    \"entrypoint\": {\n      \"file\": \"bin/app\",\n      \"args\": [\n        \"--serve\",\n        \"\"\n      ]\n    },\n    \"url\": \"https://example.invalid/private\"\n  },\n  \"execution\": {\n    \"mode\": \"continuous\"\n  },\n  \"deployment\": {\n    \"schedule\": {\n      \"duration\": \"30m\"\n    },\n    \"lifecycle\": {\n      \"update\": {\n        \"timing\": \"next_renewal\",\n        \"method\": {\n          \"mode\": \"supervised_payload\",\n          \"shutdownGrace\": \"5s\",\n          \"readiness\": {\n            \"mode\": \"exec\",\n            \"file\": \"bin/readiness\",\n            \"args\": [\n              \"--check\"\n            ],\n            \"timeout\": \"2s\",\n            \"maxWait\": \"20s\"\n          },\n          \"onActivationFailure\": {\n            \"mode\": \"stop\"\n          }\n        }\n      }\n    },\n    \"spend\": {\n      \"unit\": \"service_credit_micros\",\n      \"perJob\": \"1000000\",\n      \"rate\": {\n        \"amount\": \"5000000\",\n        \"window\": \"1h\"\n      }\n    }\n  },\n  \"state\": {\n    \"mode\": \"off\"\n  }\n}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/runtime/url"
+    },
+    {
+      "name": "v8/invalid/supervised-once",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/lifecycle/update/method\n# EXPECT: refused\n{\n  \"schema\": \"proof.liskov.application-manifest\",\n  \"schemaVersion\": 8,\n  \"applicationId\": \"cargo-payload\",\n  \"release\": {\n    \"mode\": \"pinned\",\n    \"artifact\": {\n      \"digest\": \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n    }\n  },\n  \"runtime\": {\n    \"kind\": \"native_payload\",\n    \"image\": {\n      \"name\": \"generic-cargo\",\n      \"version\": \"1.0\"\n    },\n    \"entrypoint\": {\n      \"file\": \"bin/app\",\n      \"args\": [\n        \"--serve\",\n        \"\"\n      ]\n    }\n  },\n  \"execution\": {\n    \"mode\": \"once\"\n  },\n  \"deployment\": {\n    \"schedule\": {\n      \"duration\": \"30m\"\n    },\n    \"lifecycle\": {\n      \"update\": {\n        \"timing\": \"next_renewal\",\n        \"method\": {\n          \"mode\": \"supervised_payload\",\n          \"shutdownGrace\": \"5s\",\n          \"readiness\": {\n            \"mode\": \"exec\",\n            \"file\": \"bin/readiness\",\n            \"args\": [\n              \"--check\"\n            ],\n            \"timeout\": \"2s\",\n            \"maxWait\": \"20s\"\n          },\n          \"onActivationFailure\": {\n            \"mode\": \"stop\"\n          }\n        }\n      }\n    },\n    \"spend\": {\n      \"unit\": \"service_credit_micros\",\n      \"perJob\": \"1000000\"\n    }\n  },\n  \"state\": {\n    \"mode\": \"off\"\n  }\n}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/lifecycle/update/method"
+    },
+    {
+      "name": "v8/invalid/zero-grace",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/lifecycle/update/method/shutdownGrace\n# EXPECT: refused\n{\n  \"schema\": \"proof.liskov.application-manifest\",\n  \"schemaVersion\": 8,\n  \"applicationId\": \"cargo-payload\",\n  \"release\": {\n    \"mode\": \"pinned\",\n    \"artifact\": {\n      \"digest\": \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n    }\n  },\n  \"runtime\": {\n    \"kind\": \"native_payload\",\n    \"image\": {\n      \"name\": \"generic-cargo\",\n      \"version\": \"1.0\"\n    },\n    \"entrypoint\": {\n      \"file\": \"bin/app\",\n      \"args\": [\n        \"--serve\",\n        \"\"\n      ]\n    }\n  },\n  \"execution\": {\n    \"mode\": \"continuous\"\n  },\n  \"deployment\": {\n    \"schedule\": {\n      \"duration\": \"30m\"\n    },\n    \"lifecycle\": {\n      \"update\": {\n        \"timing\": \"next_renewal\",\n        \"method\": {\n          \"mode\": \"supervised_payload\",\n          \"shutdownGrace\": \"0ms\",\n          \"readiness\": {\n            \"mode\": \"exec\",\n            \"file\": \"bin/readiness\",\n            \"args\": [\n              \"--check\"\n            ],\n            \"timeout\": \"2s\",\n            \"maxWait\": \"20s\"\n          },\n          \"onActivationFailure\": {\n            \"mode\": \"stop\"\n          }\n        }\n      }\n    },\n    \"spend\": {\n      \"unit\": \"service_credit_micros\",\n      \"perJob\": \"1000000\",\n      \"rate\": {\n        \"amount\": \"5000000\",\n        \"window\": \"1h\"\n      }\n    }\n  },\n  \"state\": {\n    \"mode\": \"off\"\n  }\n}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/lifecycle/update/method/shutdownGrace"
+    },
+    {
       "name": "v4/duration-below-acurast-minimum",
       "request": {
         "schema": "proof.liskov.policy-client-request.v1",
@@ -6013,12 +7229,509 @@
       "expectedPointer": "/deployment/schedule/maxStartDelayMs"
     }
   ],
+  "refused": [
+    {
+      "name": "v8/refused/zero-shutdownGrace",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"0ms\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/over-window-shutdownGrace",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"31m\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/overflow-shutdownGrace",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"18446744073709551615d\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/zero-readiness/timeout",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"0ms\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/over-window-readiness/timeout",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"31m\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/overflow-readiness/timeout",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"18446744073709551615d\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/zero-readiness/maxWait",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"0ms\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/over-window-readiness/maxWait",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"31m\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/overflow-readiness/maxWait",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"18446744073709551615d\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/probe-over-wait",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"21s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/cutover-equals-window",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"1795s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/supervised-javascript",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"javascript\", \"entrypoint\": {\"file\": \"index.js\"}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/supervised-native_image",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_image\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"executable\": \"/bin/app\"}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/supervised-once",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"once\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/supervised-interval",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"interval\", \"every\": \"1h\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/bad-entrypoint-../app",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"../app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/bad-probe-../app",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"../app\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/bad-entrypoint-/bin/app",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"/bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/bad-probe-/bin/app",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"/bin/app\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/bad-entrypoint-bin/../../app",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/../../app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/bad-probe-bin/../../app",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/../../app\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/bad-entrypoint-bin//app",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin//app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/bad-probe-bin//app",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin//app\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/bad-entrypoint-https://payload.invalid/app",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"https://payload.invalid/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/bad-probe-https://payload.invalid/app",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"https://payload.invalid/app\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/bad-entrypoint-bin\\app",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin\\\\app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/bad-probe-bin\\app",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin\\\\app\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/bad-entrypoint-",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/bad-probe-",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/directory-entrypoint-.",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \".\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/directory-entrypoint-bin/.",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/.\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/too-many-args",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/too-many-probe-args",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\", \"arg\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/nul-arg",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"x\\u0000y\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/nul-probe-arg",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"x\\u0000y\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/supervisor-on-replace",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"replace_job\", \"shutdownGrace\": \"5s\"}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/rollback-no-state",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/rollback-unknown-state",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"inferred\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/stop-with-state",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"stop\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/no-policy",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\"}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/no-probe-mode",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"file\": \"bin/readiness\", \"timeout\": \"1s\", \"maxWait\": \"2s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/unknown-probe-mode",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"http\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/not-inherited-integrations",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}, \"integrations\": {}}"
+      }
+    },
+    {
+      "name": "v8/refused/not-inherited-ingress",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}, \"ingress\": {}}"
+      }
+    },
+    {
+      "name": "v8/refused/not-inherited-hooks",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}, \"hooks\": {}}"
+      }
+    },
+    {
+      "name": "v8/refused/not-inherited-cohort",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}, \"cohort\": {}}"
+      }
+    },
+    {
+      "name": "v8/refused/runtime-url",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}, \"url\": \"https://payload.invalid/app\"}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/runtime-digest",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}, \"digest\": \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/runtime-encryption",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\"}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}, \"encryption\": \"none\"}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/builder-authority",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\", \"builder\": {\"kind\": \"github\"}}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/pinned-no-digest",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"pinned\", \"artifact\": {}}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/source-with-artifact",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"source\", \"artifact\": {\"digest\": \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/pinned-url",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"pinned\", \"artifact\": {\"digest\": \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"url\": \"https://payload.invalid/app\"}}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/pinned-encryption",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"pinned\", \"artifact\": {\"digest\": \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"encryption\": \"none\"}}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    },
+    {
+      "name": "v8/refused/pinned-duplicate-digest",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "json",
+        "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"applicationId\": \"cargo-payload\", \"release\": {\"mode\": \"pinned\", \"digest\": \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"artifact\": {\"digest\": \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}}, \"runtime\": {\"kind\": \"native_payload\", \"image\": {\"name\": \"generic-cargo\", \"version\": \"1.0\"}, \"entrypoint\": {\"file\": \"bin/app\", \"args\": [\"--serve\", \"\"]}}, \"execution\": {\"mode\": \"continuous\"}, \"deployment\": {\"schedule\": {\"duration\": \"30m\"}, \"lifecycle\": {\"update\": {\"timing\": \"immediate\", \"method\": {\"mode\": \"supervised_payload\", \"shutdownGrace\": \"5s\", \"readiness\": {\"mode\": \"exec\", \"file\": \"bin/readiness\", \"args\": [\"--check\"], \"timeout\": \"2s\", \"maxWait\": \"20s\"}, \"onActivationFailure\": {\"mode\": \"rollback\", \"stateCompatibility\": \"backward_compatible\"}}}}, \"spend\": {\"unit\": \"service_credit_micros\", \"perJob\": \"1000000\", \"rate\": {\"amount\": \"5000000\", \"window\": \"1h\"}}}, \"state\": {\"mode\": \"off\"}}"
+      }
+    }
+  ],
   "unknown": {
     "request": {
       "schema": "proof.liskov.policy-client-request.v1",
       "operation": "validate",
       "encoding": "json",
-      "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 8, \"opaqueFutureBody\": {\"mustNotBeRead\": true}}"
+      "document": "{\"schema\": \"proof.liskov.application-manifest\", \"schemaVersion\": 9, \"opaqueFutureBody\": {\"mustNotBeRead\": true}}"
     }
   }
 }

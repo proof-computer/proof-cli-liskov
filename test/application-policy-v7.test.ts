@@ -96,9 +96,11 @@ describe("V7 application-manifest validation through the vendored contract", () 
     assert.equal(isRegisteredSourcePublicationPair(result), false);
   });
 
-  it("treats a schemaVersion 8 document as unknown_opaque", () => {
+  // Producer 13f039d41b8febf36db37844a7a61cc405fcec79 also prepares V8;
+  // its unknown-pair vector is V9. Neither V7 nor V8 is publishable.
+  it("treats the owner's schemaVersion 9 document as unknown_opaque", () => {
     const declared = JSON.parse(corpus.unknown.request.document) as { schemaVersion: number };
-    assert.equal(declared.schemaVersion, 8);
+    assert.equal(declared.schemaVersion, 9);
     const result = evaluate(corpus.unknown);
     assert.equal(result.disposition, "unknown_opaque");
     assert.equal(isRegisteredSourcePublicationPair(result), false);
