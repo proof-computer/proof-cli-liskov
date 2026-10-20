@@ -138,7 +138,8 @@ describe("retained V5 application-manifest validation", () => {
 
   it("degrades on a future schemaVersion without interpreting nested fields", () => {
     const future = retainedJavascript();
-    future.schemaVersion = 8;
+    // The producer at 13f039d41 prepares V8; V9 remains unregistered.
+    future.schemaVersion = 9;
     future.ingress = { http: { mode: "required" } };
     const diagnostics = validateApplicationManifest(future);
     assert.equal(diagnostics.length, 1);

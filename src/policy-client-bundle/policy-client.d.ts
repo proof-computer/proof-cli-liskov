@@ -5,6 +5,12 @@ export interface PolicyClientBundleManifest {
   supportedPairs: Array<{ schema: string; schemaVersion: number }>;
   publicationPairs: Array<{ schema: string; schemaVersion: number; releaseMode: "source" }>;
   sourceDigest: string;
+  releaseContracts?: Array<{
+    version: number;
+    identity: { rcDigest: string; canonicalIdentity: { domain: string; components: Record<string, string> } };
+    source: { sourceRepository: string; sourceCommit: string; sourcePathTemplate: string };
+    expectedClientSurfaces: Array<{ repository: string; surface: string }>;
+  }>;
 }
 
 export interface PolicyContract {
