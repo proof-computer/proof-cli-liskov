@@ -35,18 +35,33 @@ function sessionBody(effective: string, sessionDefault = effective) {
   };
 }
 
-function intentBody(encryptionMode = "none") {
+function intentBody(
+  encryptionMode = "none",
+  upload: { url?: string; method?: string; field?: string } = {
+    url: UPLOAD_URL,
+    method: "POST",
+    field: "file"
+  }
+) {
   return {
     ok: true,
     uploadId: UPLOAD_ID,
     token: UPLOAD_TOKEN,
-    upload: { url: UPLOAD_URL, method: "POST", field: "file" },
+    upload,
     gatewayUrlTemplate: "https://gateway.test/ipfs/{cid}",
     maxBytes: 8_388_608,
     encryptionMode,
     expiresAtMs: 1,
     cidVersion: 0
   };
+}
+
+function humanSuccess(file: string, applicationRef: string, bytes: Uint8Array, alreadyRecorded = false): string {
+  const digest = `sha256:${sha256(bytes)}`;
+  const recorded = alreadyRecorded ? ", already recorded" : "";
+  const uploaded = `Uploaded ${file} for ${applicationRef}: member-abc (${digest}, ipfs://${CID})${recorded}`;
+  const next = `Publish a pinned release {"release": {"mode": "pinned", "artifact": {"digest": "${digest}"}}} with proof liskov application policy publish <application-id> --file <manifest> --artifact-digest ${digest} --expected-pointer-version <current, 0 for a first publication> --dry-run.`;
+  return `${uploaded}\n${next}`;
 }
 
 function recordBody(bytes: Uint8Array, manifestDigest: string, alreadyRecorded = false) {
@@ -221,10 +236,7 @@ test("happy path requests session, intent, upload, and record in order", async (
         manifestDigest: `sha256:${sha256(bytes)}`,
         encryptionMode: "none"
       });
-      assert.equal(
-        human.text,
-        `Uploaded ${file} for my app: member-abc (sha256:${sha256(bytes)}, ipfs://${CID})`
-      );
+      assert.equal(human.text, humanSuccess(file, "my app", bytes));
 
       const json = await runUpload(sessionFile, {
         applicationRef: "my app",
@@ -238,7 +250,7 @@ test("happy path requests session, intent, upload, and record in order", async (
   });
 });
 
-test("a manifest digest replaces the bundle digest and encryption mode is forwarded unchanged", async () => {
+test("a manifest digest replaces the bundle digest and only none is forwarded", async () => {
   const bytes = Buffer.from("bundle-bytes");
   const manifest = Buffer.from("{\"name\":\"app\"}");
   const manifestDigest = `sha256:${sha256(manifest)}`;
@@ -249,20 +261,105 @@ test("a manifest digest replaces the bundle digest and encryption mode is forwar
         applicationRef: "proof-docs",
         file,
         manifest: manifestPath,
-        encryptionMode: "aes-256-gcm-payload-v1",
+        encryptionMode: "none",
         config: sessionFile
-      }, successScript(record, "aes-256-gcm-payload-v1"));
+      }, successScript(record, "none"));
       assert.equal(out.code, 0);
       assert.equal((out.seen[1]?.body as { manifestDigest: string }).manifestDigest, manifestDigest);
       assert.notEqual(manifestDigest, `sha256:${sha256(bytes)}`);
-      assert.equal((out.seen[1]?.body as { encryptionMode: string }).encryptionMode, "aes-256-gcm-payload-v1");
-      assert.equal((out.seen[3]?.body as { encryptionMode: string }).encryptionMode, "aes-256-gcm-payload-v1");
-      assert.equal(
-        out.text,
-        `Uploaded ${file} for proof-docs: member-abc (sha256:${sha256(bytes)}, ipfs://${CID}), already recorded`
-      );
+      assert.equal((out.seen[1]?.body as { encryptionMode: string }).encryptionMode, "none");
+      assert.equal((out.seen[3]?.body as { encryptionMode: string }).encryptionMode, "none");
+      assert.equal(out.text, humanSuccess(file, "proof-docs", bytes, true));
+
+      const refuse = async (encryptionMode: string, json = false) => runUpload(sessionFile, {
+        applicationRef: "proof-docs",
+        file,
+        encryptionMode,
+        config: sessionFile,
+        json
+      }, () => {
+        throw new Error("fetch should not run");
+      });
+      const encrypted = await refuse("aes-256-gcm-payload-v1", true);
+      assert.equal(encrypted.code, 1);
+      assert.equal(encrypted.seen.length, 0);
+      assert.deepEqual(JSON.parse(encrypted.text), {
+        ok: false,
+        error: "SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED",
+        reason: "encryption_unsupported"
+      });
+      const encryptedHuman = await refuse("aes-256-gcm-payload-v1");
+      assert.equal(encryptedHuman.code, 1);
+      assert.equal(encryptedHuman.seen.length, 0);
+      assert.match(encryptedHuman.text, /encrypted member uploads are not supported/u);
+      assert.match(encryptedHuman.text, /encryption_unsupported/u);
+
+      const unknown = await refuse("rot13");
+      assert.equal(unknown.code, 1);
+      assert.equal(unknown.seen.length, 0);
+      assert.match(unknown.text, /encryption_mode/u);
+      assert.match(unknown.text, /--encryption-mode must be none/u);
+      assert.equal(unknown.text.includes("aes-256-gcm-payload-v1"), false);
     });
   }, manifest);
+});
+
+test("a malformed upload target is refused before the token is sent", async () => {
+  const bytes = Buffer.from("bundle");
+  const targets: Array<{ url?: string; method?: string; field?: string }> = [
+    { url: "http://upload.test/pinning/pinFileToIPFS", method: "POST", field: "file" },
+    { url: "https://user:pass@upload.test/pinning/pinFileToIPFS", method: "POST", field: "file" },
+    { url: `https://upload.test/pinning/pinFileToIPFS?token=${UPLOAD_TOKEN}`, method: "POST", field: "file" },
+    { url: "https://upload.test/pinning/pinFileToIPFS#part", method: "POST", field: "file" },
+    { url: "https://upload.test/pinning/other", method: "POST", field: "file" },
+    { url: "/pinning/pinFileToIPFS", method: "POST", field: "file" },
+    { url: UPLOAD_URL, method: "PUT", field: "file" },
+    { url: UPLOAD_URL, method: "POST", field: "bundle" },
+    { url: UPLOAD_URL, field: "file" },
+    { url: UPLOAD_URL, method: "POST" }
+  ];
+  await withBundle(bytes, async (file) => {
+    await withSession(async (sessionFile) => {
+      for (const upload of targets) {
+        const out = await runUpload(sessionFile, {
+          applicationRef: "proof-docs",
+          file,
+          config: sessionFile,
+          json: true
+        }, (index) => {
+          if (index === 0) return Response.json(sessionBody("org-1"));
+          if (index === 1) return Response.json(intentBody("none", upload));
+          throw new Error(`unexpected request ${index}`);
+        });
+        assert.equal(out.code, 1, JSON.stringify(upload));
+        assert.equal(out.seen.length, 2, JSON.stringify(upload));
+        assert.deepEqual(JSON.parse(out.text), {
+          ok: false,
+          error: "SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED",
+          reason: "upload_url"
+        });
+        assert.equal(out.seen.some((request) => request.authorization === `Bearer ${UPLOAD_TOKEN}`), false);
+      }
+
+      const human = await runUpload(sessionFile, {
+        applicationRef: "proof-docs",
+        file,
+        config: sessionFile
+      }, (index) => {
+        if (index === 0) return Response.json(sessionBody("org-1"));
+        if (index === 1) return Response.json(intentBody("none", {
+          url: "http://upload.test/pinning/pinFileToIPFS",
+          method: "POST",
+          field: "file"
+        }));
+        throw new Error(`unexpected request ${index}`);
+      });
+      assert.equal(human.code, 1);
+      assert.equal(human.seen.length, 2);
+      assert.match(human.text, /SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED/u);
+      assert.match(human.text, /upload_url/u);
+    });
+  });
 });
 
 test("an explicit organization selector wins and a missing context uses organization.id", async () => {
