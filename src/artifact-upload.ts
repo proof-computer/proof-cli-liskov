@@ -1,9 +1,16 @@
 import { createHash } from "node:crypto";
 
-/** Postures the member upload route accepts. The CLI does not encrypt. */
+/**
+ * Flag options. Kept wider than the member allowlist so oclif does not refuse
+ * the encrypted mode before the CLI can name its own reason.
+ */
 export const ARTIFACT_ENCRYPTION_MODES = ["none", "aes-256-gcm-payload-v1"] as const;
 
+/** Postures a member CLI upload will send. Encrypted payloads are refused locally. */
+export const MEMBER_UPLOAD_ENCRYPTION_MODES = ["none"] as const;
+
 export type ArtifactEncryptionMode = (typeof ARTIFACT_ENCRYPTION_MODES)[number];
+export type MemberUploadEncryptionMode = (typeof MEMBER_UPLOAD_ENCRYPTION_MODES)[number];
 
 export interface ArtifactFileHash {
   sha256Hex: string;
@@ -59,6 +66,10 @@ const CID_V0 = /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/u;
 
 export function isArtifactEncryptionMode(value: string): value is ArtifactEncryptionMode {
   return (ARTIFACT_ENCRYPTION_MODES as readonly string[]).includes(value);
+}
+
+export function isMemberUploadEncryptionMode(value: string): value is MemberUploadEncryptionMode {
+  return (MEMBER_UPLOAD_ENCRYPTION_MODES as readonly string[]).includes(value);
 }
 
 export function hashFile(bytes: Uint8Array): ArtifactFileHash {

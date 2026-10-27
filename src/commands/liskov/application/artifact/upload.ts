@@ -18,7 +18,7 @@ export default class SlipwayApplicationArtifactUpload extends OrganizationScoped
     config: Flags.string({ description: "Path to the local Liskov session file." }),
     "encryption-mode": Flags.string({
       default: "none",
-      description: "Encryption posture of the uploaded bytes. The CLI uploads the file unchanged.",
+      description: "Encryption posture of the uploaded bytes. Only none is supported; encrypted member uploads are refused before any request.",
       options: [...ARTIFACT_ENCRYPTION_MODES]
     }),
     file: Flags.string({ description: "Built bundle to upload.", required: true }),

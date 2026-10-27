@@ -4,7 +4,7 @@ import { access, mkdir, readFile, rm, writeFile, chmod } from "node:fs/promises"
 import { homedir } from "node:os";
 import path from "node:path";
 
-import { buildUploadForm, hashFile, isArtifactEncryptionMode, parseIpfsHash } from "./artifact-upload.js";
+import { buildUploadForm, hashFile, isArtifactEncryptionMode, isMemberUploadEncryptionMode, parseIpfsHash } from "./artifact-upload.js";
 
 import {
   isExecutionHistoryResponse,
@@ -4561,7 +4561,15 @@ export async function runSlipwayApplicationArtifactUpload(input: SlipwayApplicat
   if (!isArtifactEncryptionMode(encryptionMode)) {
     return writeArtifactUploadRefusal(options, input.json, {
       reason: "encryption_mode",
-      message: "Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED): --encryption-mode must be none or aes-256-gcm-payload-v1."
+      message: "Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED): --encryption-mode must be none."
+    });
+  }
+  // Member uploads stay unencrypted until a key-delivery path exists. Refuse
+  // here, before any request, so the reason is the CLI's and not oclif's.
+  if (!isMemberUploadEncryptionMode(encryptionMode)) {
+    return writeArtifactUploadRefusal(options, input.json, {
+      reason: "encryption_unsupported",
+      message: "Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED): encrypted member uploads are not supported."
     });
   }
 
@@ -4634,6 +4642,15 @@ export async function runSlipwayApplicationArtifactUpload(input: SlipwayApplicat
       body: intent.body,
       secrets,
       message: "Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED): Liskov refused the artifact upload."
+    });
+  }
+  // The bearer leaves the CLI only for the pin endpoint the GitHub action
+  // accepts. Do not print the URL: a rejected target may carry the token.
+  if (!acceptedMemberUploadTarget(issued)) {
+    return writeArtifactUploadRefusal(options, input.json, {
+      reason: "upload_url",
+      secrets,
+      message: "Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED): the upload target must be POST of field file to an https URL ending in /pinning/pinFileToIPFS, with no credentials, query, or fragment."
     });
   }
 
@@ -4735,7 +4752,7 @@ interface ArtifactUploadServerBody {
   maxBytes?: number;
   token?: string;
   uploadId?: string;
-  upload?: { url?: string; method?: string };
+  upload?: { url?: string; method?: string; field?: string };
   artifactVersionId?: string;
   artifactDigest?: string;
   artifactCid?: string;
@@ -4782,15 +4799,31 @@ function canonicalUploadOrganizationId(body: SlipwayApiSessionResponse): string 
   return typeof id === "string" && id.length > 0 && id.trim() === id ? id : undefined;
 }
 
-function readIssuedUpload(body: ArtifactUploadServerBody | undefined): { uploadId: string; token: string; url: string; method: string } | undefined {
+function readIssuedUpload(body: ArtifactUploadServerBody | undefined): { uploadId: string; token: string; url: string; method: string; field: string } | undefined {
   const token = typeof body?.token === "string" ? body.token : undefined;
   const uploadId = typeof body?.uploadId === "string" ? body.uploadId : undefined;
   const url = typeof body?.upload?.url === "string" ? body.upload.url : undefined;
-  const method = typeof body?.upload?.method === "string" && body.upload.method.length > 0
-    ? body.upload.method
-    : "POST";
+  const method = typeof body?.upload?.method === "string" ? body.upload.method : "";
+  const field = typeof body?.upload?.field === "string" ? body.upload.field : "";
   if (body?.ok !== true || !token || !uploadId || !url) return undefined;
-  return { uploadId, token, url, method };
+  return { uploadId, token, url, method, field };
+}
+
+/** Same shape the GitHub action accepts before it sends the upload token. */
+function acceptedMemberUploadTarget(upload: { url: string; method: string; field: string }): boolean {
+  if (upload.method !== "POST" || upload.field !== "file") return false;
+  if (!upload.url.endsWith("/pinning/pinFileToIPFS")) return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(upload.url);
+  } catch {
+    return false;
+  }
+  return parsed.protocol === "https:"
+    && parsed.username === ""
+    && parsed.password === ""
+    && parsed.search === ""
+    && parsed.hash === "";
 }
 
 function rememberArtifactToken(secrets: string[], body: ArtifactUploadServerBody | undefined): void {
@@ -4808,7 +4841,13 @@ function artifactRecordIdentity(body: ArtifactUploadServerBody | undefined): boo
 
 function artifactUploadHumanLine(input: SlipwayApplicationArtifactUploadInput, body: ArtifactUploadServerBody): string {
   const recorded = body.alreadyRecorded === true ? ", already recorded" : "";
-  return `Uploaded ${input.file} for ${input.applicationRef}: ${body.artifactVersionId} (${body.artifactDigest}, ${body.artifactCid})${recorded}`;
+  const digest = body.artifactDigest ?? "";
+  const uploaded = `Uploaded ${input.file} for ${input.applicationRef}: ${body.artifactVersionId} (${digest}, ${body.artifactCid})${recorded}`;
+  // The upload accepts a uid, name, or legacy id and the record carries no
+  // application id, so the publish target stays a placeholder.
+  const release = `{"release": {"mode": "pinned", "artifact": {"digest": ${JSON.stringify(digest)}}}}`;
+  const next = `Publish a pinned release ${release} with proof liskov application policy publish <application-id> --file <manifest> --artifact-digest ${digest} --expected-pointer-version <current, 0 for a first publication> --dry-run.`;
+  return `${uploaded}\n${next}`;
 }
 
 function artifactServerCode(body: ArtifactUploadServerBody | undefined): string | undefined {
