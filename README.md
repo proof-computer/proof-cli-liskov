@@ -36,6 +36,9 @@ proof liskov application logs proof-docs --deployment dep-123 --job job-123 --or
 proof liskov application logs proof-docs --follow
 proof liskov application logs proof-docs --from-start --ndjson
 proof liskov application logs proof-docs --follow --event 'runtime.access.*'
+# Uploads the bundle with the session's effective organization. --organization selects another one for this command only and does not change the saved default.
+proof liskov application artifact upload proof-docs --file bundle.zip
+proof liskov application artifact upload proof-docs --file bundle.zip --organization org-123
 proof liskov application publish proof-docs --artifact-version av-... --dry-run
 proof liskov application publish proof-docs --artifact-version av-... --yes
 proof liskov application publish proof-docs --paused --reason "failure-matrix initialization" --yes
