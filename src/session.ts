@@ -4,6 +4,8 @@ import { access, mkdir, readFile, rm, writeFile, chmod } from "node:fs/promises"
 import { homedir } from "node:os";
 import path from "node:path";
 
+import { buildUploadForm, hashFile, isArtifactEncryptionMode, parseIpfsHash } from "./artifact-upload.js";
+
 import {
   isExecutionHistoryResponse,
   formatExecutionHistory,
@@ -537,6 +539,16 @@ export interface SlipwayApplicationArtifactPinRestoreInput {
   applicationRef: string;
   pinId: string;
   yes?: boolean;
+  slipwayUrl?: string;
+  config?: string;
+  json?: boolean;
+}
+
+export interface SlipwayApplicationArtifactUploadInput {
+  applicationRef: string;
+  file: string;
+  manifest?: string;
+  encryptionMode?: string;
   slipwayUrl?: string;
   config?: string;
   json?: boolean;
@@ -4537,6 +4549,363 @@ export async function runSlipwayApplicationArtifactPinRestore(input: SlipwayAppl
     ? `Dry run: would restore pin ${input.pinId} for ${input.applicationRef}. Pass --yes to apply.`
     : `Restored pin ${input.pinId} for ${input.applicationRef}.`);
   return 0;
+}
+
+const ARTIFACT_UPLOAD_FILE_UNREADABLE = "SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_FILE_UNREADABLE";
+const ARTIFACT_UPLOAD_REFUSED = "SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED";
+const ARTIFACT_UPLOAD_FAILED = "SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_FAILED";
+const ARTIFACT_UPLOAD_RECORD_FAILED = "SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_RECORD_FAILED";
+
+export async function runSlipwayApplicationArtifactUpload(input: SlipwayApplicationArtifactUploadInput, options: SlipwayCliOptions = {}): Promise<number> {
+  const encryptionMode = input.encryptionMode ?? "none";
+  if (!isArtifactEncryptionMode(encryptionMode)) {
+    return writeArtifactUploadRefusal(options, input.json, {
+      reason: "encryption_mode",
+      message: "Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED): --encryption-mode must be none or aes-256-gcm-payload-v1."
+    });
+  }
+
+  const secrets = await artifactUploadSecrets(input, options);
+  const bundle = await readArtifactBytes(input.file, options, input.json, secrets);
+  if (!bundle.ok) return bundle.exitCode;
+  let manifestDigest = `sha256:${hashFile(bundle.bytes).sha256Hex}`;
+  if (input.manifest !== undefined) {
+    const manifest = await readArtifactBytes(input.manifest, options, input.json, secrets);
+    if (!manifest.ok) return manifest.exitCode;
+    manifestDigest = `sha256:${hashFile(manifest.bytes).sha256Hex}`;
+  }
+  const bundleHash = hashFile(bundle.bytes);
+
+  const session = await authenticatedSlipwayRequest<SlipwayApiSessionResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: "/api/session",
+    requestErrorCode: ARTIFACT_UPLOAD_REFUSED,
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read the Liskov session",
+    wordsOwnRefusals: true
+  }, options);
+  if (!session.ok) return session.exitCode;
+  if (!session.response.ok || session.body?.ok !== true || !session.body.session) {
+    return writeArtifactUploadRefusal(options, input.json, {
+      status: session.response.status,
+      body: session.body,
+      secrets,
+      message: "Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED): Liskov refused the session."
+    });
+  }
+  const organizationId = canonicalUploadOrganizationId(session.body);
+  if (!organizationId) {
+    return writeArtifactUploadRefusal(options, input.json, {
+      status: session.response.status,
+      reason: "malformed_organization",
+      secrets,
+      message: "Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED): Liskov did not return a canonical organization id."
+    });
+  }
+
+  const applicationPath = `/api/organizations/${encodeURIComponent(organizationId)}/applications/${encodeURIComponent(input.applicationRef)}`;
+  const intent = await authenticatedSlipwayJsonRequest<ArtifactUploadServerBody>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `${applicationPath}/artifact-upload-intents`,
+    body: {
+      sha256: bundleHash.sha256Hex,
+      byteSize: bundleHash.byteSize,
+      manifestDigest,
+      encryptionMode
+    },
+    requestErrorCode: ARTIFACT_UPLOAD_REFUSED,
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not request a Liskov artifact upload",
+    // Keep this command's typed envelope. The shared helper would rewrite
+    // capability_not_granted as SLIPWAY_ACCESS_DENIED.
+    wordsOwnRefusals: true
+  }, options);
+  if (!intent.ok) return intent.exitCode;
+  rememberArtifactToken(secrets, intent.body);
+  const issued = readIssuedUpload(intent.body);
+  if (!intent.response.ok || !issued) {
+    return writeArtifactUploadRefusal(options, input.json, {
+      status: intent.response.status,
+      body: intent.body,
+      secrets,
+      message: "Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED): Liskov refused the artifact upload."
+    });
+  }
+
+  const fetchImpl = options.fetchImpl ?? fetch;
+  let uploadResponse: Response;
+  try {
+    uploadResponse = await fetchImpl(issued.url, {
+      method: issued.method,
+      headers: { authorization: `Bearer ${issued.token}` },
+      body: buildUploadForm(bundle.bytes)
+    });
+  } catch {
+    return writeArtifactUploadFailure(options, input.json, {
+      secrets,
+      message: "Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_FAILED): could not upload the artifact."
+    });
+  }
+  let uploadText = "";
+  try {
+    uploadText = await uploadResponse.text();
+  } catch {
+    uploadText = "";
+  }
+  if (!uploadResponse.ok) {
+    return writeArtifactUploadFailure(options, input.json, {
+      status: uploadResponse.status,
+      body: uploadText,
+      secrets,
+      message: `Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_FAILED): artifact upload failed (${uploadResponse.status}).`
+    });
+  }
+  let uploadBody: unknown;
+  try {
+    uploadBody = uploadText.trim() ? JSON.parse(uploadText) as unknown : undefined;
+  } catch {
+    uploadBody = undefined;
+  }
+  const cid = parseIpfsHash(uploadBody);
+  if (!cid) {
+    return writeArtifactUploadFailure(options, input.json, {
+      status: uploadResponse.status,
+      body: uploadText,
+      secrets,
+      message: "Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_FAILED): the upload response did not include a CIDv0 IpfsHash."
+    });
+  }
+
+  const record = await authenticatedSlipwayJsonRequest<ArtifactUploadServerBody>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `${applicationPath}/artifact-uploads`,
+    body: {
+      uploadId: issued.uploadId,
+      cid: `ipfs://${cid}`,
+      sha256: bundleHash.sha256Hex,
+      byteSize: bundleHash.byteSize,
+      manifestDigest,
+      encryptionMode
+    },
+    requestErrorCode: ARTIFACT_UPLOAD_RECORD_FAILED,
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not record the Liskov artifact upload",
+    wordsOwnRefusals: true
+  }, options);
+  if (!record.ok) return record.exitCode;
+  rememberArtifactToken(secrets, record.body);
+  if (!record.response.ok || record.body?.ok !== true || !artifactRecordIdentity(record.body)) {
+    const serverCode = artifactServerCode(record.body);
+    return writeArtifactUploadFailure(options, input.json, {
+      error: ARTIFACT_UPLOAD_RECORD_FAILED,
+      status: record.response.status,
+      reason: serverCode,
+      reasonCode: artifactServerReasonCode(record.body) ?? serverCode,
+      secrets,
+      message: `Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_RECORD_FAILED): ${serverCode ?? "Liskov could not record the artifact upload."}`
+    });
+  }
+  const human = artifactUploadHumanLine(input, record.body);
+  if (containsSecret(record.body, secrets) || containsSecret(human, secrets)) {
+    return writeArtifactUploadFailure(options, input.json, {
+      error: ARTIFACT_UPLOAD_RECORD_FAILED,
+      status: record.response.status,
+      reason: "credential_in_response",
+      secrets,
+      message: "Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_RECORD_FAILED): Liskov returned a record that included a credential."
+    });
+  }
+  writeStructuredOrHuman(options, input.json, record.body, human);
+  return 0;
+}
+
+interface ArtifactUploadServerBody {
+  ok?: boolean;
+  error?: string;
+  reason?: string;
+  reasonCode?: string;
+  maxBytes?: number;
+  token?: string;
+  uploadId?: string;
+  upload?: { url?: string; method?: string };
+  artifactVersionId?: string;
+  artifactDigest?: string;
+  artifactCid?: string;
+  alreadyRecorded?: boolean;
+  [key: string]: unknown;
+}
+
+async function readArtifactBytes(
+  file: string,
+  options: SlipwayCliOptions,
+  json: boolean | undefined,
+  secrets: readonly string[]
+): Promise<{ ok: true; bytes: Uint8Array } | { ok: false; exitCode: number }> {
+  try {
+    return { ok: true, bytes: await readFile(file) };
+  } catch (error) {
+    const message = redactArtifactText(errorMessage(error), secrets) ?? "could not read the file";
+    writeStructuredOrHuman(options, json, {
+      ok: false,
+      error: ARTIFACT_UPLOAD_FILE_UNREADABLE,
+      message
+    }, redactArtifactText(`Error (${ARTIFACT_UPLOAD_FILE_UNREADABLE}): could not read ${file}.`, secrets)
+      ?? `Error (${ARTIFACT_UPLOAD_FILE_UNREADABLE}): could not read the file.`);
+    return { ok: false, exitCode: 1 };
+  }
+}
+
+async function artifactUploadSecrets(input: SlipwayApplicationArtifactUploadInput, options: SlipwayCliOptions): Promise<string[]> {
+  try {
+    const saved = await readSlipwaySession(resolveSlipwaySessionFile({
+      config: input.config,
+      env: options.env ?? process.env
+    }));
+    return saved ? [saved.sessionToken] : [];
+  } catch {
+    return [];
+  }
+}
+
+function canonicalUploadOrganizationId(body: SlipwayApiSessionResponse): string | undefined {
+  const id = body.organizationContext !== undefined
+    ? body.organizationContext.effective?.id
+    : body.organization?.id;
+  return typeof id === "string" && id.length > 0 && id.trim() === id ? id : undefined;
+}
+
+function readIssuedUpload(body: ArtifactUploadServerBody | undefined): { uploadId: string; token: string; url: string; method: string } | undefined {
+  const token = typeof body?.token === "string" ? body.token : undefined;
+  const uploadId = typeof body?.uploadId === "string" ? body.uploadId : undefined;
+  const url = typeof body?.upload?.url === "string" ? body.upload.url : undefined;
+  const method = typeof body?.upload?.method === "string" && body.upload.method.length > 0
+    ? body.upload.method
+    : "POST";
+  if (body?.ok !== true || !token || !uploadId || !url) return undefined;
+  return { uploadId, token, url, method };
+}
+
+function rememberArtifactToken(secrets: string[], body: ArtifactUploadServerBody | undefined): void {
+  if (typeof body?.token === "string" && body.token.length > 0) secrets.push(body.token);
+}
+
+function artifactRecordIdentity(body: ArtifactUploadServerBody | undefined): boolean {
+  return typeof body?.artifactVersionId === "string"
+    && body.artifactVersionId.length > 0
+    && typeof body.artifactDigest === "string"
+    && body.artifactDigest.length > 0
+    && typeof body.artifactCid === "string"
+    && body.artifactCid.length > 0;
+}
+
+function artifactUploadHumanLine(input: SlipwayApplicationArtifactUploadInput, body: ArtifactUploadServerBody): string {
+  const recorded = body.alreadyRecorded === true ? ", already recorded" : "";
+  return `Uploaded ${input.file} for ${input.applicationRef}: ${body.artifactVersionId} (${body.artifactDigest}, ${body.artifactCid})${recorded}`;
+}
+
+function artifactServerCode(body: ArtifactUploadServerBody | undefined): string | undefined {
+  return typeof body?.error === "string" ? body.error : typeof body?.reason === "string" ? body.reason : undefined;
+}
+
+function artifactServerReasonCode(body: ArtifactUploadServerBody | undefined): string | undefined {
+  return typeof body?.reasonCode === "string" ? body.reasonCode : undefined;
+}
+
+function writeArtifactUploadRefusal(
+  options: SlipwayCliOptions,
+  json: boolean | undefined,
+  failure: {
+    status?: number;
+    body?: unknown;
+    reason?: string;
+    secrets?: readonly string[];
+    message: string;
+  }
+): number {
+  const record = objectRecord(failure.body);
+  const serverError = stringValue(record.error);
+  // A real 403 carries both `error: "forbidden"` and a `reason` sentence.
+  // The sentence must not replace the server error code.
+  const reason = failure.reason ?? stringValue(record.reason) ?? serverError;
+  const reasonCode = stringValue(record.reasonCode) ?? (failure.reason === undefined ? serverError : undefined);
+  const carriedServerError = serverError !== undefined && serverError !== reason ? serverError : undefined;
+  const maxBytes = typeof record.maxBytes === "number" ? record.maxBytes : undefined;
+  const secrets = failure.secrets ?? [];
+  const detail = [
+    failure.status === undefined ? undefined : String(failure.status),
+    carriedServerError !== undefined && carriedServerError !== reasonCode ? carriedServerError : undefined,
+    reason,
+    reasonCode !== undefined && reasonCode !== reason ? reasonCode : undefined,
+    maxBytes === undefined ? undefined : `maxBytes ${maxBytes}`
+  ].filter((part): part is string => part !== undefined).join(", ");
+  const message = detail.length > 0
+    ? failure.message.replace(/\.$/u, ` (${detail}).`)
+    : failure.message;
+  const redactedServerError = redactArtifactText(carriedServerError, secrets);
+  writeStructuredOrHuman(options, json, {
+    ok: false,
+    error: ARTIFACT_UPLOAD_REFUSED,
+    status: failure.status,
+    reason: redactArtifactText(reason, secrets),
+    reasonCode: redactArtifactText(reasonCode, secrets),
+    ...(redactedServerError === undefined ? {} : { serverError: redactedServerError }),
+    ...(maxBytes === undefined ? {} : { maxBytes })
+  }, redactArtifactText(message, secrets) ?? message);
+  return 1;
+}
+
+function writeArtifactUploadFailure(
+  options: SlipwayCliOptions,
+  json: boolean | undefined,
+  failure: {
+    error?: string;
+    status?: number;
+    reason?: string;
+    reasonCode?: string;
+    body?: string;
+    secrets?: readonly string[];
+    message: string;
+  }
+): number {
+  const secrets = failure.secrets ?? [];
+  const snippet = failure.body === undefined
+    ? undefined
+    : redactArtifactText(failure.body, secrets)?.replace(/\s+/gu, " ").slice(0, 200);
+  writeStructuredOrHuman(options, json, {
+    ok: false,
+    error: failure.error ?? ARTIFACT_UPLOAD_FAILED,
+    status: failure.status,
+    reason: redactArtifactText(failure.reason, secrets),
+    reasonCode: redactArtifactText(failure.reasonCode, secrets),
+    ...(snippet === undefined ? {} : { body: snippet })
+  }, redactArtifactText(
+    snippet === undefined ? failure.message : `${failure.message.replace(/\.$/u, "")}: ${snippet}`,
+    secrets
+  ) ?? failure.message);
+  return 1;
+}
+
+function redactArtifactText(value: string | undefined, secrets: readonly string[]): string | undefined {
+  if (value === undefined) return undefined;
+  return secrets.reduce(
+    (current, secret) => secret.length > 0 ? current.split(secret).join("[redacted]") : current,
+    value
+  );
+}
+
+function containsSecret(value: unknown, secrets: readonly string[]): boolean {
+  if (typeof value === "string") return secrets.some((secret) => secret.length > 0 && value.includes(secret));
+  if (Array.isArray(value)) return value.some((item) => containsSecret(item, secrets));
+  if (value && typeof value === "object") return Object.values(value).some((item) => containsSecret(item, secrets));
+  return false;
 }
 
 export async function runSlipwayApplicationLockboxGrantList(input: SlipwayApplicationLockboxGrantListInput, options: SlipwayCliOptions = {}): Promise<number> {
