@@ -350,6 +350,13 @@ test("intent refusals keep the server code and do not upload", async () => {
   const bytes = Buffer.from("bundle");
   await withBundle(bytes, async (file) => {
     await withSession(async (sessionFile) => {
+      const denied = {
+        ok: false,
+        error: "forbidden",
+        reasonCode: "capability_not_granted",
+        reason: "Session is not allowed to perform policy.publish",
+        capability: "policy.publish"
+      };
       const forbidden = await runUpload(sessionFile, {
         applicationRef: "proof-docs",
         file,
@@ -357,10 +364,44 @@ test("intent refusals keep the server code and do not upload", async () => {
         json: true
       }, (index) => index === 0
         ? Response.json(sessionBody("org-1"))
-        : Response.json({ ok: false, error: "forbidden", reasonCode: "capability_not_granted" }, { status: 403 }));
+        : Response.json(denied, { status: 403 }));
       assert.equal(forbidden.code, 1);
       assert.equal(forbidden.seen.length, 2);
       assert.deepEqual(JSON.parse(forbidden.text), {
+        ok: false,
+        error: "SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED",
+        status: 403,
+        reason: "Session is not allowed to perform policy.publish",
+        reasonCode: "capability_not_granted",
+        serverError: "forbidden"
+      });
+      assert.equal(forbidden.text.includes("forbidden"), true);
+      assert.equal(forbidden.text.includes("capability_not_granted"), true);
+
+      const human = await runUpload(sessionFile, {
+        applicationRef: "proof-docs",
+        file,
+        config: sessionFile
+      }, (index) => index === 0
+        ? Response.json(sessionBody("org-1"))
+        : Response.json(denied, { status: 403 }));
+      assert.equal(human.code, 1);
+      assert.equal(human.seen.length, 2);
+      assert.match(human.text, /SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED/u);
+      assert.match(human.text, /forbidden/u);
+      assert.match(human.text, /capability_not_granted/u);
+
+      const codedOnly = await runUpload(sessionFile, {
+        applicationRef: "proof-docs",
+        file,
+        config: sessionFile,
+        json: true
+      }, (index) => index === 0
+        ? Response.json(sessionBody("org-1"))
+        : Response.json({ ok: false, error: "forbidden", reasonCode: "capability_not_granted" }, { status: 403 }));
+      assert.equal(codedOnly.code, 1);
+      assert.equal(codedOnly.seen.length, 2);
+      assert.deepEqual(JSON.parse(codedOnly.text), {
         ok: false,
         error: "SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED",
         status: 403,

@@ -4831,12 +4831,17 @@ function writeArtifactUploadRefusal(
   }
 ): number {
   const record = objectRecord(failure.body);
-  const reason = failure.reason ?? stringValue(record.reason) ?? stringValue(record.error);
-  const reasonCode = stringValue(record.reasonCode) ?? (failure.reason === undefined ? stringValue(record.error) : undefined);
+  const serverError = stringValue(record.error);
+  // A real 403 carries both `error: "forbidden"` and a `reason` sentence.
+  // The sentence must not replace the server error code.
+  const reason = failure.reason ?? stringValue(record.reason) ?? serverError;
+  const reasonCode = stringValue(record.reasonCode) ?? (failure.reason === undefined ? serverError : undefined);
+  const carriedServerError = serverError !== undefined && serverError !== reason ? serverError : undefined;
   const maxBytes = typeof record.maxBytes === "number" ? record.maxBytes : undefined;
   const secrets = failure.secrets ?? [];
   const detail = [
     failure.status === undefined ? undefined : String(failure.status),
+    carriedServerError !== undefined && carriedServerError !== reasonCode ? carriedServerError : undefined,
     reason,
     reasonCode !== undefined && reasonCode !== reason ? reasonCode : undefined,
     maxBytes === undefined ? undefined : `maxBytes ${maxBytes}`
@@ -4844,12 +4849,14 @@ function writeArtifactUploadRefusal(
   const message = detail.length > 0
     ? failure.message.replace(/\.$/u, ` (${detail}).`)
     : failure.message;
+  const redactedServerError = redactArtifactText(carriedServerError, secrets);
   writeStructuredOrHuman(options, json, {
     ok: false,
     error: ARTIFACT_UPLOAD_REFUSED,
     status: failure.status,
     reason: redactArtifactText(reason, secrets),
     reasonCode: redactArtifactText(reasonCode, secrets),
+    ...(redactedServerError === undefined ? {} : { serverError: redactedServerError }),
     ...(maxBytes === undefined ? {} : { maxBytes })
   }, redactArtifactText(message, secrets) ?? message);
   return 1;
