@@ -79,13 +79,15 @@ export function hashFile(bytes: Uint8Array): ArtifactFileHash {
   };
 }
 
-/** One `file` part the upload service stores, plus the CIDv0 option the GitHub action sends. */
+/**
+ * Exactly one `file` part. PROOF's upload service refuses any other multipart
+ * field (LIA4010); the upload token already fixes CIDv0.
+ */
 export function buildUploadForm(bytes: Uint8Array): FormData {
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
   const form = new FormData();
   form.append("file", new Blob([copy], { type: "application/zip" }), "bundle.zip");
-  form.append("pinataOptions", JSON.stringify({ cidVersion: 0 }));
   return form;
 }
 

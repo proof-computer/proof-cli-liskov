@@ -215,13 +215,12 @@ test("happy path requests session, intent, upload, and record in order", async (
       assert.equal(human.seen[2]?.authorization, `Bearer ${UPLOAD_TOKEN}`);
       assert.equal(human.seen[2]?.contentType, null);
       const form = human.seen[2]?.body as FormData;
-      assert.deepEqual([...form.keys()], ["file", "pinataOptions"]);
+      assert.deepEqual([...form.keys()], ["file"]);
       const uploaded = form.get("file");
       assert.ok(uploaded instanceof File);
       assert.equal(uploaded.name, "bundle.zip");
       assert.equal(uploaded.type, "application/zip");
       assert.deepEqual(Buffer.from(await uploaded.arrayBuffer()), bytes);
-      assert.equal(form.get("pinataOptions"), JSON.stringify({ cidVersion: 0 }));
       assert.equal(human.seen[3]?.method, "POST");
       assert.equal(human.seen[3]?.contentType, "application/json");
       assert.equal(
