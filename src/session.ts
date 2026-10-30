@@ -1,3 +1,4 @@
+import { isApplicationPlacementPlan, formatPlacementPlan, placementPlanPath } from "./placement-plan.js";
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { access, mkdir, readFile, rm, writeFile, chmod } from "node:fs/promises";
@@ -6133,6 +6134,38 @@ export async function runSlipwayCustodySignerStatus(input: SlipwayCustodySignerS
     },
     formatSelfCustodySignerStatus(applicationId, signer)
   );
+  return 0;
+}
+
+export async function runSlipwayApplicationPlacementPlan(input: {
+  applicationId: string;
+  occurrenceAuthorityDigest: string;
+  config?: string;
+  slipwayUrl?: string;
+  json?: boolean;
+}, options: SlipwayCliOptions = {}): Promise<number> {
+  const errorCode = "LISKOV_APPLICATION_PLACEMENT_PLAN_FAILED";
+  if (!input.applicationId.trim() || !input.occurrenceAuthorityDigest.trim()) {
+    writeStructuredOrHuman(options, input.json, { ok: false, error: errorCode, reason: "explicit_identity_required" },
+      `Error (${errorCode}): Provide an application and an explicit occurrence authority digest.`);
+    return 1;
+  }
+  const request = await authenticatedSlipwayRequest<unknown>({
+    config: input.config, slipwayUrl: input.slipwayUrl, json: input.json,
+    path: placementPlanPath(input.applicationId, input.occurrenceAuthorityDigest),
+    requestErrorCode: errorCode,
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read the initial placement plan"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  if (!request.response.ok || !isApplicationPlacementPlan(request.body)) {
+    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : errorCode;
+    const reason = request.response.ok ? "invalid_or_unsupported_placement_plan" : "placement_plan_read_failed";
+    writeStructuredOrHuman(options, input.json, { ok: false, error, status: request.response.status, reason },
+      `Error (${error}): Could not read the initial placement plan (${reason}, HTTP ${request.response.status}). Check the occurrence identity and service availability.`);
+    return 1;
+  }
+  writeStructuredOrHuman(options, input.json, request.body, formatPlacementPlan(request.body));
   return 0;
 }
 

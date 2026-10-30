@@ -1,6 +1,7 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { createServer } from "node:http";
+import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { spawnSync } from "node:child_process";
+import { spawnSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -45,6 +46,58 @@ try {
   assertIncludes(applicationHelp.stdout, "liskov application deployment");
   assertIncludes(applicationHelp.stdout, "liskov application logs");
   assertIncludes(applicationHelp.stdout, "liskov application vars");
+
+  assertExcludes(applicationHelp.stdout, "placement-plan");
+  const placementPlanHelp = run(process.execPath, [proofDevBin, "liskov", "application", "placement-plan", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(placementPlanHelp.stdout, "OCCURRENCE_AUTHORITY_DIGEST");
+  assertIncludes(placementPlanHelp.stdout, "--organization");
+
+  // Exercise the built, linked plugin against HTTP, including exact owner
+  // seed/follower/null envelopes and malformed/unavailable refusals.
+  const planVectors = JSON.parse(await readFile(path.join(repoRoot, "test/fixtures/application-placement-plan.json"), "utf8"));
+  let servedPlan;
+  let servedStatus = 200;
+  const planToken = "placement-plan-smoke-token-never-print";
+  const planRequests = [];
+  const planServer = createServer((request, response) => {
+    planRequests.push({ url: request.url, auth: request.headers.authorization, org: request.headers["x-liskov-organization"] });
+    response.writeHead(servedStatus, { "content-type": "application/json" });
+    response.end(JSON.stringify(servedPlan));
+  });
+  await new Promise((resolve, reject) => {
+    planServer.once("error", reject);
+    planServer.listen(0, "127.0.0.1", resolve);
+  });
+  try {
+    const serviceUrl = `http://127.0.0.1:${planServer.address().port}`;
+    const sessionFile = path.join(home, "placement-session.json");
+    await writeFile(sessionFile, JSON.stringify({ version: 1, slipwayUrl: serviceUrl, sessionToken: planToken, savedAtMs: 1 }), { mode: 0o600 });
+    const planEnv = { ...env, LISKOV_URL: serviceUrl, LISKOV_SESSION_TOKEN: planToken, LISKOV_ADMIN_SERVICE_TOKEN: "" };
+    const planArgs = [proofDevBin, "liskov", "application", "placement-plan", "app /?", "sha256:a/b", "--config", sessionFile, "--liskov-url", serviceUrl, "--organization", "org_smoke", "--no-analytics"];
+    for (const body of Object.values(planVectors)) {
+      servedPlan = body;
+      const result = await runAsync(process.execPath, [...planArgs, "--json"], { cwd: proofCliRoot, env: planEnv });
+      if (result.status !== 0) throw new Error(`placement plan command failed: ${result.stderr}`);
+      if (JSON.stringify(JSON.parse(result.stdout)) !== JSON.stringify(body)) throw new Error("placement plan changed owner JSON");
+      assertExcludes(result.stdout + result.stderr, planToken);
+    }
+    servedPlan = planVectors.follower;
+    const rendered = await runAsync(process.execPath, planArgs, { cwd: proofCliRoot, env: planEnv });
+    if (rendered.status !== 0) throw new Error("placement plan human command failed");
+    assertIncludes(rendered.stdout, "Initial feasibility snapshot (immutable)");
+    for (const [body, status] of [[{}, 200], [{ ...planVectors.seed, schema: "unknown" }, 200], [{ ok: false }, 404], [{ ok: false }, 503]]) {
+      servedPlan = body; servedStatus = status;
+      const result = await runAsync(process.execPath, [...planArgs, "--json"], { cwd: proofCliRoot, env: planEnv });
+      if (result.status === 0) throw new Error("placement plan accepted an invalid or unavailable response");
+      assertExcludes(result.stdout + result.stderr, planToken);
+    }
+    if (!planRequests.length || planRequests.some((request) => request.url !== "/api/applications/app%20%2F%3F/placement/plans/sha256%3Aa%2Fb" || request.auth !== `Liskov-Organization ${planToken}` || request.org !== "org_smoke")) {
+      throw new Error("placement plan path or organization/auth context changed");
+    }
+  } finally {
+    planServer.closeAllConnections();
+    await new Promise((resolve) => planServer.close(resolve));
+  }
 
   const applicationVarsHelp = run(process.execPath, [proofDevBin, "liskov", "application", "vars", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationVarsHelp.stdout, "liskov application vars list");
@@ -268,4 +321,16 @@ function assertExcludes(value, forbidden) {
   if (value.includes(forbidden)) {
     throw new Error(`Expected output to exclude ${JSON.stringify(forbidden)}.\nOutput:\n${value}`);
   }
+}
+
+function runAsync(command, args, options) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "", stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk) => { stdout += chunk; });
+    child.stderr.setEncoding("utf8").on("data", (chunk) => { stderr += chunk; });
+    const timeout = setTimeout(() => { child.kill(); reject(new Error("built placement-plan smoke timed out")); }, 30000);
+    child.once("error", (error) => { clearTimeout(timeout); reject(error); });
+    child.once("close", (status) => { clearTimeout(timeout); resolve({ status, stdout, stderr }); });
+  });
 }

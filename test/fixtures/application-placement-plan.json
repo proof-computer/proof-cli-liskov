@@ -1,0 +1,107 @@
+{
+  "seed": {
+    "ok": true,
+    "schema": "application_placement_plan_v1",
+    "applicationId": "app_canonical",
+    "occurrenceAuthorityDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "generatedAtMs": 1758000000000,
+    "semantics": "initial_feasibility_snapshot",
+    "plan": {
+      "seedOccurrenceAuthorityDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "planDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "policyDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "memberCount": 2,
+      "rules": [
+        {
+          "by": "manager",
+          "strength": "required",
+          "minimumDistinct": null,
+          "targetDistinct": 2,
+          "plannedDistinct": 2,
+          "preferredDegraded": false
+        }
+      ]
+    }
+  },
+  "follower": {
+    "ok": true,
+    "schema": "application_placement_plan_v1",
+    "applicationId": "app_canonical",
+    "occurrenceAuthorityDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "generatedAtMs": 1758000000000,
+    "semantics": "initial_feasibility_snapshot",
+    "plan": {
+      "seedOccurrenceAuthorityDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "planDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "policyDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "memberCount": 2,
+      "rules": [
+        {
+          "by": "manager",
+          "strength": "required",
+          "minimumDistinct": null,
+          "targetDistinct": 2,
+          "plannedDistinct": 2,
+          "preferredDegraded": false
+        }
+      ]
+    }
+  },
+  "legacyNull": {
+    "ok": true,
+    "schema": "application_placement_plan_v1",
+    "applicationId": "app_canonical",
+    "occurrenceAuthorityDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "generatedAtMs": 1758000000000,
+    "semantics": "initial_feasibility_snapshot",
+    "plan": null
+  },
+  "requiredSatisfied": {
+    "ok": true,
+    "schema": "application_placement_plan_v1",
+    "applicationId": "app_canonical",
+    "occurrenceAuthorityDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "generatedAtMs": 1758000000000,
+    "semantics": "initial_feasibility_snapshot",
+    "plan": {
+      "seedOccurrenceAuthorityDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "planDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "policyDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "memberCount": 2,
+      "rules": [
+        {
+          "by": "manager",
+          "strength": "required",
+          "minimumDistinct": 2,
+          "targetDistinct": 2,
+          "plannedDistinct": 2,
+          "preferredDegraded": false
+        }
+      ]
+    }
+  },
+  "preferredDegraded": {
+    "ok": true,
+    "schema": "application_placement_plan_v1",
+    "applicationId": "app_canonical",
+    "occurrenceAuthorityDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "generatedAtMs": 1758000000000,
+    "semantics": "initial_feasibility_snapshot",
+    "plan": {
+      "seedOccurrenceAuthorityDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "planDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "policyDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "memberCount": 2,
+      "rules": [
+        {
+          "by": "country",
+          "strength": "preferred",
+          "minimumDistinct": null,
+          "targetDistinct": 2,
+          "plannedDistinct": 1,
+          "preferredDegraded": true
+        }
+      ]
+    }
+  }
+}
