@@ -1,0 +1,225 @@
+{
+  "emptyHistory": {
+    "ok": true,
+    "schema": "application_placement_refusals_v1",
+    "applicationId": "app_canonical",
+    "generatedAtMs": 1758000000000,
+    "observations": [],
+    "nextCursor": null,
+    "incomplete": false
+  },
+  "countryRefusal": {
+    "ok": true,
+    "schema": "application_placement_refusals_v1",
+    "applicationId": "app_canonical",
+    "generatedAtMs": 1758000000000,
+    "observations": [
+      {
+        "windowStartMs": 1757998800000,
+        "placementCode": "placement_no_eligible_candidate",
+        "launchReason": "country_fleet_empty",
+        "country": [
+          {
+            "reason": "country_not_allowed",
+            "predicate": "allowed_countries",
+            "source": "located_country",
+            "nextAction": "widen_or_remove_allowed_countries",
+            "candidates": 2
+          },
+          {
+            "reason": "country_excluded",
+            "predicate": "excluded_countries",
+            "source": "located_country",
+            "nextAction": "remove_excluded_country",
+            "candidates": 1
+          }
+        ],
+        "spread": []
+      }
+    ],
+    "nextCursor": null,
+    "incomplete": false
+  },
+  "spreadRefusal": {
+    "ok": true,
+    "schema": "application_placement_refusals_v1",
+    "applicationId": "app_canonical",
+    "generatedAtMs": 1758000000000,
+    "observations": [
+      {
+        "windowStartMs": 1757998800000,
+        "placementCode": "placement_required_spread_unsatisfied",
+        "launchReason": "required_manager_spread_unsatisfied",
+        "country": [],
+        "spread": [
+          {
+            "reason": "required_manager_spread_unsatisfied",
+            "key": "manager",
+            "nextAction": "review_required_manager_spread",
+            "observations": 1
+          }
+        ]
+      }
+    ],
+    "nextCursor": null,
+    "incomplete": false
+  },
+  "mixedHistory": {
+    "ok": true,
+    "schema": "application_placement_refusals_v1",
+    "applicationId": "app_canonical",
+    "generatedAtMs": 1758000000000,
+    "observations": [
+      {
+        "windowStartMs": 1757998800000,
+        "placementCode": "placement_search_budget_exhausted",
+        "launchReason": "spread_search_budget_exhausted",
+        "country": [],
+        "spread": [
+          {
+            "reason": "search_budget_exhausted",
+            "key": null,
+            "nextAction": "retry_bounded_spread_discovery",
+            "observations": 1
+          }
+        ]
+      },
+      {
+        "windowStartMs": 1757998800000,
+        "placementCode": "placement_required_spread_unsatisfied",
+        "launchReason": "required_manager_spread_unsatisfied",
+        "country": [],
+        "spread": [
+          {
+            "reason": "required_manager_spread_unsatisfied",
+            "key": "manager",
+            "nextAction": "review_required_manager_spread",
+            "observations": 1
+          }
+        ]
+      },
+      {
+        "windowStartMs": 1757995200000,
+        "placementCode": "placement_selection_unreadable",
+        "launchReason": "spread_plan_revalidation_required",
+        "country": [],
+        "spread": [
+          {
+            "reason": "plan_revalidation_required",
+            "key": null,
+            "nextAction": "retry_spread_plan_revalidation",
+            "observations": 1
+          }
+        ]
+      },
+      {
+        "windowStartMs": 1757995200000,
+        "placementCode": "placement_no_eligible_candidate",
+        "launchReason": "country_fleet_empty",
+        "country": [
+          {
+            "reason": "country_unavailable",
+            "predicate": "country_rule",
+            "source": "located_country",
+            "nextAction": "retry_later",
+            "candidates": 1
+          }
+        ],
+        "spread": []
+      }
+    ],
+    "nextCursor": null,
+    "incomplete": false
+  },
+  "truncatedPage": {
+    "ok": true,
+    "schema": "application_placement_refusals_v1",
+    "applicationId": "app_canonical",
+    "generatedAtMs": 1758000000000,
+    "observations": [
+      {
+        "windowStartMs": 1757995200000,
+        "placementCode": "placement_no_eligible_candidate",
+        "launchReason": "country_fleet_empty",
+        "country": [
+          {
+            "reason": "country_not_allowed",
+            "predicate": "allowed_countries",
+            "source": "located_country",
+            "nextAction": "widen_or_remove_allowed_countries",
+            "candidates": 2
+          },
+          {
+            "reason": "country_excluded",
+            "predicate": "excluded_countries",
+            "source": "located_country",
+            "nextAction": "remove_excluded_country",
+            "candidates": 1
+          }
+        ],
+        "spread": []
+      }
+    ],
+    "nextCursor": "eyJ2IjoxLCJzY29wZSI6ImY1YzE3ZjJiYzQ2NGU5ODY5ZmE4ZDlkZjdmNTY4NjNhZjU4ZjdhZjhmMGYyZWVjMTM3YmYxYjVhMDI3NzZmMzgiLCJ3aW5kb3dTdGFydE1zIjoxNzU3OTk1MjAwMDAwLCJwbGFjZW1lbnRDb2RlIjoicGxhY2VtZW50X25vX2VsaWdpYmxlX2NhbmRpZGF0ZSJ9",
+    "incomplete": true
+  },
+  "truncatedCandidates": {
+    "ok": true,
+    "schema": "application_placement_refusals_v1",
+    "applicationId": "app_canonical",
+    "generatedAtMs": 1758000000000,
+    "observations": [
+      {
+        "windowStartMs": 1757995200000,
+        "placementCode": "placement_no_eligible_candidate",
+        "launchReason": "processor_metric_floor_fleet_empty",
+        "country": [],
+        "spread": []
+      }
+    ],
+    "nextCursor": null,
+    "incomplete": true
+  },
+  "badRequests": {
+    "invalidApplicationRef": {
+      "ok": false,
+      "error": "invalid_request",
+      "reason": "invalid_application_ref"
+    },
+    "invalidQuery": {
+      "ok": false,
+      "error": "invalid_request",
+      "reason": "invalid_query"
+    },
+    "invalidFromMs": {
+      "ok": false,
+      "error": "invalid_request",
+      "reason": "invalid_from_ms"
+    },
+    "invalidToMs": {
+      "ok": false,
+      "error": "invalid_request",
+      "reason": "invalid_to_ms"
+    },
+    "invalidTimeBounds": {
+      "ok": false,
+      "error": "invalid_request",
+      "reason": "invalid_time_bounds"
+    },
+    "invalidLimit": {
+      "ok": false,
+      "error": "invalid_request",
+      "reason": "invalid_limit"
+    },
+    "invalidCursor": {
+      "ok": false,
+      "error": "invalid_request",
+      "reason": "invalid_cursor"
+    },
+    "cursorScopeMismatch": {
+      "ok": false,
+      "error": "invalid_request",
+      "reason": "cursor_scope_mismatch"
+    }
+  }
+}
