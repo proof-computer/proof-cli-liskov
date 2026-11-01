@@ -99,6 +99,82 @@ try {
     await new Promise((resolve) => planServer.close(resolve));
   }
 
+  assertExcludes(applicationHelp.stdout, "placement-refusals");
+  const placementRefusalsHelp = run(process.execPath, [proofDevBin, "liskov", "application", "placement-refusals", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(placementRefusalsHelp.stdout, "APPLICATION_ID");
+  for (const flag of ["--from-ms", "--to-ms", "--limit", "--cursor", "--json", "--organization"]) assertIncludes(placementRefusalsHelp.stdout, flag);
+  assertIncludes(placementRefusalsHelp.stdout.replace(/\s+/g, " "), "Absent rows never mean placement succeeded");
+
+  // The built, linked plugin against HTTP: every owner envelope, both output
+  // paths, refusals, and flags the command must refuse before any request.
+  const { badRequests: refusalBadRequests, ...refusalEnvelopes } = JSON.parse(await readFile(path.join(repoRoot, "test/fixtures/application-placement-refusals.json"), "utf8"));
+  let servedRefusals;
+  let servedRefusalsStatus = 200;
+  const refusalsToken = "placement-refusals-smoke-token-never-print";
+  const refusalsRequests = [];
+  const refusalsServer = createServer((request, response) => {
+    refusalsRequests.push({ url: request.url, auth: request.headers.authorization, org: request.headers["x-liskov-organization"] });
+    response.writeHead(servedRefusalsStatus, { "content-type": "application/json" });
+    response.end(JSON.stringify(servedRefusals));
+  });
+  await new Promise((resolve, reject) => {
+    refusalsServer.once("error", reject);
+    refusalsServer.listen(0, "127.0.0.1", resolve);
+  });
+  try {
+    const serviceUrl = `http://127.0.0.1:${refusalsServer.address().port}`;
+    const sessionFile = path.join(home, "placement-refusals-session.json");
+    await writeFile(sessionFile, JSON.stringify({ version: 1, slipwayUrl: serviceUrl, sessionToken: refusalsToken, savedAtMs: 1 }), { mode: 0o600 });
+    const refusalsEnv = { ...env, LISKOV_URL: serviceUrl, LISKOV_SESSION_TOKEN: refusalsToken, LISKOV_ADMIN_SERVICE_TOKEN: "" };
+    const refusalsBase = [proofDevBin, "liskov", "application", "placement-refusals", "app /?", "--config", sessionFile, "--liskov-url", serviceUrl, "--organization", "org_smoke", "--no-analytics"];
+    const refusalsArgs = [...refusalsBase, "--from-ms", "1757995200000", "--to-ms", "1758002400000", "--limit", "25", "--cursor", "a+b/c= d"];
+    for (const body of Object.values(refusalEnvelopes)) {
+      servedRefusals = body;
+      const result = await runAsync(process.execPath, [...refusalsArgs, "--json"], { cwd: proofCliRoot, env: refusalsEnv });
+      if (result.status !== 0) throw new Error(`placement refusals command failed: ${result.stderr}`);
+      if (JSON.stringify(JSON.parse(result.stdout)) !== JSON.stringify(body)) throw new Error("placement refusals changed owner JSON");
+      assertExcludes(result.stdout + result.stderr, refusalsToken);
+    }
+    servedRefusals = refusalEnvelopes.mixedHistory;
+    const refusalsRendered = await runAsync(process.execPath, refusalsArgs, { cwd: proofCliRoot, env: refusalsEnv });
+    if (refusalsRendered.status !== 0) throw new Error("placement refusals human command failed");
+    assertIncludes(refusalsRendered.stdout, "Country: country_unavailable");
+    assertIncludes(refusalsRendered.stdout, "Next action: retry_later");
+    assertIncludes(refusalsRendered.stdout, "Spread: required_manager_spread_unsatisfied");
+    assertIncludes(refusalsRendered.stdout, "Next action: review_required_manager_spread");
+    servedRefusals = refusalEnvelopes.emptyHistory;
+    const refusalsEmpty = await runAsync(process.execPath, refusalsArgs, { cwd: proofCliRoot, env: refusalsEnv });
+    if (refusalsEmpty.status !== 0) throw new Error("placement refusals empty command failed");
+    assertIncludes(refusalsEmpty.stdout, "There are no recorded refusals in this page.");
+    assertIncludes(refusalsEmpty.stdout, "does not say placement succeeded");
+    for (const [body, status] of [[{}, 200], [{ ...refusalEnvelopes.emptyHistory, schema: "unknown" }, 200], [{ ok: false, error: "unauthorized" }, 401], [refusalBadRequests.invalidCursor, 400], [{ ok: false, error: "internal_error" }, 500]]) {
+      servedRefusals = body; servedRefusalsStatus = status;
+      const result = await runAsync(process.execPath, [...refusalsArgs, "--json"], { cwd: proofCliRoot, env: refusalsEnv });
+      if (result.status === 0) throw new Error("placement refusals accepted an invalid or unavailable response");
+      assertExcludes(result.stdout + result.stderr, refusalsToken);
+    }
+    const expectedRefusalsUrl = "/api/applications/app%20%2F%3F/placement/refusals?fromMs=1757995200000&toMs=1758002400000&limit=25&cursor=a%2Bb%2Fc%3D+d";
+    if (!refusalsRequests.length || refusalsRequests.some((request) => request.url !== expectedRefusalsUrl || request.auth !== `Liskov-Organization ${refusalsToken}` || request.org !== "org_smoke")) {
+      throw new Error("placement refusals route, query or organization/auth context changed");
+    }
+    const requestsBeforeRefusedFlags = refusalsRequests.length;
+    for (const flags of [
+      ["--to-ms", "2", "--limit", "1"],
+      ["--from-ms", "1", "--limit", "1"],
+      ["--from-ms", "1", "--to-ms", "2"],
+      ["--from-ms", "-1", "--to-ms", "2", "--limit", "1"],
+      ["--from-ms", "2", "--to-ms", "2", "--limit", "1"],
+      ["--from-ms", "1", "--to-ms", "2", "--limit", "101"]
+    ]) {
+      const result = await runAsync(process.execPath, [...refusalsBase, ...flags], { cwd: proofCliRoot, env: refusalsEnv });
+      if (result.status === 0) throw new Error(`placement refusals accepted flags: ${flags.join(" ")}`);
+    }
+    if (refusalsRequests.length !== requestsBeforeRefusedFlags) throw new Error("placement refusals sent a request for flags it must refuse");
+  } finally {
+    refusalsServer.closeAllConnections();
+    await new Promise((resolve) => refusalsServer.close(resolve));
+  }
+
   const applicationVarsHelp = run(process.execPath, [proofDevBin, "liskov", "application", "vars", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(applicationVarsHelp.stdout, "liskov application vars list");
   assertIncludes(applicationVarsHelp.stdout, "liskov application vars set");
@@ -329,7 +405,7 @@ function runAsync(command, args, options) {
     let stdout = "", stderr = "";
     child.stdout.setEncoding("utf8").on("data", (chunk) => { stdout += chunk; });
     child.stderr.setEncoding("utf8").on("data", (chunk) => { stderr += chunk; });
-    const timeout = setTimeout(() => { child.kill(); reject(new Error("built placement-plan smoke timed out")); }, 30000);
+    const timeout = setTimeout(() => { child.kill(); reject(new Error("built plugin smoke timed out")); }, 30000);
     child.once("error", (error) => { clearTimeout(timeout); reject(error); });
     child.once("close", (status) => { clearTimeout(timeout); resolve({ status, stdout, stderr }); });
   });

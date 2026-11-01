@@ -168,8 +168,10 @@ for (const command of scopedLeafCommands) {
   }
 }
 
-if (oclifManifest.commands["liskov:application:placement-plan"]?.hidden !== true) {
-  errors.push("liskov:application:placement-plan must stay hidden until V6 release");
+for (const id of ["liskov:application:placement-plan", "liskov:application:placement-refusals"]) {
+  if (oclifManifest.commands[id]?.hidden !== true) {
+    errors.push(`${id} must stay hidden until V6 release`);
+  }
 }
 
 const custodyCommands = Object.values(oclifManifest.commands).filter((command) =>

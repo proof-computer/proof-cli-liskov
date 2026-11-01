@@ -1,4 +1,5 @@
 import { isApplicationPlacementPlan, formatPlacementPlan, placementPlanPath } from "./placement-plan.js";
+import { isApplicationPlacementRefusals, formatPlacementRefusals, parsePlacementRefusalsQuery, placementRefusalsPath } from "./placement-refusals.js";
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { access, mkdir, readFile, rm, writeFile, chmod } from "node:fs/promises";
@@ -6166,6 +6167,70 @@ export async function runSlipwayApplicationPlacementPlan(input: {
     return 1;
   }
   writeStructuredOrHuman(options, input.json, request.body, formatPlacementPlan(request.body));
+  return 0;
+}
+
+/**
+ * One page of an application's recorded country and spread refusals. `--json`
+ * prints the server's body unchanged. A failure prints no rows, and nothing here
+ * reads absent rows as a successful placement.
+ */
+export async function runSlipwayApplicationPlacementRefusals(input: {
+  applicationId: string;
+  fromMs: string;
+  toMs: string;
+  limit: string;
+  cursor?: string;
+  config?: string;
+  slipwayUrl?: string;
+  json?: boolean;
+}, options: SlipwayCliOptions = {}): Promise<number> {
+  const errorCode = "LISKOV_APPLICATION_PLACEMENT_REFUSALS_FAILED";
+  // `.` and `..` survive encodeURIComponent and URL parsing would then walk off the route.
+  const applicationId = input.applicationId.trim();
+  if (!applicationId || applicationId === "." || applicationId === "..") {
+    writeStructuredOrHuman(options, input.json, { ok: false, error: errorCode, reason: "invalid_application_ref" },
+      `Error (${errorCode}): Provide an Application identity.`);
+    return 1;
+  }
+  const parsed = parsePlacementRefusalsQuery(input);
+  if (!parsed.ok) {
+    writeStructuredOrHuman(options, input.json, { ok: false, error: errorCode, reason: parsed.reason, message: parsed.message },
+      `Error (${errorCode}): ${parsed.message}`);
+    return 1;
+  }
+  const request = await authenticatedSlipwayRequest<unknown>({
+    config: input.config, slipwayUrl: input.slipwayUrl, json: input.json,
+    path: placementRefusalsPath(input.applicationId, parsed.query),
+    requestErrorCode: errorCode,
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "placement refusals are unavailable: could not read them"
+  }, options);
+  if (!request.ok) return request.exitCode;
+  const { status } = request.response;
+  if (!request.response.ok) {
+    const error = status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : errorCode;
+    const refusal = objectRecord(request.body);
+    // A refusal's text is the server's, and a 404 echoes the caller's reference.
+    // The bearer token must not come back through it.
+    const session = await readSlipwaySession(request.sessionFile);
+    const secrets = session ? [session.sessionToken] : [];
+    const reasonCode = redactArtifactText(stringValue(refusal.error), secrets);
+    const reason = redactArtifactText(stringValue(refusal.reason), secrets);
+    const detail = [`HTTP ${status}`, reasonCode, reason].filter((part) => part !== undefined).join(", ");
+    writeStructuredOrHuman(options, input.json, { ok: false, error, status, reasonCode, reason, applicationId: input.applicationId },
+      status >= 500
+        ? `Error (${error}): Placement refusals are unavailable (${detail}). No refusals were read, and this does not say whether placement succeeded.`
+        : `Error (${error}): Could not read placement refusals for ${input.applicationId} (${detail}).`);
+    return 1;
+  }
+  if (!isApplicationPlacementRefusals(request.body)) {
+    const reason = "invalid_or_unsupported_placement_refusals";
+    writeStructuredOrHuman(options, input.json, { ok: false, error: errorCode, status, reason, applicationId: input.applicationId },
+      `Error (${errorCode}): Liskov answered with a malformed or unsupported placement refusals envelope (${reason}, HTTP ${status}). No refusals were read.`);
+    return 1;
+  }
+  writeStructuredOrHuman(options, input.json, request.body, formatPlacementRefusals(request.body));
   return 0;
 }
 
