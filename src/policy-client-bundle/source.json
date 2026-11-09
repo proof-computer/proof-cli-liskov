@@ -1,0 +1,35 @@
+{
+  "repository": "https://github.com/proof-computer/liskov-rs",
+  "commit": "8d31d0e3c18d2e48426c63f1af5a4c5fd737d2d0",
+  "packet": "BKLG-20261013-mkd2",
+  "files": {
+    "policy-client-bundle.json": {
+      "source": "crates/liskov-policy-client-contract/bundle/policy-client-bundle.json",
+      "sha256": "sha256:9b01e404387b061d188576db27c3d540a5bc9ca53c74a1e6c303bfc725a5f03d"
+    },
+    "policy-client-contract.wasm.gz": {
+      "source": "crates/liskov-policy-client-contract/bundle/policy-client-contract.wasm.gz",
+      "sha256": "sha256:2e9a35ff45dd4cde31aa613fc84e7b311933e61a63834987fc0c504f63fd13c3"
+    },
+    "policy-client.cjs": {
+      "source": "crates/liskov-policy-client-contract/bundle/policy-client.cjs",
+      "sha256": "sha256:e5fd667fad2731d370c5a99514d9a741cc9886ae07dc0ab85c84d9eac5b1f896"
+    },
+    "policy-client.d.ts": {
+      "source": "crates/liskov-policy-client-contract/bundle/policy-client.d.ts",
+      "sha256": "sha256:26e38affdb548106cc20315ac4594fa8468717dfe4ddfc261f335a33aaada18f"
+    },
+    "policy-client-conformance.json": {
+      "source": "crates/liskov-policy-client-contract/bundle/policy-client-conformance.json",
+      "sha256": "sha256:8581f6471b84c1c7a1d7f23869a5b12f85a7215d6ca56a50b1029ba5c3b1e820"
+    },
+    "test/fixtures/booking-v6/booking-fragments.json": {
+      "source": "crates/liskov-application-policy/fixtures/v6/booking-fragments.json",
+      "sha256": "sha256:c61c38112257236f5ca414a29b1fb8b704fa84e38bb9b05dd865cce966b5c322"
+    },
+    "test/fixtures/booking-v6/materialization-digest-goldens.json": {
+      "source": "crates/liskov-application-policy/fixtures/v6/materialization-digest-goldens.json",
+      "sha256": "sha256:c0d8b6fdaced73c19088e512a29b022e2cd245d41522a0f9517e854cc1702c12"
+    }
+  }
+}

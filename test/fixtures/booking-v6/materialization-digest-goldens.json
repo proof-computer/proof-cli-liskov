@@ -1,0 +1,2974 @@
+{
+  "schema": "proof.liskov.policy-v6-materialization-goldens.v1",
+  "resolverFixture": {
+    "applicationUid": "app_0123456789abcdef",
+    "sourceCommit": "0123456789abcdef",
+    "configurationRevision": 1,
+    "revocationEpoch": 0
+  },
+  "count": 26,
+  "applications": [
+    {
+      "name": "benchmark-cargo",
+      "authoredDigest": "502cb6891c739ebfd54f40bc129a63938b4922dee5804d3b090585d7d93492e2",
+      "releaseIntentDigest": "f6f56524006887081d7dacabd20774bb31eb8d79aeef48efe5796c6af046cc77",
+      "effectiveDigest": "1325f5176abf7f892ac70c0938f33f6ad8c2dd6579f03fc463f067797d7d4296",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "benchmark-cargo",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/benchmark-cargo",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/start.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "200000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "643bf81b625e6f4e0b817d189bb5d421efc767deeaa3fb5374df30431ec443ec"
+    },
+    {
+      "name": "benchmark-cargo-native",
+      "authoredDigest": "c23f0113b6616450eeba80264a7751bfc1de1edf4aa70cbbd055bc86e761d726",
+      "releaseIntentDigest": "0cee7c98d33cd30d57768d3c2e7dd3d875e7efb2c23d9df078a6af222aca4bad",
+      "effectiveDigest": "80e7a73127652e5ff8682e008764845947abb4c615fd1eac8caa4ed2cefb9ec6",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "benchmark-cargo-native",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/benchmark-cargo-native",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/start.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "200000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "9cb1d4bf19137d319d52c769b43a60050d9fd7a109bc7054e51716850386bfeb"
+    },
+    {
+      "name": "benchmark-js",
+      "authoredDigest": "42444a791f6ac1f41c9676025d78605b53d379f167992b912df78ad6bed1dba8",
+      "releaseIntentDigest": "701f841d1c63ca9c7163517aca5f1853434eb421bf2d2ef6d2eb170a33573c19",
+      "effectiveDigest": "8e7cbbb39a6acda0a2840ac44e8b28f3eab72971a6605ed008440a644e7d6954",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "benchmark-js",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/benchmark-js",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "ipfs_bundle",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "javascript",
+          "engine": "nodejs",
+          "entrypointFile": "bundle.js"
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "50000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "0050e34350638dbd2d3c49c20d409481d31a1fee8236c16f781b92101f4347f7"
+    },
+    {
+      "name": "cargo-cpp",
+      "authoredDigest": "29dde1b6fc36ae85b36eeb5cbabf6b2b3c5bab5a2f8ed8953dd745c81cfdafa0",
+      "releaseIntentDigest": "27b534bdd2358aa3599632ef86ded4a7246c686f22a4905aa0a0c701a7bb9cfa",
+      "effectiveDigest": "8418aa391bffad2cc4c12d8bed3d109cb88ec2232957806df65ef80e9a3f697c",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "cargo-cpp",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/cargo-cpp",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/start.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "200000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "cc8ce4be8dba45475d3a9a2c8f22fb5efdafde663a8952b82504c7d62dce8a73"
+    },
+    {
+      "name": "cargo-csharp",
+      "authoredDigest": "547d36dd4ff473a4311b03be4e60ed7b6f132009f72cf9311a5bfeded2708931",
+      "releaseIntentDigest": "712a634036214456cf858d19d37fe6a9259f16617f49a67b97bb88cfc2e17925",
+      "effectiveDigest": "f8eb61c576e50aaed18943bdb02a8d4464d4f30cfb9b4ee1c89f475aa5de1199",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "cargo-csharp",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/cargo-csharp",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/start.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "200000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "00173083cba047fa8123df90475a80636b4afcc82d03d14932a3a618feecfd63"
+    },
+    {
+      "name": "cargo-go",
+      "authoredDigest": "fc77fe282eb33f9222d0d8aa85f3898a2d4737d7934faf082d060d45969d7be7",
+      "releaseIntentDigest": "bf06550b7a1708e860e8bf6e9bf3c9d0181419de5e66ee04238780fd9ff5249c",
+      "effectiveDigest": "9ac71302f47236a8429993f0957ef140e45c59406f1f32ba6f9a59169147c90e",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "cargo-go",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/cargo-go",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/start.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "200000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "b4d5b95935ab2bff347583afa09133065c0433402bba337f3637e55e7643538f"
+    },
+    {
+      "name": "cargo-hello",
+      "authoredDigest": "1a9289993527584ec6789dc77f16ff7a116c009837f95136e4ec91d014e29cfc",
+      "releaseIntentDigest": "1392441be3a6945b81c2ae9a33e7a89e2d8764babb9fbb03dce3588c31913c26",
+      "effectiveDigest": "c1cbd2a7e641beefe9d955086df36a1938c325072a5adeca2e1c82f02d311950",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "cargo",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/cargo-hello",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/start.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "interval",
+          "everyMs": 3600000
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "200000",
+            "rate": {
+              "amount": "5000000",
+              "windowMs": 2592000000
+            }
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "5262342159d4971695452fff542414bfa1974f1102b0095e844904d4af1dd8ec"
+    },
+    {
+      "name": "cargo-java",
+      "authoredDigest": "18151d3089c84509617f8778e35bfe8b9e11f64cbe6735b036dad10cffe45ec0",
+      "releaseIntentDigest": "35fd079461559233df9e69b4b53a6e4ae2fce609be918d9ce47e25e83a9a2854",
+      "effectiveDigest": "28cab9c2f598098b26b02812ac56d5045101f99ad72de419c5727cd1c8055c3b",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "cargo-java",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/cargo-java",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/start.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "200000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "500145d2eb2550fc2f29edd040adc5d884cf9d94924dab363218d3c28144c45a"
+    },
+    {
+      "name": "cargo-nodejs",
+      "authoredDigest": "f1ad643e8cb701b10ec75056dad5fc60078264b9fe9971b3b74ffd56a4ff0eee",
+      "releaseIntentDigest": "4ce4b7b56148246f8a9fbfc73f6ae8476c4fb1aeb1ae07bfb47b297609021eef",
+      "effectiveDigest": "ea0ca9c82f0ac8084114552a40c2a043782863c07b5ce118a8a23457a3424341",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "cargo-nodejs",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/cargo-nodejs",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/start.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "200000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "1c76429b7fc1c7d3424f80c342934dbf5386757d8a39bd9cf84952fb84bc4539"
+    },
+    {
+      "name": "cargo-php",
+      "authoredDigest": "68c6a31bbcbb026b5bae7f23a8b025241e8bfd2b25a310fd70a5fbc61dfefa64",
+      "releaseIntentDigest": "b6b56c181ca666aec42830f5ae09d1c7c6b619e67e28ded3f24867db18dca74f",
+      "effectiveDigest": "0482ddb39537def51246f68b53321a3ffd8f8dc696478854a85ed8e220358900",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "cargo-php",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/cargo-php",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/start.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "200000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "3cc00ae89a7f40bd3ba1eef83e9221783b09f40e11b996efc472f7cbc9bdc8da"
+    },
+    {
+      "name": "cargo-python",
+      "authoredDigest": "bb50b630cc31772581a4e60b85f4d4cdf6874fb1a182eb5b8521fa39671b7ee0",
+      "releaseIntentDigest": "e00968ab2dd7bc45b6fb65f890d0bb56d9e5ea905eefac513f59f1e69368c9f6",
+      "effectiveDigest": "e3df407e4fb0c1e4965ce27fc0600a41ca2632b3b0d34e85cc9c1321b7a67b85",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "cargo-python",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/cargo-python",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/start.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "200000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "8e3b8afee7511874f989ec3dd08ba662435f18cca6b010ad81ff498a9c4968e6"
+    },
+    {
+      "name": "cargo-ruby",
+      "authoredDigest": "350a6fc419a63383476dea10e3aae58bf9a8f1273d3eab9f265ce7eb1b41b1f6",
+      "releaseIntentDigest": "64c6c8f468e3b6f14d4934cd55e60602ccdb4512ff8c7758171cf2d6c26229e6",
+      "effectiveDigest": "70152bc7646890fb71c9d195f3d03183cff4f782bfeabdc5a3bd27f6044c718c",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "cargo-ruby",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/cargo-ruby",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/start.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "200000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "b8d6005538e32bccc67947bbbe26d997105a294db178eee22c2443b834c2f9cd"
+    },
+    {
+      "name": "cargo-rust",
+      "authoredDigest": "3554626f2be91dcb0e9c1b4caf9db5bc820e68defb3d58dd720463e639de3cea",
+      "releaseIntentDigest": "334b48f8d378046233ca96152631af9c733f5d594ececea9a89d83d72b7100dc",
+      "effectiveDigest": "f89a065343c7d2420ec59d099f243072e0ec61b8494b12e96e1fee38be5c0ee6",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "cargo-rust",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/cargo-rust",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/start.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "200000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "681dfed3e4a2c33bb379efbb18ebc711b5c3840b9913f21f07d43387d8941e7a"
+    },
+    {
+      "name": "cargo-ssh",
+      "authoredDigest": "973bbfbe6e2a24793b8a8e01fd141dd5e31ad69babca09983caab3642f721320",
+      "releaseIntentDigest": "cb4fe2955d5460ae164edadc2bf76f08d4bccef5a2fa371eb37de9a0e95592a5",
+      "effectiveDigest": "11bd763a665084ddb7e63309e83de9c140fb91a983310cd5ea6d1ccdd4ff35ca",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "cargo-ssh",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/cargo-ssh",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/start.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "continuous"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 3600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "600000",
+            "rate": {
+              "amount": "15000000",
+              "windowMs": 86400000
+            }
+          }
+        },
+        "access": {
+          "ssh": {
+            "provider": {
+              "kind": "liskov_managed"
+            }
+          }
+        },
+        "configuration": {
+          "secrets": [
+            {
+              "secretId": "cargo-ssh-password",
+              "required": true,
+              "destination": {
+                "kind": "environment",
+                "name": "SSH_PASSWORD"
+              }
+            }
+          ]
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "refused_internal_rehearsal",
+      "refusals": [
+        {
+          "code": "unsupported_policy_feature",
+          "pointer": "/access/ssh"
+        },
+        {
+          "code": "entitlement_exceeded",
+          "pointer": "/access/ssh"
+        }
+      ],
+      "operationalDigest": "c103799e5049e6892df4a5f1bdcb2a79acd4e13b65a72e3a77eeada41a842c31"
+    },
+    {
+      "name": "cargo-zig",
+      "authoredDigest": "a7af45cdbf81041d2ec5b323b033ab0303535a34cfe73c2f688f1d095f66cb10",
+      "releaseIntentDigest": "166eae305f986fcdddc292a03cc84ad6fd4f523ad7c2d57a949a6778959e641f",
+      "effectiveDigest": "8c9e721d79f3ffe9b5a04583ab0841a888799312dd93892a66913c6c4e027a6f",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "cargo-zig",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/cargo-zig",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/start.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "200000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "08b0ce7993272e2d4a9367507bd4939b6017d7a85b02b38469acb877a8fc7fd5"
+    },
+    {
+      "name": "clickhouse",
+      "authoredDigest": "d41d4b64913d7516dfdc8c9af9ec47c25ddb0fa293ec1e175c2a4c1b3e6641b3",
+      "releaseIntentDigest": "f70e8ad743e2e1466557ec87dca9fd63e132874c72d97680f043497334431175",
+      "effectiveDigest": "daa15e09aad2d38d16f460cdf8a32426c034119f3009024b0ab6fb9302b70819",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "clickhouse",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/clickhouse",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/start.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "continuous"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 21600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "placement": {
+            "minimums": {
+              "memoryBytes": 4294967296,
+              "storageBytes": 8589934592
+            }
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "run_until_scheduled_end"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "3000000",
+            "rate": {
+              "amount": "15000000",
+              "windowMs": 86400000
+            }
+          }
+        },
+        "ingress": {
+          "services": [
+            {
+              "name": "http",
+              "protocol": "http",
+              "localPort": 8123,
+              "health": {
+                "live": {
+                  "http": "/ping"
+                },
+                "ready": {
+                  "http": "/replicas_status"
+                }
+              },
+              "endpoints": [
+                {
+                  "name": "private",
+                  "provider": "tailscale",
+                  "publiclyReachable": false,
+                  "protection": "network_gated"
+                }
+              ]
+            }
+          ]
+        },
+        "access": {
+          "ssh": {
+            "provider": {
+              "kind": "tailscale"
+            }
+          }
+        },
+        "configuration": {
+          "variables": [
+            {
+              "source": "literal",
+              "name": "CLICKHOUSE_VERSION",
+              "value": "24.8"
+            },
+            {
+              "source": "literal",
+              "name": "CH_MARK_CACHE_SIZE",
+              "value": "536870912"
+            },
+            {
+              "source": "literal",
+              "name": "CH_MAX_THREADS",
+              "value": "1"
+            },
+            {
+              "source": "literal",
+              "name": "CH_MAX_BLOCK_SIZE",
+              "value": "8192"
+            },
+            {
+              "source": "literal",
+              "name": "CH_DISABLE_LOG_TABLES",
+              "value": "1"
+            },
+            {
+              "source": "literal",
+              "name": "CH_S3_ENDPOINT",
+              "value": "https://fly.storage.tigris.dev/clickhouse-example"
+            }
+          ],
+          "secrets": [
+            {
+              "secretId": "clickhouse-default-password",
+              "required": true,
+              "destination": {
+                "kind": "environment",
+                "name": "CLICKHOUSE_PASSWORD"
+              }
+            },
+            {
+              "secretId": "clickhouse-s3-credentials",
+              "required": true,
+              "destination": {
+                "kind": "file",
+                "path": "/etc/clickhouse-server/s3-credentials.xml"
+              }
+            }
+          ]
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false,
+        "integrations": [
+          {
+            "useSite": "/access/ssh/provider",
+            "organizationId": "org_fixture",
+            "integrationId": "int_00000000000000000000000000000000",
+            "kind": "tailscale",
+            "configurationRevision": 1,
+            "authorizationScopes": [
+              "devices:write"
+            ],
+            "revocationEpoch": 0,
+            "authoredOverride": false
+          },
+          {
+            "useSite": "/ingress/http/private/provider",
+            "organizationId": "org_fixture",
+            "integrationId": "int_00000000000000000000000000000000",
+            "kind": "tailscale",
+            "configurationRevision": 1,
+            "authorizationScopes": [
+              "devices:write"
+            ],
+            "revocationEpoch": 0,
+            "authoredOverride": false
+          },
+          {
+            "useSite": "/integrations/tailscale",
+            "organizationId": "org_fixture",
+            "integrationId": "int_00000000000000000000000000000000",
+            "kind": "tailscale",
+            "configurationRevision": 1,
+            "authorizationScopes": [
+              "devices:write"
+            ],
+            "revocationEpoch": 0,
+            "authoredOverride": false
+          }
+        ]
+      },
+      "policyDiagnostics": [],
+      "corpusVerdict": "refused_internal_rehearsal",
+      "refusals": [
+        {
+          "code": "unsupported_policy_feature",
+          "pointer": "/access/ssh"
+        },
+        {
+          "code": "entitlement_exceeded",
+          "pointer": "/access/ssh"
+        },
+        {
+          "code": "unsupported_policy_feature",
+          "pointer": "/ingress"
+        }
+      ],
+      "operationalDigest": "bcea5e592498a1c05ad7d6fc02cbb6084f121076e855e4183121b7493b2f3de5"
+    },
+    {
+      "name": "env-vars",
+      "authoredDigest": "8383269aa8a829cb846347b557227e22e5de21672dfbcf54c4f74cc768a5b045",
+      "releaseIntentDigest": "7c6a2d74054a0d7c491e1895d7c051fd67639bb4985b9405113fce7e5ec497a2",
+      "effectiveDigest": "d20625551338072668cde2cb8836a0093ab5e97f3fef6dcf3b117641c613f32d",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "env-vars",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/env-vars",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "ipfs_bundle",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "javascript",
+          "engine": "nodejs",
+          "entrypointFile": "bundle.js"
+        },
+        "execution": {
+          "mode": "interval",
+          "everyMs": 3600000
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 30000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "20000",
+            "rate": {
+              "amount": "500000",
+              "windowMs": 2592000000
+            }
+          }
+        },
+        "configuration": {
+          "variables": [
+            {
+              "source": "literal",
+              "name": "GREETING",
+              "value": "hello"
+            },
+            {
+              "source": "managed",
+              "name": "REPORT_LABEL",
+              "required": false,
+              "default": "nightly"
+            }
+          ],
+          "secrets": [
+            {
+              "secretId": "my-secret-env-var",
+              "required": true,
+              "destination": {
+                "kind": "environment",
+                "name": "MY_SECRET_ENV_VAR"
+              }
+            }
+          ]
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "d642f15e33fbef6feb36745575eeeae51a6984cfbd1fcb09cec593fdfddaf8a6"
+    },
+    {
+      "name": "external-deps",
+      "authoredDigest": "23a536c1601d8d69c7c06e7349a542de6165872a62c46d31fbeb6cf4e268eac4",
+      "releaseIntentDigest": "62f7f16b226f851e917ec0a482f73120ef52c2f81cacea9004c692143b425068",
+      "effectiveDigest": "818d999181a0e0c25e2a65331fd9e91fe92a9f1a3104f7d0d3a55eeb492c207c",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "external-deps",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/external-deps",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "ipfs_bundle",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "javascript",
+          "engine": "nodejs",
+          "entrypointFile": "bundle.js"
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 30000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "50000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "d6000b80d49ad1677b86f82e664f8f9c285a01c36e23cc940a34b252327465d6"
+    },
+    {
+      "name": "fetch",
+      "authoredDigest": "009bcf03f3840adeb270fb0e5d55eb5d7ef41d5d680521a65bc6f681b48dd4bf",
+      "releaseIntentDigest": "350a372954ce0269e1c8406343509d2fb9a740e561a6db5e746ef951210c88c2",
+      "effectiveDigest": "c4f484743cf4bdd30110289b79d8a79cc18867b3481d46edc1d665efbbf9d0db",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "fetch",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/fetch",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "ipfs_bundle",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "javascript",
+          "engine": "nodejs",
+          "entrypointFile": "bundle.js"
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 30000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "50000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "6e998e03e360d9260ef2ea400e322694c2801139960c82d42754f947228b0d2d"
+    },
+    {
+      "name": "heic-to-png",
+      "authoredDigest": "6e167de29c56a74e959d2f84afc9eb56156666b282f19fdce846979490e3ede0",
+      "releaseIntentDigest": "bde8b16d875d7cf9417a50e67d753abda3426666f6e3a4a6b151710982eae6f5",
+      "effectiveDigest": "8555caebfb50a5cd0e33262a98c0d5654056b24d0bb0d3b516233449db254301",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "heic-to-png",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/heic-to-png",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "ipfs_bundle",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "javascript",
+          "engine": "nodejs",
+          "entrypointFile": "bundle.js"
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 3600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "50000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "16c813ed43a8e689bd415527aa97a260d666b071dee32923ce6f2df963bc6a11"
+    },
+    {
+      "name": "p2p",
+      "authoredDigest": "da1ad800c0dc33258c4c3c8eda2208e7d663991312dbd522c9cee888136b3155",
+      "releaseIntentDigest": "76cea2b286103abf0a17addd06679f9454083b672de94e3c5837bcfd3e67e044",
+      "effectiveDigest": "bc8332c9ab6324cd296ed78b699b3898fdb344f5186fb32551c88323f4b2843f",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "p2p",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/p2p",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "ipfs_bundle",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "javascript",
+          "engine": "nodejs",
+          "entrypointFile": "bundle.js"
+        },
+        "execution": {
+          "mode": "continuous"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 3600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "600000",
+            "rate": {
+              "amount": "15000000",
+              "windowMs": 86400000
+            }
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "124f0351a7ae96bdb290e0f637639fe71186e4fb7003a6038b18d8bc7b2cdef0"
+    },
+    {
+      "name": "puppeteer",
+      "authoredDigest": "ce82de8475fd698613ac12332a81c95d2eca1cf46b2756b6a4afc1da5320cc21",
+      "releaseIntentDigest": "e068b7a1f1e64bc67e0d391052c4ef33b9b9cbbc21ec19c85947c74bfa0e6dea",
+      "effectiveDigest": "771c3b171c265b8b1c1aa43ba36f37d59f20e24261d9d6053a23dccaac0bd860",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "puppeteer",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/puppeteer",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "ipfs_bundle",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "javascript",
+          "engine": "nodejs",
+          "entrypointFile": "bundle.js"
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 64,
+          "durationMs": 60000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 64
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "100000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "refused_internal_rehearsal",
+      "refusals": [
+        {
+          "code": "entitlement_exceeded",
+          "pointer": "/deployment/jobs"
+        }
+      ],
+      "operationalDigest": "fc4ad531bd7f4211b61bc0c1dc40fc1407056abf2022cdff3300638e1494e825"
+    },
+    {
+      "name": "shard-worker",
+      "authoredDigest": "f2f296fc27dbfbf47851e24d5503f2baa0d6df38e45e7652c2ef4b9107f6bdbd",
+      "releaseIntentDigest": "033f8dc37db56fd59d871472d469ca21bf6963e305f4753d5ab7445172f6f98e",
+      "effectiveDigest": "e9b3989bc1911a09f863b6287e9186784213c421a87c6907d8751e4f6da53b54",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "shard-worker",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/shard-worker",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "ipfs_bundle",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "javascript",
+          "engine": "nodejs",
+          "entrypointFile": "bundle.js"
+        },
+        "execution": {
+          "mode": "continuous"
+        },
+        "deployment": {
+          "jobs": 3,
+          "durationMs": 21600000,
+          "phasing": {
+            "mode": "evenly_spaced",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "run_until_scheduled_end"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "3600000",
+            "rate": {
+              "amount": "45000000",
+              "windowMs": 86400000
+            }
+          }
+        },
+        "configuration": {
+          "secrets": [
+            {
+              "secretId": "shard-worker-queue-token",
+              "required": true,
+              "destination": {
+                "kind": "environment",
+                "name": "QUEUE_TOKEN"
+              }
+            }
+          ]
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [],
+      "corpusVerdict": "refused_internal_rehearsal",
+      "refusals": [
+        {
+          "code": "entitlement_exceeded",
+          "pointer": "/deployment/jobs"
+        }
+      ],
+      "operationalDigest": "c393a26929899292b2433a555b7b2fe850b95e04e30d3263e30f5e175076fd77"
+    },
+    {
+      "name": "telegram-bot",
+      "authoredDigest": "76e2c8dbfc3941d7c66f42a6630d15320c4bf2a8e69b0afaf6052c1ebdf6ef75",
+      "releaseIntentDigest": "ed93cbe9b4db66bbabe7ac73aefed52bab2308c6199ee9c222798849080b3172",
+      "effectiveDigest": "2ecd01445c72ec7d1cc654c8fce01ac92259c1a4b2f2abba3af8c323ecda259d",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "telegram-bot",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/telegram-bot",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "ipfs_bundle",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "javascript",
+          "engine": "nodejs",
+          "entrypointFile": "bundle.js"
+        },
+        "execution": {
+          "mode": "continuous"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 3600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "600000",
+            "rate": {
+              "amount": "15000000",
+              "windowMs": 86400000
+            }
+          }
+        },
+        "configuration": {
+          "secrets": [
+            {
+              "secretId": "telegram-bot-token",
+              "required": true,
+              "destination": {
+                "kind": "environment",
+                "name": "TELEGRAM_BOT_TOKEN"
+              }
+            }
+          ]
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "7c13a85d2a95f2c6161cb2ad6fe267300a4ca34dff77eed14d43777455e89cf9"
+    },
+    {
+      "name": "video-transcode",
+      "authoredDigest": "130c7b4ff4ffe5e0476c611776a95ec39938a46ee8aff3b9b0eaa4cc8efc8fd4",
+      "releaseIntentDigest": "1caa4d14cdface88dc15625f16a4f3321915c9169eb3595b9a875d4fa0ee664b",
+      "effectiveDigest": "19f255030566e335c9916ad98c27546989bbf13addebacff2d2054a9b50ee589",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "video-transcode",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/video-transcode",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "runtime_image",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "native_image",
+          "catalog": "liskov-runtime-images",
+          "name": "debian-trixie",
+          "version": "0.1",
+          "entrypoint": {
+            "executable": "/bin/sh",
+            "args": [
+              "/app/transcode.sh"
+            ]
+          }
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 1800000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "placement": {
+            "minimums": {
+              "memoryBytes": 4294967296,
+              "storageBytes": 34359738368
+            }
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "1800000"
+          }
+        },
+        "configuration": {
+          "variables": [
+            {
+              "source": "literal",
+              "name": "TRANSCODE_PRESET",
+              "value": "h264-1080p"
+            }
+          ],
+          "secrets": [
+            {
+              "secretId": "video-transcode-object-store-credentials",
+              "required": true,
+              "destination": {
+                "kind": "file",
+                "path": "/etc/liskov/object-store-credentials.json"
+              }
+            },
+            {
+              "secretId": "video-transcode-callback-token",
+              "required": true,
+              "destination": {
+                "kind": "environment",
+                "name": "CALLBACK_TOKEN"
+              }
+            }
+          ]
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "49cbf81e1baf539c32da7260761ee3767348c553cdc967c86aed59794ed6cfef"
+    },
+    {
+      "name": "wasm",
+      "authoredDigest": "665b2036d9f5ea93ff6e566961f5769dc254ae6ee1c9bfa645224e4cfb4017d7",
+      "releaseIntentDigest": "9fec86a3571360d7e73c085839dc98f43a58cf23440072938e7176963c4a52dd",
+      "effectiveDigest": "efccee83fcd480b11b48e3c7225aa89f27ebaf1d108290096fe997eded70a7b5",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "wasm",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/wasm",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "ipfs_bundle",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "javascript",
+          "engine": "nodejs",
+          "entrypointFile": "bundle.js"
+        },
+        "execution": {
+          "mode": "once"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 10000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "50000"
+          }
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "eligible_internal_rehearsal",
+      "refusals": [],
+      "operationalDigest": "01eac494f5755c9281131679db8d9e3a302f5911fba1eeccdab1470f14577b87"
+    }
+  ],
+  "booking": {
+    "just-in-time": {
+      "authoredDigest": "8c9501daf8135c3ac3925049344454baf7f126b4a092bce1382d8275ed9691d2",
+      "releaseIntentDigest": "79bd918dbd500747a2fb30ccd66bd4aa1e218e1fd499ea43eab27ee5d9772c79",
+      "effectiveDigest": "77703033d34bed04fb952a581678bf19ae14ba11d26b65be0280bdee635823bd",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "telegram-bot",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/booking",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "ipfs_bundle",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "javascript",
+          "engine": "nodejs",
+          "entrypointFile": "bundle.js"
+        },
+        "execution": {
+          "mode": "continuous"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 3600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "600000",
+            "rate": {
+              "amount": "15000000",
+              "windowMs": 86400000
+            }
+          },
+          "booking": {
+            "mode": "just_in_time"
+          }
+        },
+        "configuration": {
+          "secrets": [
+            {
+              "secretId": "telegram-bot-token",
+              "required": true,
+              "destination": {
+                "kind": "environment",
+                "name": "TELEGRAM_BOT_TOKEN"
+              }
+            }
+          ]
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "operationalDigest": "34e8db26a4f5ba434408c31b0018133d0809d3957f9855187546f02c2ea125c0"
+    },
+    "ahead-one-hour": {
+      "authoredDigest": "d107875a5b564be08bafe85c2a47a256c6b63e6ddee6d9fe584bda664742aa61",
+      "releaseIntentDigest": "d7eb29f2177898c34369125ccfd7ecf4c25b9e07698abc6fc3213b0bd474c8b9",
+      "effectiveDigest": "e5a2076b388da6804ac98905d935c1ff49ea2ab7d00f7796c4805ebacd2be2c4",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "telegram-bot",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/booking",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "ipfs_bundle",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "javascript",
+          "engine": "nodejs",
+          "entrypointFile": "bundle.js"
+        },
+        "execution": {
+          "mode": "continuous"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 3600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "600000",
+            "rate": {
+              "amount": "15000000",
+              "windowMs": 86400000
+            }
+          },
+          "booking": {
+            "mode": "ahead_of_time",
+            "horizon": "1h"
+          }
+        },
+        "configuration": {
+          "secrets": [
+            {
+              "secretId": "telegram-bot-token",
+              "required": true,
+              "destination": {
+                "kind": "environment",
+                "name": "TELEGRAM_BOT_TOKEN"
+              }
+            }
+          ]
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "operationalDigest": "8ffa87f6eeb2fd1c9ed36c4f491a92e1bff00071a74e79b9c517ff4decab4ce7"
+    },
+    "ahead-six-hours": {
+      "authoredDigest": "29bf949a3f97a3503b2507d0ef2a67f900ebbeb4df17a88bb378567f57de000f",
+      "releaseIntentDigest": "cd23acfbf83587669d84efcbf6da0408ba27b42d0566779b6c3f196a8286680b",
+      "effectiveDigest": "8cb8a146531277b356d7eef4ab22a3c6437e2e985457420af90a80be588186be",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "telegram-bot",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/booking",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "ipfs_bundle",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "javascript",
+          "engine": "nodejs",
+          "entrypointFile": "bundle.js"
+        },
+        "execution": {
+          "mode": "continuous"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 3600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "600000",
+            "rate": {
+              "amount": "15000000",
+              "windowMs": 86400000
+            }
+          },
+          "booking": {
+            "mode": "ahead_of_time",
+            "horizon": "6h"
+          }
+        },
+        "configuration": {
+          "secrets": [
+            {
+              "secretId": "telegram-bot-token",
+              "required": true,
+              "destination": {
+                "kind": "environment",
+                "name": "TELEGRAM_BOT_TOKEN"
+              }
+            }
+          ]
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "operationalDigest": "d14eb7d0dcf5a9044e327680decedf43e2c97ec73e755afda6c04dd0c8a02fae"
+    },
+    "ahead-twenty-three-hours": {
+      "authoredDigest": "c4fda12277069d9f4f1f6e5df699e49a79ef1e40c771b69d56ebb2654f55b235",
+      "releaseIntentDigest": "52fc357bbcc43ead96d10510c4ab28cbc83350df8985439fa90c9d1dcf26a24c",
+      "effectiveDigest": "5d5d6a7c22d2401251566281d1cfae09c4b096c3fa3cee094db9263514832086",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 6,
+        "applicationId": "telegram-bot",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/booking",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "ipfs_bundle",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+        },
+        "runtime": {
+          "kind": "javascript",
+          "engine": "nodejs",
+          "entrypointFile": "bundle.js"
+        },
+        "execution": {
+          "mode": "continuous"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 3600000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready"
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "600000",
+            "rate": {
+              "amount": "15000000",
+              "windowMs": 86400000
+            }
+          },
+          "booking": {
+            "mode": "ahead_of_time",
+            "horizon": "23h"
+          }
+        },
+        "configuration": {
+          "secrets": [
+            {
+              "secretId": "telegram-bot-token",
+              "required": true,
+              "destination": {
+                "kind": "environment",
+                "name": "TELEGRAM_BOT_TOKEN"
+              }
+            }
+          ]
+        },
+        "observability": {
+          "logs": {
+            "enabled": true
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "operationalDigest": "4c2e04e0331611e1a8405d54b8936881e56290d8a842c0346b6eb7d13f4ab486"
+    }
+  }
+}

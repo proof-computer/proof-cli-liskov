@@ -8,7 +8,9 @@ for (const file of [
   "policy-client-bundle.json",
   "policy-client-contract.wasm.gz",
   "policy-client.cjs",
-  "policy-client.d.ts"
+  "policy-client.d.ts",
+  "policy-client-conformance.json",
+  "source.json"
 ]) {
   await copyFile(
     path.join(root, "src", "policy-client-bundle", file),
