@@ -1,0 +1,9 @@
+{
+  "corpusFixture": "telegram-bot",
+  "cases": [
+    {"name": "just-in-time", "booking": {"mode": "just_in_time"}},
+    {"name": "ahead-one-hour", "booking": {"mode": "ahead_of_time", "horizon": "1h"}},
+    {"name": "ahead-six-hours", "booking": {"mode": "ahead_of_time", "horizon": "6h"}},
+    {"name": "ahead-twenty-three-hours", "booking": {"mode": "ahead_of_time", "horizon": "23h"}}
+  ]
+}

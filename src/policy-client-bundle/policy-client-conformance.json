@@ -6339,6 +6339,116 @@
       "expectedPointer": "/deployment/placement/minimums/androidMajor"
     },
     {
+      "name": "v6/invalid/booking-horizon-0m",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: whole minutes from 1h to 23h\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/booking\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: invalid-booking\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 1h}\n  spend: {unit: service_credit_micros, perJob: \"1000\", rate: {amount: \"24000\", window: 1d}}\n  booking: {mode: ahead_of_time, horizon: 0m}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/booking"
+    },
+    {
+      "name": "v6/invalid/booking-horizon-1381m",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: whole minutes from 1h to 23h\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/booking\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: invalid-booking\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 1h}\n  spend: {unit: service_credit_micros, perJob: \"1000\", rate: {amount: \"24000\", window: 1d}}\n  booking: {mode: ahead_of_time, horizon: 1381m}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/booking"
+    },
+    {
+      "name": "v6/invalid/booking-horizon-1d",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: whole minutes from 1h to 23h\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/booking\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: invalid-booking\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 1h}\n  spend: {unit: service_credit_micros, perJob: \"1000\", rate: {amount: \"24000\", window: 1d}}\n  booking: {mode: ahead_of_time, horizon: 1d}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/booking"
+    },
+    {
+      "name": "v6/invalid/booking-horizon-59m",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: whole minutes from 1h to 23h\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/booking\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: invalid-booking\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 1h}\n  spend: {unit: service_credit_micros, perJob: \"1000\", rate: {amount: \"24000\", window: 1d}}\n  booking: {mode: ahead_of_time, horizon: 59m}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/booking"
+    },
+    {
+      "name": "v6/invalid/booking-horizon-90s",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: whole minutes from 1h to 23h\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/booking\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: invalid-booking\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 1h}\n  spend: {unit: service_credit_micros, perJob: \"1000\", rate: {amount: \"24000\", window: 1d}}\n  booking: {mode: ahead_of_time, horizon: 90s}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/booking"
+    },
+    {
+      "name": "v6/invalid/booking-interval",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: requires continuous execution\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/booking\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: invalid-booking\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: interval, every: 1h}\ndeployment:\n  schedule: {duration: 1h}\n  spend: {unit: service_credit_micros, perJob: \"1000\", rate: {amount: \"24000\", window: 1d}}\n  booking: {mode: ahead_of_time, horizon: 1h}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/booking"
+    },
+    {
+      "name": "v6/invalid/booking-jit-horizon",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown field `horizon`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/booking\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: invalid-booking\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 1h}\n  spend: {unit: service_credit_micros, perJob: \"1000\", rate: {amount: \"24000\", window: 1d}}\n  booking: {mode: just_in_time, horizon: 1h}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/deployment/booking"
+    },
+    {
+      "name": "v6/invalid/booking-once",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: requires continuous execution\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/booking\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: invalid-booking\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 1h}\n  spend: {unit: service_credit_micros, perJob: \"1000\", rate: {amount: \"24000\", window: 1d}}\n  booking: {mode: ahead_of_time, horizon: 1h}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/booking"
+    },
+    {
+      "name": "v6/invalid/booking-self-custody",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: requires managed custody\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/booking\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: invalid-booking\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 1h}\n  spend: {unit: acu_planck, perJob: \"1000\", rate: {amount: \"24000\", window: 1d}}\n  booking: {mode: ahead_of_time, horizon: 1h}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/booking"
+    },
+    {
+      "name": "v6/invalid/booking-unknown-key",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: unknown field `unexpected`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/booking\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: invalid-booking\nrelease: {mode: source}\nruntime: {kind: javascript, entrypoint: {file: index.js}}\nexecution: {mode: continuous}\ndeployment:\n  schedule: {duration: 1h}\n  spend: {unit: service_credit_micros, perJob: \"1000\", rate: {amount: \"24000\", window: 1d}}\n  booking: {mode: ahead_of_time, horizon: 1h, unexpected: true}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "unknown_field",
+      "expectedPointer": "/deployment/booking"
+    },
+    {
       "name": "v6/invalid/cohort-is-deferred",
       "request": {
         "schema": "proof.liskov.policy-client-request.v1",

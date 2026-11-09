@@ -94,7 +94,7 @@ export function evaluateApplicationManifest(value: unknown): PolicyContractEvalu
 }
 
 export function isRegisteredSourcePublicationPair(result: PolicyContractEvaluation): boolean {
-  if (result.disposition !== "supported" || !result.pair) return false;
+  if (!publicationEnabled(result)) return false;
   return contract().manifest.publicationPairs.some((pair) =>
     pair.schema === result.pair?.schema
     && pair.schemaVersion === result.pair?.schemaVersion
@@ -109,10 +109,17 @@ export function isRegisteredSourcePublicationPair(result: PolicyContractEvaluati
  * nothing else (BKLG-20260924-ahz3).
  */
 export function isRegisteredPublicationPair(result: PolicyContractEvaluation): boolean {
-  if (result.disposition !== "supported" || !result.pair) return false;
+  if (!publicationEnabled(result)) return false;
   return contract().manifest.publicationPairs.some((pair) =>
     pair.schema === result.pair?.schema
     && pair.schemaVersion === result.pair?.schemaVersion);
+}
+
+function publicationEnabled(result: PolicyContractEvaluation): boolean {
+  if (result.disposition !== "supported" || !result.pair) return false;
+  // BKLG-20260907-ie6x owns V6 activation. The owner's expected client
+  // surfaces register offline publication support, not rollout authority.
+  return !(result.pair.schema === APPLICATION_MANIFEST_SCHEMA && result.pair.schemaVersion === 6);
 }
 
 export function validateApplicationManifest(value: unknown): PolicyValidationError[] {
