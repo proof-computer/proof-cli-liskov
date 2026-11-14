@@ -1,0 +1,532 @@
+[
+  {
+    "name": "zero-shutdownGrace",
+    "pointer": "/deployment/lifecycle/update/method/shutdownGrace",
+    "value": "0ms",
+    "parseRefusal": false
+  },
+  {
+    "name": "over-window-shutdownGrace",
+    "pointer": "/deployment/lifecycle/update/method/shutdownGrace",
+    "value": "31m",
+    "parseRefusal": false
+  },
+  {
+    "name": "overflow-shutdownGrace",
+    "pointer": "/deployment/lifecycle/update/method/shutdownGrace",
+    "value": "18446744073709551615d",
+    "parseRefusal": true
+  },
+  {
+    "name": "zero-readiness/timeout",
+    "pointer": "/deployment/lifecycle/update/method/readiness/timeout",
+    "value": "0ms",
+    "parseRefusal": false
+  },
+  {
+    "name": "over-window-readiness/timeout",
+    "pointer": "/deployment/lifecycle/update/method/readiness/timeout",
+    "value": "31m",
+    "parseRefusal": false
+  },
+  {
+    "name": "overflow-readiness/timeout",
+    "pointer": "/deployment/lifecycle/update/method/readiness/timeout",
+    "value": "18446744073709551615d",
+    "parseRefusal": true
+  },
+  {
+    "name": "zero-readiness/maxWait",
+    "pointer": "/deployment/lifecycle/update/method/readiness/maxWait",
+    "value": "0ms",
+    "parseRefusal": false
+  },
+  {
+    "name": "over-window-readiness/maxWait",
+    "pointer": "/deployment/lifecycle/update/method/readiness/maxWait",
+    "value": "31m",
+    "parseRefusal": false
+  },
+  {
+    "name": "overflow-readiness/maxWait",
+    "pointer": "/deployment/lifecycle/update/method/readiness/maxWait",
+    "value": "18446744073709551615d",
+    "parseRefusal": true
+  },
+  {
+    "name": "probe-over-wait",
+    "pointer": "/deployment/lifecycle/update/method/readiness/timeout",
+    "value": "21s",
+    "parseRefusal": false
+  },
+  {
+    "name": "cutover-equals-window",
+    "pointer": "/deployment/lifecycle/update/method/readiness/maxWait",
+    "value": "1795s",
+    "parseRefusal": false
+  },
+  {
+    "name": "supervised-javascript",
+    "pointer": "/runtime",
+    "value": {
+      "kind": "javascript",
+      "entrypoint": {
+        "file": "index.js"
+      }
+    },
+    "parseRefusal": false
+  },
+  {
+    "name": "supervised-native_image",
+    "pointer": "/runtime",
+    "value": {
+      "kind": "native_image",
+      "image": {
+        "name": "generic-cargo",
+        "version": "1.0"
+      },
+      "entrypoint": {
+        "executable": "/bin/app"
+      }
+    },
+    "parseRefusal": false
+  },
+  {
+    "name": "supervised-once",
+    "pointer": "/execution",
+    "value": {
+      "mode": "once"
+    },
+    "parseRefusal": false
+  },
+  {
+    "name": "supervised-interval",
+    "pointer": "/execution",
+    "value": {
+      "mode": "interval",
+      "every": "1h"
+    },
+    "parseRefusal": false
+  },
+  {
+    "name": "bad-entrypoint-../app",
+    "pointer": "/runtime/entrypoint/file",
+    "value": "../app",
+    "parseRefusal": true
+  },
+  {
+    "name": "bad-probe-../app",
+    "pointer": "/deployment/lifecycle/update/method/readiness/file",
+    "value": "../app",
+    "parseRefusal": true
+  },
+  {
+    "name": "bad-entrypoint-/bin/app",
+    "pointer": "/runtime/entrypoint/file",
+    "value": "/bin/app",
+    "parseRefusal": true
+  },
+  {
+    "name": "bad-probe-/bin/app",
+    "pointer": "/deployment/lifecycle/update/method/readiness/file",
+    "value": "/bin/app",
+    "parseRefusal": true
+  },
+  {
+    "name": "bad-entrypoint-bin/../../app",
+    "pointer": "/runtime/entrypoint/file",
+    "value": "bin/../../app",
+    "parseRefusal": true
+  },
+  {
+    "name": "bad-probe-bin/../../app",
+    "pointer": "/deployment/lifecycle/update/method/readiness/file",
+    "value": "bin/../../app",
+    "parseRefusal": true
+  },
+  {
+    "name": "bad-entrypoint-bin//app",
+    "pointer": "/runtime/entrypoint/file",
+    "value": "bin//app",
+    "parseRefusal": true
+  },
+  {
+    "name": "bad-probe-bin//app",
+    "pointer": "/deployment/lifecycle/update/method/readiness/file",
+    "value": "bin//app",
+    "parseRefusal": true
+  },
+  {
+    "name": "bad-entrypoint-https://payload.invalid/app",
+    "pointer": "/runtime/entrypoint/file",
+    "value": "https://payload.invalid/app",
+    "parseRefusal": true
+  },
+  {
+    "name": "bad-probe-https://payload.invalid/app",
+    "pointer": "/deployment/lifecycle/update/method/readiness/file",
+    "value": "https://payload.invalid/app",
+    "parseRefusal": true
+  },
+  {
+    "name": "bad-entrypoint-bin\\app",
+    "pointer": "/runtime/entrypoint/file",
+    "value": "bin\\app",
+    "parseRefusal": true
+  },
+  {
+    "name": "bad-probe-bin\\app",
+    "pointer": "/deployment/lifecycle/update/method/readiness/file",
+    "value": "bin\\app",
+    "parseRefusal": true
+  },
+  {
+    "name": "bad-entrypoint-",
+    "pointer": "/runtime/entrypoint/file",
+    "value": "",
+    "parseRefusal": true
+  },
+  {
+    "name": "bad-probe-",
+    "pointer": "/deployment/lifecycle/update/method/readiness/file",
+    "value": "",
+    "parseRefusal": true
+  },
+  {
+    "name": "directory-entrypoint-.",
+    "pointer": "/runtime/entrypoint/file",
+    "value": ".",
+    "parseRefusal": false
+  },
+  {
+    "name": "directory-entrypoint-bin/.",
+    "pointer": "/runtime/entrypoint/file",
+    "value": "bin/.",
+    "parseRefusal": false
+  },
+  {
+    "name": "too-many-args",
+    "pointer": "/runtime/entrypoint/args",
+    "value": [
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg"
+    ],
+    "parseRefusal": false
+  },
+  {
+    "name": "too-many-probe-args",
+    "pointer": "/deployment/lifecycle/update/method/readiness/args",
+    "value": [
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg",
+      "arg"
+    ],
+    "parseRefusal": false
+  },
+  {
+    "name": "nul-arg",
+    "pointer": "/runtime/entrypoint/args",
+    "value": [
+      "x\u0000y"
+    ],
+    "parseRefusal": false
+  },
+  {
+    "name": "nul-probe-arg",
+    "pointer": "/deployment/lifecycle/update/method/readiness/args",
+    "value": [
+      "x\u0000y"
+    ],
+    "parseRefusal": false
+  },
+  {
+    "name": "supervisor-on-replace",
+    "pointer": "/deployment/lifecycle/update/method",
+    "value": {
+      "mode": "replace_job",
+      "shutdownGrace": "5s"
+    },
+    "parseRefusal": true
+  },
+  {
+    "name": "rollback-no-state",
+    "pointer": "/deployment/lifecycle/update/method/onActivationFailure",
+    "value": {
+      "mode": "rollback"
+    },
+    "parseRefusal": true
+  },
+  {
+    "name": "rollback-unknown-state",
+    "pointer": "/deployment/lifecycle/update/method/onActivationFailure",
+    "value": {
+      "mode": "rollback",
+      "stateCompatibility": "inferred"
+    },
+    "parseRefusal": true
+  },
+  {
+    "name": "stop-with-state",
+    "pointer": "/deployment/lifecycle/update/method/onActivationFailure",
+    "value": {
+      "mode": "stop",
+      "stateCompatibility": "backward_compatible"
+    },
+    "parseRefusal": true
+  },
+  {
+    "name": "no-policy",
+    "pointer": "/deployment/lifecycle/update/method",
+    "value": {
+      "mode": "supervised_payload"
+    },
+    "parseRefusal": true
+  },
+  {
+    "name": "no-probe-mode",
+    "pointer": "/deployment/lifecycle/update/method/readiness",
+    "value": {
+      "file": "bin/readiness",
+      "timeout": "1s",
+      "maxWait": "2s"
+    },
+    "parseRefusal": true
+  },
+  {
+    "name": "unknown-probe-mode",
+    "pointer": "/deployment/lifecycle/update/method/readiness/mode",
+    "value": "http",
+    "parseRefusal": true
+  },
+  {
+    "name": "not-inherited-integrations",
+    "pointer": "/integrations",
+    "value": {},
+    "parseRefusal": true
+  },
+  {
+    "name": "not-inherited-ingress",
+    "pointer": "/ingress",
+    "value": {},
+    "parseRefusal": true
+  },
+  {
+    "name": "not-inherited-hooks",
+    "pointer": "/hooks",
+    "value": {},
+    "parseRefusal": true
+  },
+  {
+    "name": "not-inherited-cohort",
+    "pointer": "/cohort",
+    "value": {},
+    "parseRefusal": true
+  },
+  {
+    "name": "runtime-url",
+    "pointer": "/runtime/url",
+    "value": "https://payload.invalid/app",
+    "parseRefusal": true
+  },
+  {
+    "name": "runtime-digest",
+    "pointer": "/runtime/digest",
+    "value": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "parseRefusal": true
+  },
+  {
+    "name": "runtime-encryption",
+    "pointer": "/runtime/encryption",
+    "value": "none",
+    "parseRefusal": true
+  },
+  {
+    "name": "builder-authority",
+    "pointer": "/release/builder",
+    "value": {
+      "kind": "github"
+    },
+    "parseRefusal": true
+  },
+  {
+    "name": "pinned-no-digest",
+    "pointer": "/release",
+    "value": {
+      "mode": "pinned",
+      "artifact": {}
+    },
+    "parseRefusal": true
+  },
+  {
+    "name": "source-with-artifact",
+    "pointer": "/release",
+    "value": {
+      "mode": "source",
+      "artifact": {
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "parseRefusal": true
+  },
+  {
+    "name": "pinned-url",
+    "pointer": "/release",
+    "value": {
+      "mode": "pinned",
+      "artifact": {
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "url": "https://payload.invalid/app"
+      }
+    },
+    "parseRefusal": true
+  },
+  {
+    "name": "pinned-encryption",
+    "pointer": "/release",
+    "value": {
+      "mode": "pinned",
+      "artifact": {
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "encryption": "none"
+      }
+    },
+    "parseRefusal": true
+  },
+  {
+    "name": "pinned-duplicate-digest",
+    "pointer": "/release",
+    "value": {
+      "mode": "pinned",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "artifact": {
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "parseRefusal": true
+  }
+]

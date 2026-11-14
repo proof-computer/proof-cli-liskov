@@ -6,7 +6,7 @@ import { access, mkdir, readFile, rm, writeFile, chmod } from "node:fs/promises"
 import { homedir } from "node:os";
 import path from "node:path";
 
-import { buildUploadForm, hashFile, isArtifactEncryptionMode, isMemberUploadEncryptionMode, parseIpfsHash } from "./artifact-upload.js";
+import { buildUploadForm, hashFile, isArtifactEncryptionMode, isMemberUploadEncryptionMode, parseIpfsHash, nativePayloadIdentity, privatePayloadUploadPlan } from "./artifact-upload.js";
 
 import {
   isExecutionHistoryResponse,
@@ -547,6 +547,8 @@ export interface SlipwayApplicationArtifactPinRestoreInput {
 }
 
 export interface SlipwayApplicationArtifactUploadInput {
+  kind?: string;
+  descriptor?: string;
   applicationRef: string;
   file: string;
   manifest?: string;
@@ -3449,7 +3451,9 @@ export async function runSlipwayApplicationPolicyPublish(
     : isRegisteredSourcePublicationPair(contractResult);
   if (!registered) {
     diagnostics.push({
-      code: contractResult.disposition === "unknown_opaque" ? "unknown_policy_schema" : "invalid_manifest",
+      code: contractResult.pair?.schemaVersion === 8
+        ? "v8_production_registration_not_activated"
+        : contractResult.disposition === "unknown_opaque" ? "unknown_policy_schema" : "invalid_manifest",
       message: contractResult.disposition === "unknown_opaque"
         ? "this CLI has no registered publication contract for the exact schema pair"
         : "the document does not declare a locally supported registered publication pair",
@@ -4575,9 +4579,19 @@ export async function runSlipwayApplicationArtifactUpload(input: SlipwayApplicat
     });
   }
 
+  const kind = input.kind ?? "bundle";
+  if (!["bundle", "native_payload"].includes(kind)
+    || (kind === "native_payload" && (input.descriptor === undefined || input.manifest !== undefined))
+    || (kind === "bundle" && input.descriptor !== undefined)) {
+    return writeArtifactUploadRefusal(options, input.json, {
+      reason: "artifact_kind",
+      message: "Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED): use --kind native_payload with --descriptor and without --manifest, or upload a bundle without --descriptor."
+    });
+  }
   const secrets = await artifactUploadSecrets(input, options);
   const bundle = await readArtifactBytes(input.file, options, input.json, secrets);
   if (!bundle.ok) return bundle.exitCode;
+  if (kind === "native_payload") return runNativePayloadUpload(input, bundle.bytes, secrets, options);
   let manifestDigest = `sha256:${hashFile(bundle.bytes).sha256Hex}`;
   if (input.manifest !== undefined) {
     const manifest = await readArtifactBytes(input.manifest, options, input.json, secrets);
@@ -4743,6 +4757,116 @@ export async function runSlipwayApplicationArtifactUpload(input: SlipwayApplicat
     });
   }
   writeStructuredOrHuman(options, input.json, record.body, human);
+  return 0;
+}
+
+/** Native payloads use the same member/session owner and scoped routes as ZIPs. */
+async function runNativePayloadUpload(
+  input: SlipwayApplicationArtifactUploadInput,
+  bytes: Uint8Array,
+  secrets: string[],
+  options: SlipwayCliOptions
+): Promise<number> {
+  const stdout = options.stdout ?? console.log;
+  const stderr = options.stderr ?? console.error;
+  options = {
+    ...options,
+    stdout: (line) => stdout(redactArtifactText(line, secrets) ?? ""),
+    stderr: (line) => stderr(redactArtifactText(line, secrets) ?? "")
+  };
+  const fail = (reason: string, status?: number, finalize = false) => writeArtifactUploadFailure(options, input.json, {
+    error: finalize ? ARTIFACT_UPLOAD_RECORD_FAILED : ARTIFACT_UPLOAD_REFUSED,
+    reason, reasonCode: reason, status,
+    // Do not echo provider bodies, plans, descriptors or exception messages.
+    message: `Error (${finalize ? ARTIFACT_UPLOAD_RECORD_FAILED : ARTIFACT_UPLOAD_REFUSED}): ${reason}. Re-run the same command to retry; an incomplete immutable upload may need its server lease to expire.`
+  });
+  const descriptorFile = await readArtifactBytes(input.descriptor!, options, input.json, secrets);
+  if (!descriptorFile.ok) return descriptorFile.exitCode;
+  let descriptor: Record<string, unknown>;
+  try {
+    descriptor = objectRecord(JSON.parse(Buffer.from(descriptorFile.bytes).toString("utf8")));
+  } catch {
+    return fail("invalid_payload_descriptor");
+  }
+  const expected = hashFile(bytes);
+  if (descriptor.artifactDigest !== `sha256:${expected.sha256Hex}` || descriptor.artifactSizeBytes !== expected.byteSize) {
+    return fail("payload_integrity_mismatch");
+  }
+  if (descriptor.encryption !== "none") return fail("encryption_unsupported");
+  // The server validates inventory, ABI and producer against its canonical owners.
+  const session = await authenticatedSlipwayRequest<SlipwayApiSessionResponse>({
+    config: input.config, slipwayUrl: input.slipwayUrl, json: input.json,
+    path: "/api/session", requestErrorCode: ARTIFACT_UPLOAD_REFUSED,
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not read the Liskov session", wordsOwnRefusals: true, redactFetchError: true
+  }, options);
+  if (!session.ok) return session.exitCode;
+  const org = session.body === undefined ? undefined : canonicalUploadOrganizationId(session.body);
+  if (!session.response.ok || session.body?.ok !== true || !session.body.session || org === undefined) {
+    return fail("invalid_session_organization", session.response.status);
+  }
+  const base = `/api/organizations/${encodeURIComponent(org)}/applications/${encodeURIComponent(input.applicationRef)}`;
+  const post = (path: string, body: unknown, finalize = false) => authenticatedSlipwayJsonRequest<ArtifactUploadServerBody>({
+    config: input.config, slipwayUrl: input.slipwayUrl, json: input.json,
+    method: "POST", path, body,
+    requestErrorCode: finalize ? ARTIFACT_UPLOAD_RECORD_FAILED : ARTIFACT_UPLOAD_REFUSED,
+    notFoundMessage: "No Liskov CLI session is stored locally.",
+    fetchFailedMessage: "could not complete the native payload request", wordsOwnRefusals: true, redactFetchError: true
+  }, options);
+  const intent = await post(`${base}/artifact-upload-intents`, { kind: "native_payload", descriptor });
+  if (!intent.ok) return intent.exitCode;
+  // Only bounded owner codes are printable; no remote message enters an error.
+  const refusal = (body: ArtifactUploadServerBody | undefined) => {
+    const code = body?.reasonCode ?? body?.error;
+    return typeof code === "string" && /^[a-z][a-z0-9_]{0,79}$/u.test(code)
+      && !containsSecret(code, secrets) ? code : "invalid_payload_response";
+  };
+  if (!intent.response.ok || intent.body?.ok !== true) return fail(refusal(intent.body), intent.response.status);
+  const body = intent.body;
+  const artifact = nativePayloadIdentity(body.artifact, expected);
+  if (body.kind !== "native_payload" || artifact === undefined
+    || typeof body.uploadId !== "string" || !/^upl-[a-f0-9]{32}$/u.test(body.uploadId)
+    || typeof body.maxBytes !== "number" || !Number.isSafeInteger(body.maxBytes) || body.maxBytes < expected.byteSize
+    || typeof body.expiresAtMs !== "number" || !Number.isSafeInteger(body.expiresAtMs)
+    || (!artifact.ready && body.expiresAtMs <= (options.nowMs?.() ?? Date.now()))) return fail("invalid_payload_plan");
+  if (artifact.ready) {
+    if (body.upload !== null) return fail("invalid_payload_plan");
+  } else {
+    const plan = privatePayloadUploadPlan(body.upload, expected);
+    if (plan === undefined) return fail("invalid_payload_plan");
+    // The entire locator and every signed header are credentials; never emit them.
+    secrets.push(plan.url);
+    for (const [name, value] of new URL(plan.url).searchParams) {
+      if (/credential|signature|token/iu.test(name) && value.length > 0) secrets.push(value);
+    }
+    for (const [name, value] of Object.entries(plan.headers)) {
+      if (/authorization|credential|token|signature/iu.test(name) && value.length > 0) secrets.push(value);
+    }
+    try {
+      const response = await (options.fetchImpl ?? fetch)(plan.url, {
+        method: plan.method, headers: plan.headers, body: Buffer.from(bytes), redirect: "error"
+      });
+      // A prior PUT can have committed even if its response was lost. A 412 is
+      // only permission to ask the server to verify; it never proves readiness.
+      if (!response.ok && response.status !== 412) return fail("payload_upload_failed", response.status);
+    } catch {
+      return fail("payload_upload_failed");
+    }
+  }
+  const finalized = await post(`${base}/artifact-uploads`, {
+    kind: "native_payload", uploadId: body.uploadId, artifactDigest: artifact.artifactDigest
+  }, true);
+  if (!finalized.ok) return finalized.exitCode;
+  if (!finalized.response.ok || finalized.body?.ok !== true) return fail(refusal(finalized.body), finalized.response.status, true);
+  const ready = nativePayloadIdentity(finalized.body.artifact, expected);
+  if (finalized.body.kind !== "native_payload" || ready === undefined || !ready.ready
+    || containsSecret(ready, secrets)
+    || ready.artifactVersionId !== artifact.artifactVersionId || ready.descriptorDigest !== artifact.descriptorDigest) {
+    return fail("invalid_payload_finalization", finalized.response.status, true);
+  }
+  // An explicit allowlist prevents upload credentials or locators being reflected.
+  writeStructuredOrHuman(options, input.json, { ok: true, kind: "native_payload", artifact: ready },
+    `Artifact ready: ${ready.artifactVersionId} (${ready.artifactDigest}). Publication, execution and encryption are separate.`);
   return 0;
 }
 

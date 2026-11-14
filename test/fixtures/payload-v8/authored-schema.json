@@ -1,0 +1,1337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Liskov Application Manifest v8",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "$ref": "#/$defs/ManifestSchemaId"
+    },
+    "schemaVersion": {
+      "$ref": "#/$defs/V8SchemaVersion"
+    },
+    "applicationId": {
+      "$ref": "#/$defs/ApplicationId"
+    },
+    "metadata": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Metadata"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "release": {
+      "$ref": "#/$defs/Release"
+    },
+    "runtime": {
+      "$ref": "#/$defs/Runtime"
+    },
+    "execution": {
+      "$ref": "#/$defs/Execution"
+    },
+    "deployment": {
+      "$ref": "#/$defs/Deployment"
+    },
+    "access": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Access"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "configuration": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Configuration"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "observability": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Observability"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "state": {
+      "$ref": "#/$defs/State"
+    },
+    "debug": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Debug"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schemaVersion",
+    "applicationId",
+    "release",
+    "runtime",
+    "execution",
+    "deployment",
+    "state"
+  ],
+  "$defs": {
+    "ManifestSchemaId": {
+      "type": "string",
+      "const": "proof.liskov.application-manifest"
+    },
+    "V8SchemaVersion": {
+      "type": "integer",
+      "const": 8
+    },
+    "ApplicationId": {
+      "description": "The application slug.\n\n**Unique within one organization only.** It is never a global\nidentifier and never safe to use alone as a join or attribution key —\nproduction has carried the same `application_id` for two different\norganizations, and a guard that assumed otherwise crash-looped the\ncontrol plane. Join on the application UID.",
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
+    },
+    "Metadata": {
+      "description": "Authored-only description and labels.\n\nAbsent from effective execution policy and from the policy digest — which is\nwhat makes a cosmetic republish inert, and is load-bearing for `once`\nexecution: editing a description must not re-run a one-shot application.",
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 500
+        },
+        "labels": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Label"
+          },
+          "maxItems": 32
+        }
+      },
+      "additionalProperties": false
+    },
+    "Label": {
+      "description": "A free-form organizational label. Authored-only: labels never reach\nexecution and never enter the effective policy.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,62}$"
+    },
+    "Release": {
+      "description": "Where the application artifact comes from.",
+      "oneOf": [
+        {
+          "description": "Liskov builds the artifact from the repository the organization's\nsource integration binds.\n\nSpelled as an empty struct variant, not a unit variant, and that is\nload-bearing: serde's `deny_unknown_fields` is silently inert on unit\nvariants of an internally tagged enum, so `{mode: source, builder: ...}`\nwould parse and drop the builder. An empty struct variant rejects it.",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "source"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ]
+        },
+        {
+          "description": "This exact artifact, by digest.",
+          "type": "object",
+          "properties": {
+            "artifact": {
+              "$ref": "#/$defs/PinnedArtifact"
+            },
+            "mode": {
+              "type": "string",
+              "const": "pinned"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "artifact"
+          ]
+        }
+      ]
+    },
+    "PinnedArtifact": {
+      "description": "One exact, already-built artifact.\n\nCarries only a digest. The CID, encryption mode and artifact kind are all\nresolved server-side and recorded as evidence — authoring them would be\nthree more facts that can disagree with the artifact they describe.",
+      "type": "object",
+      "properties": {
+        "digest": {
+          "$ref": "#/$defs/Sha256Digest"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "digest"
+      ]
+    },
+    "Sha256Digest": {
+      "description": "A SHA-256 digest in `sha256:<64 lowercase hex>` form.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "Runtime": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "engine": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/JavascriptEngine"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "nodejs"
+            },
+            "entrypoint": {
+              "$ref": "#/$defs/JavascriptEntrypoint"
+            },
+            "kind": {
+              "type": "string",
+              "const": "javascript"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "entrypoint"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "image": {
+              "$ref": "#/$defs/RuntimeImage"
+            },
+            "entrypoint": {
+              "$ref": "#/$defs/NativeEntrypoint"
+            },
+            "kind": {
+              "type": "string",
+              "const": "native_image"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "image",
+            "entrypoint"
+          ]
+        },
+        {
+          "description": "The image is a generic catalogue environment; release selects the\napplication bytes. Catalogue/ABI compatibility needs resolved evidence.\nLISKOV_WORKLOAD_DATA_DIR is supplied by the helper; authored variable\nand secret destinations cannot override it in this arm.",
+          "type": "object",
+          "properties": {
+            "image": {
+              "$ref": "#/$defs/RuntimeImage"
+            },
+            "entrypoint": {
+              "$ref": "#/$defs/PayloadEntrypoint"
+            },
+            "kind": {
+              "type": "string",
+              "const": "native_payload"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "image",
+            "entrypoint"
+          ]
+        }
+      ]
+    },
+    "JavascriptEngine": {
+      "description": "The JavaScript engine. One member today; a union so adding one later is\nadditive rather than a re-typing.",
+      "type": "string",
+      "enum": [
+        "nodejs"
+      ]
+    },
+    "JavascriptEntrypoint": {
+      "description": "The bundle entrypoint.",
+      "type": "object",
+      "properties": {
+        "file": {
+          "description": "Relative to the **immutable artifact root**, not to the repository. The\nartifact is what the processor receives; the repository is not.",
+          "$ref": "#/$defs/ArtifactRelativePath"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "file"
+      ]
+    },
+    "ArtifactRelativePath": {
+      "description": "A path inside the immutable artifact, relative to the artifact root.\n\nKept out of [`pattern_scalar`] because its schema pattern uses lookahead to\nforbid a leading `/` and any `..` segment, and the `regex` crate\ndeliberately does not implement lookahead. The containment rule is therefore\nchecked structurally here while the schema keeps the ECMA pattern — so the\ntwo are equivalent but not literally shared, which\n`artifact_relative_path_agrees_with_its_schema_pattern` pins by testing both\nagainst the same corpus.\n\nRelative to the **artifact root**, never to the repository: the artifact is\nwhat the processor receives.",
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$"
+    },
+    "RuntimeImage": {
+      "description": "The curated environment a `native_image` application runs in.\n\nDistinct from `release`, which is the application's own code. Pinning the\nartifact does not pin the image, and vice versa.",
+      "type": "object",
+      "properties": {
+        "catalog": {
+          "description": "Which catalogue the image comes from. Validated server-side against\ncatalogue membership, failing closed on an unknown name — not against a\nclosed list in the schema (ADR-0057 §5, generalised 2026-08-12).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ImageName"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "liskov-runtime-images"
+        },
+        "name": {
+          "$ref": "#/$defs/ImageName"
+        },
+        "version": {
+          "description": "A version **floor**, resolved to an exact digest at publication and\nrecorded in effective policy. Authors name a floor rather than a digest\nso that a security rebuild of the same version is not frozen out.",
+          "$ref": "#/$defs/ImageVersion"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version"
+      ]
+    },
+    "ImageName": {
+      "description": "A curated runtime-image catalogue or image name.\n\nDeliberately a pattern rather than a closed enum. ADR-0057's 2026-08-12\namendment settles this for curated images: a versioned vocabulary whose\nmembers are not knowable when the schema\nfreezes is validated **server-side against the published catalogue,\nfailing closed** on an unknown name. A closed enum would make every new\nimage a schema revision.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+    },
+    "ImageVersion": {
+      "description": "A curated-image version **floor**, resolved to an exact digest at\npublication and recorded in the effective policy.\n\nAuthors name a floor rather than a digest deliberately (finding #2): a\nraw digest is a mechanism choice where the platform has the better\nanswer, and it freezes out security rebuilds of the same version.",
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+){0,2}$"
+    },
+    "NativeEntrypoint": {
+      "description": "An absolute executable and its argument vector, inside the image.\n\n**No shell string is reparsed anywhere, and there is no inline program\nbody.** An inline body would be a second build and source channel that\nbypasses the artifact's digest, provenance and immutability. Shell logic is\na file in the repository, built into the artifact, and invoked as\n`/bin/sh /app/start.sh`.",
+      "type": "object",
+      "properties": {
+        "executable": {
+          "$ref": "#/$defs/AbsolutePath"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "executable"
+      ]
+    },
+    "AbsolutePath": {
+      "description": "An absolute in-job path — a secret file destination, an image\nentrypoint executable, or a state volume mount point.\n\nThe NUL exclusion is spelled `\\x00` rather than the draft schema's\n`\\0`. The two are the same character class in ECMA regex, but `\\0` is a\n**backreference** to the `regex` crate, which rejects it outright — so\nthe draft's spelling cannot be the runtime check. Choosing the spelling\nboth engines read identically is what keeps this module's one-pattern-\ntwo-consumers property intact; the alternative was two patterns that\ncould drift.",
+      "type": "string",
+      "pattern": "^/[^\\x00]{1,255}$"
+    },
+    "PayloadEntrypoint": {
+      "description": "Executed directly, without shell reparsing, relative to verified payload bytes.",
+      "type": "object",
+      "properties": {
+        "file": {
+          "$ref": "#/$defs/ArtifactRelativePath"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "file"
+      ]
+    },
+    "Execution": {
+      "description": "How the author wants the application to run.",
+      "oneOf": [
+        {
+          "description": "Run exactly one occurrence.\n\nReaching a terminal posture is the expected outcome, not a failure.\nRunning again requires an explicit, audited re-arm — a distinct \"Run\nagain\", never ADR-0050's \"Retry now\", which refills the pacing bucket\nand means recovery.\n\nAn empty struct variant rather than a unit variant: `deny_unknown_fields`\ndoes not reach unit variants of an internally tagged enum, and a\nsilently ignored `maxGenerations` on a one-shot is precisely the retired\nknob this contract exists to reject.",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "once"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ]
+        },
+        {
+          "description": "Keep the application running; the platform decides placement, pacing and\npath.",
+          "type": "object",
+          "properties": {
+            "until": {
+              "description": "Optional termination bound. Absent means unbounded — the only shape\nV4 could express.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/UtcInstant"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "mode": {
+              "type": "string",
+              "const": "continuous"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ]
+        },
+        {
+          "description": "Start a fresh occurrence on a cadence.\n\nEach occurrence has its own identity and terminal state; this is not\nrenewal of one long-lived job.",
+          "type": "object",
+          "properties": {
+            "every": {
+              "$ref": "#/$defs/Duration"
+            },
+            "until": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/UtcInstant"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "mode": {
+              "type": "string",
+              "const": "interval"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "every"
+          ]
+        }
+      ]
+    },
+    "UtcInstant": {
+      "description": "An absolute UTC instant, used as an execution termination bound.\n\nExactly one spelling: `YYYY-MM-DDTHH:MM:SSZ`. Offsets other than `Z` and\nfractional seconds are rejected so that one instant has one authored form\nand therefore one digest.\n\nCalendar validity is checked, not just shape — `2026-02-30T00:00:00Z`\nmatches the pattern and is not a date.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "Duration": {
+      "description": "An authored duration: one integer and one unit.\n\nNormalizes to exact milliseconds. There is no unitless form and no `mo`\nunit — a calendar month is 28–31 days, so an authored spend rate over \"1mo\"\nwould mean different money in February than in July.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)(ms|s|m|h|d)$"
+    },
+    "Deployment": {
+      "type": "object",
+      "properties": {
+        "jobs": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JobCount"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 1
+        },
+        "schedule": {
+          "$ref": "#/$defs/Schedule"
+        },
+        "placement": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Placement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lifecycle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Lifecycle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "spend": {
+          "$ref": "#/$defs/Spend"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "schedule",
+        "spend"
+      ]
+    },
+    "JobCount": {
+      "description": "A count of Liskov jobs — total desired, per phase, or allocated to one\ndistribution value.",
+      "type": "integer",
+      "format": "uint16",
+      "minimum": 1,
+      "maximum": 256
+    },
+    "Schedule": {
+      "description": "One paid job window.\n\n`startDelayMs` and `maxStartDelayMs` are **absent**. The platform-owned\n`standard` launch-timing profile resolves a 3 m schedule lead and a 3 m\nprocessor start-within allowance, recorded per launch. Authors were setting\nlaunch runway they had no way to reason about, and it is mechanism rather\nthan intent (finding #2).",
+      "type": "object",
+      "properties": {
+        "duration": {
+          "description": "How long one paid job runs. Required on every authored schedule.",
+          "$ref": "#/$defs/Duration"
+        },
+        "phasing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Phasing"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "duration"
+      ]
+    },
+    "Phasing": {
+      "description": "When the jobs in a deployment start relative to one another.\n\n# This is the high-availability mechanism, not a load-spreading nicety\n\n`evenly_spaced` with `jobsPerPhase` is how a quorum service survives\nrenewal. With three jobs and a six-hour window it staggers renewal by two\nhours, so only one member is ever at its boundary; `simultaneous` retires\nthe whole cluster at the same instant, on a schedule.\n\nThe author expresses rolling replacement without naming a slot, an offset,\nor a millisecond — which is worth stating out loud rather than leaving as an\ninference from the words \"evenly spaced\".",
+      "oneOf": [
+        {
+          "description": "Every job starts and renews together.",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "simultaneous"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ]
+        },
+        {
+          "description": "Jobs are divided into equal phases spread across the window.\n\n`jobsPerPhase` must be in `1..=jobs` **and divide `jobs` exactly**:\nLiskov never rounds and never leaves a short final phase. That is a\ncross-field rule, enforced in [`crate::v5::validation`].",
+          "type": "object",
+          "properties": {
+            "jobsPerPhase": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/JobCount"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 1
+            },
+            "mode": {
+              "type": "string",
+              "const": "evenly_spaced"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ]
+        }
+      ]
+    },
+    "Placement": {
+      "description": "Where the application's jobs may run.\n\nCommonly omitted entirely: open market plus mandatory platform-owned\nprocessor intelligence is the default.",
+      "type": "object",
+      "properties": {
+        "minimums": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CapabilityMinimums"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "processorSelection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProcessorSelection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "CapabilityMinimums": {
+      "description": "Minimum processor capability, enforced **on chain** and fail-closed.\n\nAt least one key must be present: an empty block reads like a constraint and\nis not one. Enforced in [`crate::v5::validation`] and published as\n`minProperties`.",
+      "type": "object",
+      "properties": {
+        "memory": {
+          "description": "**Total device RAM**, not a budget this process is given.\n\nThe pool behind it is `v1_ram_total`. An author who reads this as \"how\nmuch memory my process gets\" has misunderstood it in the direction that\ncauses OOM: it selects devices that *have* this much, and says nothing\nabout how much of it is free.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ByteSize"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "storage": {
+          "description": "**Available** storage, not total.\n\nThe pool behind it is `v1_storage_avail`. The asymmetry with `memory` is\nreal and comes from the pools themselves, so it must not be smoothed\nover in documentation.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ByteSize"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cpuSingleCoreScore": {
+          "description": "Single-core benchmark score floor (pool `v1_cpu_single_core`).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MetricScore"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cpuMultiCoreScore": {
+          "description": "Multi-core benchmark score floor (pool `v1_cpu_multi_core`).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MetricScore"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "ByteSize": {
+      "description": "An authored byte quantity: one integer and one unit.\n\nBinary (`KiB`, `MiB`, `GiB`, `TiB`) and decimal (`KB`, `MB`, `GB`, `TB`)\nsuffixes are both accepted and both mean exactly what they say. Unitless\nnumbers are rejected.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)(B|KiB|MiB|GiB|TiB|KB|MB|GB|TB)$"
+    },
+    "MetricScore": {
+      "description": "A benchmark score floor for one capability pool.\n\nUnlike memory and storage, a CPU score carries no unit, so the *name*\nhas to carry the semantics. It is also optional everywhere it appears:\na score is meaningless without a published fleet distribution, and most\nworkloads are memory- or storage-bound.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "ProcessorSelection": {
+      "description": "A high-level processor source. Absent means the open market.",
+      "oneOf": [
+        {
+          "description": "An exact list of processors.",
+          "type": "object",
+          "properties": {
+            "processorIds": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ProcessorId"
+              },
+              "minItems": 1,
+              "maxItems": 64
+            },
+            "mode": {
+              "type": "string",
+              "const": "exact"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "processorIds"
+          ]
+        }
+      ]
+    },
+    "ProcessorId": {
+      "description": "A base58 Acurast processor account id.",
+      "type": "string",
+      "pattern": "^[1-9A-HJ-NP-Za-km-z]{47,48}$"
+    },
+    "Lifecycle": {
+      "type": "object",
+      "properties": {
+        "renewal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Renewal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "update": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Update"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Renewal": {
+      "description": "How far ahead of a window's end the successor is planned.\n\nValid only for `continuous` execution — renewal must not define `once` or\n`interval` cadence. Enforced in [`crate::v5::validation`].",
+      "type": "object",
+      "properties": {
+        "leadTime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RenewalLeadTime"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "RenewalLeadTime": {
+      "description": "The renewal lead.",
+      "oneOf": [
+        {
+          "description": "Liskov chooses the lead from observed launch behaviour. The default.",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "automatic"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ]
+        },
+        {
+          "description": "An exact lead the author is accountable for.",
+          "type": "object",
+          "properties": {
+            "duration": {
+              "$ref": "#/$defs/Duration"
+            },
+            "mode": {
+              "type": "string",
+              "const": "fixed"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "duration"
+          ]
+        }
+      ]
+    },
+    "Update": {
+      "type": "object",
+      "properties": {
+        "timing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UpdateTiming"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "immediate"
+        },
+        "existingJobs": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExistingJobs"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": {
+            "mode": "stop_when_successor_ready"
+          }
+        },
+        "method": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UpdateMethod"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": {
+            "mode": "replace_job"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "UpdateTiming": {
+      "description": "When a published policy version takes effect.",
+      "oneOf": [
+        {
+          "description": "Roll the change out as soon as it is published.",
+          "type": "string",
+          "const": "immediate"
+        },
+        {
+          "description": "Wait for each job's natural renewal boundary.",
+          "type": "string",
+          "const": "next_renewal"
+        }
+      ]
+    },
+    "ExistingJobs": {
+      "description": "What happens to a predecessor job during replacement.\n\n# One default, at one level\n\nThis block once stated its default **twice** — a field-level\n`run_until_scheduled_end` and an object-level `stop_when_successor_ready` —\nand they disagreed. Omitting the block gave overlap; writing\n`existingJobs: {}` gave no overlap. Same authorial intent, opposite\nbehaviour, on the one setting where the difference is data loss rather than\na preference (finding #28).\n\nThe fix was to keep exactly one default and match the convention\n`renewal.leadTime` already had. That convention is a required discriminator\nplus a default for the *absent* block, which is why [`ExistingJobs::mode`]\nhas no `serde` default of its own: omit the block and get the default,\nor write the block and say what you mean. `existingJobs: {}` is rejected\nrather than resolved, because resolving it is what produced two answers.\n\n# The residual risk is accepted, not overlooked\n\nThe failure modes are not symmetric: a wrong overlap default is\nunrecoverable corruption for an exclusive-resource application, while a\nwrong no-overlap default is a recoverable availability gap. Fail-safe\nreasoning would favour the other value.\n\nIt was considered and rejected 2026-08-12 by the product owner, on three\ngrounds: it is what the object-level default already said, 46 of 47 drafts\nomit the block and want overlap, and ADR-0050 is availability-first.\n**No cross-field rule can close the gap** — the platform cannot detect the\nexclusive-resource class, because `state.volumes` is not the signal:\n`clickhouse` declares no `state` block at all, precisely because its data\nlives in S3.",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/ExistingJobsMode"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ]
+    },
+    "ExistingJobsMode": {
+      "description": "The supported replacement outcomes.\n\nCollapsed to outcomes deliberately. V4's `rollout_started` /\n`processor_claimed` triggers exposed internal milestones and could sacrifice\navailability; they remain effective-policy and read evidence only.",
+      "oneOf": [
+        {
+          "description": "The predecessor serves out its paid window. No overlap, and a gap if the\nsuccessor is slow. Correct when two jobs must never address one\nexclusive resource.",
+          "type": "string",
+          "const": "run_until_scheduled_end"
+        },
+        {
+          "description": "The predecessor stops once the successor is ready, so the two overlap.\nThe default, and what availability-first recovery wants.",
+          "type": "string",
+          "const": "stop_when_successor_ready"
+        }
+      ]
+    },
+    "UpdateMethod": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "replace_job"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "shutdownGrace": {
+              "$ref": "#/$defs/Duration"
+            },
+            "readiness": {
+              "$ref": "#/$defs/Readiness"
+            },
+            "onActivationFailure": {
+              "$ref": "#/$defs/ActivationFailure"
+            },
+            "mode": {
+              "type": "string",
+              "const": "supervised_payload"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "shutdownGrace",
+            "readiness",
+            "onActivationFailure"
+          ]
+        }
+      ]
+    },
+    "Readiness": {
+      "description": "A probe from the same immutable payload, with its own bounded execution.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "file": {
+              "$ref": "#/$defs/ArtifactRelativePath"
+            },
+            "args": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 64
+            },
+            "timeout": {
+              "$ref": "#/$defs/Duration"
+            },
+            "maxWait": {
+              "$ref": "#/$defs/Duration"
+            },
+            "mode": {
+              "type": "string",
+              "const": "exec"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "file",
+            "timeout",
+            "maxWait"
+          ]
+        }
+      ]
+    },
+    "ActivationFailure": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "stop"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "stateCompatibility": {
+              "$ref": "#/$defs/StateCompatibility"
+            },
+            "mode": {
+              "type": "string",
+              "const": "rollback"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "stateCompatibility"
+          ]
+        }
+      ]
+    },
+    "StateCompatibility": {
+      "description": "A declaration, never inferred database rollback or an execution guarantee.",
+      "type": "string",
+      "enum": [
+        "backward_compatible"
+      ]
+    },
+    "Spend": {
+      "description": "Authored spend authority.",
+      "type": "object",
+      "properties": {
+        "unit": {
+          "$ref": "#/$defs/ChainSpendUnit"
+        },
+        "perJob": {
+          "description": "The cap on one delivered occurrence, including every failed attempt and\ncustody-specific register, environment, closeout, and deregistration\nexposure linked to it.\n\nThe platform's fee reservation comes out of this amount and the rest\nbecomes the reward ceiling, so it is total exposure rather than a reward\nbudget with a fee bolted on. V4 called it\n`maxServiceCreditMicrosPerGeneration`; renamed because authors should\nnot have to understand generations.",
+          "$ref": "#/$defs/Micros"
+        },
+        "rate": {
+          "description": "The lifetime ceiling, expressed as a rate.\n\nRequired when execution is recurring — enforced in\n[`crate::v5::validation`], using the frozen\n[`crate::ExecutionIntent::is_recurring`] predicate rather than a second\nopinion about what recurring means.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SpendRate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "perJob"
+      ]
+    },
+    "ChainSpendUnit": {
+      "description": "The denomination a cap is expressed in.\n\nDiscriminates *which custody path pays*, and therefore drives control-plane\nbehaviour rather than merely describing it. Thin V5 has one custody path:\nADR-0082 §3.a defers self-custody ACU spend, which needs a customer signer on\nthe live chain — an independent product program. The unit stays a named enum\nrather than collapsing into the surrounding struct precisely because the\ndeferral is about *which wallet pays*, and a later version reintroducing that\nquestion must reintroduce it here.",
+      "oneOf": [
+        {
+          "description": "Managed custody: Liskov's Service Credits pay.",
+          "type": "string",
+          "const": "service_credit_micros"
+        }
+      ]
+    },
+    "Micros": {
+      "description": "An exact integer amount of the smallest unit of account, as a decimal\nstring.\n\n**Never a JSON number.** Money does not go through a float: an IEEE 754\ndouble loses exactness above 2^53, and a spend cap that silently rounds is a\nspend cap that does not hold. The denomination is carried separately by the\nauthored spend unit — Service Credit micros under managed custody, ACU\nplanck under self-custody.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,24})$"
+    },
+    "SpendRate": {
+      "description": "An amount over a window.",
+      "type": "object",
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/Micros"
+        },
+        "window": {
+          "description": "Defaults to `30d`, matching `billing::SpendGuards::budget_window_days`.\n\nThere is no `mo` unit: a calendar month is 28–31 days, so an authored\nmonthly rate would mean different money in February than in July.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Duration"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "amount"
+      ]
+    },
+    "Access": {
+      "description": "Operator access to a running job.",
+      "type": "object",
+      "properties": {
+        "ssh": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SshAccess"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "SshAccess": {
+      "description": "SSH access and who provides it.",
+      "type": "object",
+      "properties": {
+        "provider": {
+          "$ref": "#/$defs/SshProvider"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "provider"
+      ]
+    },
+    "SshProvider": {
+      "description": "Who carries the SSH session.",
+      "oneOf": [
+        {
+          "description": "Managed blind access (ADR-0045). Liskov brokers the session without\nbeing able to read it.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "liskov_managed"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ]
+        }
+      ]
+    },
+    "Configuration": {
+      "description": "Variables and secrets for the job.",
+      "type": "object",
+      "properties": {
+        "variables": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Variable"
+          },
+          "maxItems": 64
+        },
+        "secrets": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Secret"
+          },
+          "maxItems": 64
+        }
+      },
+      "additionalProperties": false
+    },
+    "Variable": {
+      "description": "One environment variable.",
+      "oneOf": [
+        {
+          "description": "A constant, part of the authored document and its digest.",
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/EnvName"
+            },
+            "value": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string",
+              "const": "literal"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "source",
+            "name",
+            "value"
+          ]
+        },
+        {
+          "description": "A value the platform resolves out of policy at delivery time.",
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/EnvName"
+            },
+            "required": {
+              "description": "Whether the job may start without it. Absent means required.",
+              "type": [
+                "boolean",
+                "null"
+              ],
+              "default": true
+            },
+            "default": {
+              "description": "Fallback for the mutable value. Valid only here — on a literal it\nwould be a second value for one name.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source": {
+              "type": "string",
+              "const": "managed"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "source",
+            "name"
+          ]
+        }
+      ]
+    },
+    "EnvName": {
+      "description": "An environment variable name.\n\nDestinations must not collide: a name claimed by both\n`configuration.variables` and a `configuration.secrets` destination is\nrejected at authoring time rather than resolved by precedence.",
+      "type": "string",
+      "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+    },
+    "Secret": {
+      "description": "One declared secret.",
+      "type": "object",
+      "properties": {
+        "secretId": {
+          "$ref": "#/$defs/SecretId"
+        },
+        "required": {
+          "description": "Whether the job may start without it. Absent means required.",
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": true
+        },
+        "destination": {
+          "$ref": "#/$defs/SecretDestination"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "secretId",
+        "destination"
+      ]
+    },
+    "SecretId": {
+      "description": "The customer-facing identifier of one declared secret.\n\n`bundleId` is deliberately absent: it exposed Lockbox grouping\nmechanics with no customer semantics, and is derived.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,126}$"
+    },
+    "SecretDestination": {
+      "description": "Where a secret lands inside the job.",
+      "oneOf": [
+        {
+          "description": "An environment variable. Collides with a variable of the same name, and\nthat collision is rejected at authoring time rather than resolved by\nprecedence.",
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/EnvName"
+            },
+            "kind": {
+              "type": "string",
+              "const": "environment"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "name"
+          ]
+        },
+        {
+          "description": "A file. Never collides with an environment name.",
+          "type": "object",
+          "properties": {
+            "path": {
+              "$ref": "#/$defs/AbsolutePath"
+            },
+            "kind": {
+              "type": "string",
+              "const": "file"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "path"
+          ]
+        }
+      ]
+    },
+    "Observability": {
+      "description": "Managed logging.\n\nADR-0046. `logs.enabled` is the sole authored switch. `profileId`,\n`sinkName` and `context` are removed: they exposed sink mechanics with no\ncustomer semantics, and V4 already emitted deprecation diagnostics for all\nthree.\n\n`runtimeDiagnostics.signed` is derived, not authored — `false` is invalid,\nbecause signed diagnostics are a trust invariant rather than a preference,\nand a control whose only valid value is a constant is not a control.",
+      "type": "object",
+      "properties": {
+        "logs": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Logs"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Logs": {
+      "description": "The managed log stream.",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "enabled"
+      ]
+    },
+    "State": {
+      "description": "Durable-state intent. Required at the manifest root so opt-out is explicit.",
+      "oneOf": [
+        {
+          "description": "The application deliberately uses no Liskov state service.",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "off"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ]
+        }
+      ]
+    },
+    "Debug": {
+      "description": "Diagnostic behaviour, for fixtures only.",
+      "type": "object",
+      "properties": {
+        "holdOnFailure": {
+          "description": "Hold a failed job instead of recovering it, so it can be inspected.\n\nThe honest spelling of what `maxRetries: 0` was being abused for\n(ADR-0050). Naming the intent means the platform can treat it as a\ndiagnostic hold rather than as a retry budget of zero, which is what made\nthe old spelling a foot-gun: it silently disabled recovery for the\napplication's whole life.",
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$id": "https://schemas.proof.computer/liskov/application-manifest-v8.schema.json"
+}

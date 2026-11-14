@@ -40,7 +40,7 @@ test("the npm tarball loads the pinned booking contract and keeps publication ga
     const source = json(path.join(directory, "source.json")) as {
       commit: string; files: Record<string, { source: string; sha256: string }>;
     };
-    assert.equal(source.commit, "8d31d0e3c18d2e48426c63f1af5a4c5fd737d2d0");
+    assert.equal(source.commit, "0444b93c77ee0509aa9dde36b68cd0c9e37d44e9");
     for (const [file, entry] of Object.entries(source.files)) {
       const packaged = file.startsWith("test/") ? file : path.join(directory, file);
       assert.equal(digest(packaged), entry.sha256, file);
@@ -49,7 +49,7 @@ test("the npm tarball loads the pinned booking contract and keeps publication ga
       }
     }
     assert.equal(digest(path.join(directory, "policy-client-bundle.json")),
-      "sha256:9b01e404387b061d188576db27c3d540a5bc9ca53c74a1e6c303bfc725a5f03d");
+      "sha256:14a9eb8b64ccc9e2d0600f102dd3ec29f52190a49031735d63e88a2453384e23");
     const require = createRequire(import.meta.url);
     const contract = require(path.join(directory, "policy-client.cjs")).loadPolicyContract(directory) as {
       evaluate(request: Record<string, unknown>): PolicyContractEvaluation;

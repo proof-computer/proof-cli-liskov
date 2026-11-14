@@ -1,15 +1,15 @@
 {
   "repository": "https://github.com/proof-computer/liskov-rs",
-  "commit": "8d31d0e3c18d2e48426c63f1af5a4c5fd737d2d0",
-  "packet": "BKLG-20261013-mkd2",
+  "commit": "0444b93c77ee0509aa9dde36b68cd0c9e37d44e9",
+  "packet": "BKLG-20261013-buih",
   "files": {
     "policy-client-bundle.json": {
       "source": "crates/liskov-policy-client-contract/bundle/policy-client-bundle.json",
-      "sha256": "sha256:9b01e404387b061d188576db27c3d540a5bc9ca53c74a1e6c303bfc725a5f03d"
+      "sha256": "sha256:14a9eb8b64ccc9e2d0600f102dd3ec29f52190a49031735d63e88a2453384e23"
     },
     "policy-client-contract.wasm.gz": {
       "source": "crates/liskov-policy-client-contract/bundle/policy-client-contract.wasm.gz",
-      "sha256": "sha256:2e9a35ff45dd4cde31aa613fc84e7b311933e61a63834987fc0c504f63fd13c3"
+      "sha256": "sha256:1877eea89d9ce8a064b61294a9947dd1adf15b28b97f9ac95fa3711cef2461c5"
     },
     "policy-client.cjs": {
       "source": "crates/liskov-policy-client-contract/bundle/policy-client.cjs",
@@ -30,6 +30,38 @@
     "test/fixtures/booking-v6/materialization-digest-goldens.json": {
       "source": "crates/liskov-application-policy/fixtures/v6/materialization-digest-goldens.json",
       "sha256": "sha256:c0d8b6fdaced73c19088e512a29b022e2cd245d41522a0f9517e854cc1702c12"
+    },
+    "test/fixtures/payload-v8/payload-replace.json": {
+      "source": "crates/liskov-application-policy/fixtures/v8/payload-replace.json",
+      "sha256": "sha256:0e269b3aafba5a65cbbcfa52dbf9b201d5353daa472396d5ca2a60b1a07c5887"
+    },
+    "test/fixtures/payload-v8/payload-supervised-rollback.json": {
+      "source": "crates/liskov-application-policy/fixtures/v8/payload-supervised-rollback.json",
+      "sha256": "sha256:fa89daab8c1ca919e38712102c8cbe56ef6bef81d916c72db7636bde036de6ef"
+    },
+    "test/fixtures/payload-v8/payload-supervised-stop.json": {
+      "source": "crates/liskov-application-policy/fixtures/v8/payload-supervised-stop.json",
+      "sha256": "sha256:db35a699a901e009e5b962f1c42dab34832fd8f886cf07d700b05f37e2c80a47"
+    },
+    "test/fixtures/payload-v8/invalid-cases.json": {
+      "source": "crates/liskov-application-policy/fixtures/v8/invalid-cases.json",
+      "sha256": "sha256:17f9c563ca23e9770d3bc449ff862e81dba4f6772db0b6a3e698b45a262378d9"
+    },
+    "test/fixtures/payload-v8/v8-digests.json": {
+      "source": "crates/liskov-application-policy/fixtures/v8/v8-digests.json",
+      "sha256": "sha256:45e25c9858b4909b87968355fe28cf949cf95c2875eb26fe9f2086aa788cc3e2"
+    },
+    "test/fixtures/payload-v8/materialization-digest-goldens.json": {
+      "source": "crates/liskov-application-policy/releases/v8/materialization-digest-goldens.json",
+      "sha256": "sha256:234613180dd391766dcaba4674b70fb5b7b017eb906cdcee7446e5cc820a25f2"
+    },
+    "test/fixtures/payload-v8/authored-schema.json": {
+      "source": "crates/liskov-application-policy/releases/v8/authored-schema.json",
+      "sha256": "sha256:c2805b0b8fb6baad885f16f20d208eb7aeab14386ffbf463353ea930600e4b25"
+    },
+    "test/fixtures/payload-v8/effective-schema.json": {
+      "source": "crates/liskov-application-policy/releases/v8/effective-schema.json",
+      "sha256": "sha256:eb54d0fa3659de68be484f0ca6e12948aebf5d283fde85ec681e50f71c2a7968"
     }
   }
 }

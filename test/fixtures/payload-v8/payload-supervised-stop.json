@@ -1,0 +1,65 @@
+{
+  "schema": "proof.liskov.application-manifest",
+  "schemaVersion": 8,
+  "applicationId": "cargo-payload",
+  "release": {
+    "mode": "pinned",
+    "artifact": {
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "runtime": {
+    "kind": "native_payload",
+    "image": {
+      "name": "generic-cargo",
+      "version": "1.0"
+    },
+    "entrypoint": {
+      "file": "bin/app",
+      "args": [
+        "--serve",
+        ""
+      ]
+    }
+  },
+  "execution": {
+    "mode": "continuous"
+  },
+  "deployment": {
+    "schedule": {
+      "duration": "30m"
+    },
+    "lifecycle": {
+      "update": {
+        "timing": "next_renewal",
+        "method": {
+          "mode": "supervised_payload",
+          "shutdownGrace": "5s",
+          "readiness": {
+            "mode": "exec",
+            "file": "bin/readiness",
+            "args": [
+              "--check"
+            ],
+            "timeout": "2s",
+            "maxWait": "20s"
+          },
+          "onActivationFailure": {
+            "mode": "stop"
+          }
+        }
+      }
+    },
+    "spend": {
+      "unit": "service_credit_micros",
+      "perJob": "1000000",
+      "rate": {
+        "amount": "5000000",
+        "window": "1h"
+      }
+    }
+  },
+  "state": {
+    "mode": "off"
+  }
+}

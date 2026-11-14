@@ -1,6 +1,6 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 
-import { Command, Flags, type Interfaces } from "@oclif/core";
+import { Flags, type Interfaces } from "@oclif/core";
 import { AnalyticsCommand } from "../../../../analytics-command.js";
 
 import {
@@ -9,17 +9,18 @@ import {
 } from "../../../../application-policy.js";
 
 export default class LiskovApplicationManifestValidate extends AnalyticsCommand {
-  static description = "Strictly validate an authored Application manifest v4 or retained V5 file without publishing it.";
+  static description = "Strictly validate a registered authored Application manifest, including dark V8, without publishing it.";
   static examples = [
     "<%= config.bin %> liskov application manifest validate --file .liskov/application-manifest.json",
     "<%= config.bin %> liskov application manifest validate --file manifest.json --json"
   ];
   static flags: Interfaces.FlagInput = {
+    export: Flags.string({ description: "Write the contract-validated authored JSON to a new file; refuses overwrite." }),
     file: Flags.string({ char: "f", description: "Application manifest JSON file.", required: true }),
     help: Flags.help({ char: "h" }),
     json: Flags.boolean({ description: "Emit machine-readable JSON." })
   };
-  static summary = "Validate an authored Application manifest v4 or retained V5.";
+  static summary = "Validate an authored Application manifest offline.";
 
   async run(): Promise<void> {
     const { flags } = await this.parse(LiskovApplicationManifestValidate);
@@ -37,6 +38,15 @@ export default class LiskovApplicationManifestValidate extends AnalyticsCommand 
     const capabilityDiagnostics = evaluation.capabilityDiagnostics;
     const deprecationDiagnostics = evaluation.deprecationDiagnostics;
     const manifestValid = evaluation.valid;
+    if (flags.export !== undefined && manifestValid) {
+      try {
+        await writeFile(flags.export as string, `${JSON.stringify(evaluation.document, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+      } catch {
+        if (flags.json) this.log(JSON.stringify({ ok: false, error: "manifest_export_failed" }));
+        else this.log("Unable to export manifest; choose a writable path to a new file.");
+        this.exit(1);
+      }
+    }
     const result = {
       ok: manifestValid,
       manifestValid,
@@ -47,7 +57,7 @@ export default class LiskovApplicationManifestValidate extends AnalyticsCommand 
             releaseIntentDigest: evaluation.releaseIntentDigest
           }
         : {}),
-      firstPublicReady: manifestValid && capabilityDiagnostics.length === 0,
+      firstPublicReady: manifestValid && schemaVersion !== 8 && capabilityDiagnostics.length === 0,
       errors,
       capabilityDiagnostics,
       deprecationDiagnostics
@@ -71,6 +81,6 @@ export default class LiskovApplicationManifestValidate extends AnalyticsCommand 
     else {
       for (const error of errors) this.log(`${error.code} ${error.pointer || "/"}: ${error.message}`);
     }
-    if (errors.length > 0) this.exit(1);
+    if (!manifestValid) this.exit(1);
   }
 }

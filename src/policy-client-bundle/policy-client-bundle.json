@@ -3,8 +3,8 @@
   "abiVersion": 1,
   "artifact": {
     "file": "policy-client-contract.wasm.gz",
-    "sha256": "sha256:2e9a35ff45dd4cde31aa613fc84e7b311933e61a63834987fc0c504f63fd13c3",
-    "uncompressedSha256": "sha256:cf0a4d785bc7767847a57a40c7f48af05dbe82565484ff404922b417f1a99efb"
+    "sha256": "sha256:1877eea89d9ce8a064b61294a9947dd1adf15b28b97f9ac95fa3711cef2461c5",
+    "uncompressedSha256": "sha256:22c945697618fbaa3761c98c9d1c68b4f7610f799ca37bfba75911f9d498c2a7"
   },
   "adapter": {
     "file": "policy-client.cjs",
@@ -251,6 +251,6 @@
       ]
     }
   ],
-  "sourceDigest": "sha256:d88e0575cb55f11c790550d59173713b1af094582bebba31db13dbdd312259f3",
+  "sourceDigest": "sha256:2fe32caf9694cbce7178a1864e022670671c21e71e07691db897ed5336ea7574",
   "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)"
 }
