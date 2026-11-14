@@ -97,3 +97,50 @@ export function parseIpfsHash(body: unknown): string | undefined {
   const hash = (body as { IpfsHash?: unknown }).IpfsHash;
   return typeof hash === "string" && CID_V0.test(hash) ? hash : undefined;
 }
+
+export interface NativePayloadIdentity {
+  artifactVersionId: string;
+  artifactDigest: string;
+  descriptorDigest: string;
+  byteSize: number;
+  ready: boolean;
+}
+
+export interface PrivatePayloadUploadPlan {
+  url: string;
+  method: "PUT";
+  headers: Record<string, string>;
+}
+
+export function nativePayloadIdentity(value: unknown, expected: ArtifactFileHash): NativePayloadIdentity | undefined {
+  if (value === null || typeof value !== "object") return undefined;
+  const v = value as Record<string, unknown>;
+  if (typeof v.artifactVersionId !== "string" || !/^[A-Za-z0-9_-]{1,256}$/u.test(v.artifactVersionId)
+    || v.artifactDigest !== `sha256:${expected.sha256Hex}`
+    || typeof v.descriptorDigest !== "string" || !/^sha256:[a-f0-9]{64}$/u.test(v.descriptorDigest)
+    || v.byteSize !== expected.byteSize || typeof v.ready !== "boolean") return undefined;
+  return {
+    artifactVersionId: v.artifactVersionId, artifactDigest: v.artifactDigest,
+    descriptorDigest: v.descriptorDigest, byteSize: v.byteSize, ready: v.ready
+  };
+}
+
+/** Consume the owner's signed PUT as issued, without a session bearer or redirects. */
+export function privatePayloadUploadPlan(value: unknown, expected: ArtifactFileHash): PrivatePayloadUploadPlan | undefined {
+  if (value === null || typeof value !== "object") return undefined;
+  const v = value as Record<string, unknown>;
+  if (v.method !== "PUT" || typeof v.url !== "string" || v.headers === null || typeof v.headers !== "object" || Array.isArray(v.headers)) return undefined;
+  try {
+    const url = new URL(v.url);
+    if (url.protocol !== "https:" || url.username !== "" || url.password !== "" || url.hash !== "") return undefined;
+    const headers = v.headers as Record<string, unknown>;
+    if (Object.values(headers).some((entry) => typeof entry !== "string")) return undefined;
+    const normalized = new Headers(headers as Record<string, string>);
+    if (normalized.get("content-length") !== String(expected.byteSize)
+      || normalized.get("x-amz-checksum-sha256") !== Buffer.from(expected.sha256Hex, "hex").toString("base64")
+      || normalized.get("if-none-match") !== "*") return undefined;
+    return { url: v.url, method: "PUT", headers: headers as Record<string, string> };
+  } catch {
+    return undefined;
+  }
+}

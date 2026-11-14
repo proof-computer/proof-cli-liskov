@@ -408,3 +408,43 @@ with Apache-2.0 as the future licence (SPDX `FSL-1.1-Apache-2.0`). Each
 version becomes available under Apache-2.0 two years after it is released.
 Releases tagged before this licence was added keep the terms they were
 published under. See [`LICENSE`](LICENSE) for the full text.
+
+## Native Cargo payloads and dark V8 authoring
+
+The source candidate adds an unencrypted native payload upload through the member
+session, with no GitHub account or repository required:
+
+```sh
+proof liskov application artifact upload cargo-app --kind native_payload --file payload.tar.gz --descriptor payload.json --organization org-123 --json
+proof liskov application manifest validate --file cargo-v8.json --export validated-v8.json --json
+```
+
+`payload.json` is the separate `liskov.cargo-payload.v1` companion descriptor
+produced alongside the prebuilt tar.gz. It binds the archive SHA-256 and byte
+length, target ABI, sorted inventory and executable entrypoints. Its producer
+must be `member` with the signed-in member's canonical id as `subject`; local
+`sourceRevision` and `buildId` describe the actual build. The server verifies
+inventory, provenance, ABI and archive contents. The CLI does not build, encrypt,
+or select a storage bucket or download URL. `--manifest` applies to ZIP bundles;
+native uploads use `--descriptor` instead. Session/config and organization
+selection follow the existing upload command's precedence.
+
+The server issues a private write-once PUT plan. Only its headers go to storage;
+the member session stays on Liskov requests. Signed URLs, headers and provider
+responses are excluded from output. Finalize must confirm the exact digest,
+size and descriptor identity before `Artifact ready` is reported. Re-run the same
+command after a lost upload/finalize response. An existing object is verified
+again; incomplete bytes never become ready. A partial immutable object can
+require the upload lease to expire before the server issues a fresh attempt.
+
+V8 manifests validate and export through the pinned owner WASM contract, including
+`runtime.kind: native_payload`, artifact-relative entrypoint/args and the explicit
+supervised update/readiness/rollback fields. Export creates a new file and refuses
+overwrite. Unknown fields/capabilities and incompatible update settings refuse.
+V8 remains dark: `firstPublicReady` is false and policy publication refuses with
+`v8_production_registration_not_activated`. Existing V5/V6/V7 behavior is retained.
+
+Artifact readiness is separate from policy publication and running code. This
+candidate provides no encryption, npm release, public availability or production
+runtime proof. Those require the person-owned package, canary, documentation and
+promotion handoffs for EPIC-20261013-otop.

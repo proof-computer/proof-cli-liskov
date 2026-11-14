@@ -1,0 +1,329 @@
+{
+  "schema": "proof.liskov.policy-v8-materialization-goldens.v1",
+  "resolverFixture": {
+    "applicationUid": "app_0123456789abcdef",
+    "sourceCommit": "0123456789abcdef",
+    "configurationRevision": 1,
+    "revocationEpoch": 0
+  },
+  "count": 3,
+  "applications": [
+    {
+      "name": "payload-replace",
+      "authoredDigest": "59b3db808cf32fac5e4cbfe97b3246b88f0a76e7240e5fcd5874490cf46c739c",
+      "releaseIntentDigest": "06614256cebad2da3f374460900d59b699d6aa8f1e5127ef5e358f6b6e22b624",
+      "effectiveDigest": "eaa9c00859d9a1a479e2c7393d9ae7cb2b5f7890457452930cf9993b08279751",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 8,
+        "applicationId": "cargo-payload",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/payload-replace",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "native_payload",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "descriptorDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "runtime": {
+          "kind": "native_payload",
+          "catalog": "liskov-runtime-images",
+          "name": "generic-cargo",
+          "version": "1.0",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "helperDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "bootstrapDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "bootstrapCid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+          "entrypoint": {
+            "file": "bin/app",
+            "args": [
+              "--serve",
+              ""
+            ]
+          }
+        },
+        "execution": {
+          "mode": "continuous"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 1800000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready",
+            "updateMethod": {
+              "mode": "replace_job"
+            }
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "1000000",
+            "rate": {
+              "amount": "5000000",
+              "windowMs": 3600000
+            }
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "refused_internal_rehearsal",
+      "refusals": [
+        {
+          "code": "v8_production_registration_not_activated",
+          "pointer": "/schemaVersion"
+        }
+      ]
+    },
+    {
+      "name": "payload-supervised-rollback",
+      "authoredDigest": "ab15b0bd5027d1e8464e96a7e7cab4a62a9d8d471acf1b855b468d9d32c06393",
+      "releaseIntentDigest": "06614256cebad2da3f374460900d59b699d6aa8f1e5127ef5e358f6b6e22b624",
+      "effectiveDigest": "b2ea53e38b2107414ea74982432a4c1dd224334f1b1e82b8b5e563d129dc514c",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 8,
+        "applicationId": "cargo-payload",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "source",
+          "binding": {
+            "organizationId": "org_fixture",
+            "applicationUid": "app_0123456789abcdef",
+            "revision": 1,
+            "repository": "proof-computer/payload-supervised-rollback",
+            "allowedRefs": [
+              "refs/heads/main"
+            ],
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "manifestPath": "liskov.draft.yaml",
+            "revocationEpoch": 0
+          },
+          "sourceCommit": "0123456789abcdef",
+          "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+          "artifactDigests": [
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "artifact": {
+          "kind": "native_payload",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "descriptorDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "runtime": {
+          "kind": "native_payload",
+          "catalog": "liskov-runtime-images",
+          "name": "generic-cargo",
+          "version": "1.0",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "helperDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "bootstrapDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "bootstrapCid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+          "entrypoint": {
+            "file": "bin/app",
+            "args": [
+              "--serve",
+              ""
+            ]
+          }
+        },
+        "execution": {
+          "mode": "continuous"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 1800000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "immediate",
+            "existingJobs": "stop_when_successor_ready",
+            "updateMethod": {
+              "mode": "supervised_payload",
+              "shutdownGraceMs": 5000,
+              "readiness": {
+                "mode": "exec",
+                "file": "bin/readiness",
+                "args": [
+                  "--check"
+                ],
+                "timeoutMs": 2000,
+                "maxWaitMs": 20000
+              },
+              "onActivationFailure": {
+                "mode": "rollback",
+                "stateCompatibility": "backward_compatible"
+              }
+            }
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "1000000",
+            "rate": {
+              "amount": "5000000",
+              "windowMs": 3600000
+            }
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "refused_internal_rehearsal",
+      "refusals": [
+        {
+          "code": "v8_production_registration_not_activated",
+          "pointer": "/schemaVersion"
+        }
+      ]
+    },
+    {
+      "name": "payload-supervised-stop",
+      "authoredDigest": "4e561e64d6533bd8332338eab3d6b5ce5e173c3ece8606bd5f80396726f8d04b",
+      "releaseIntentDigest": "986201e6e2fba2bf229e9502c6c4f898f4d23c7b012679789eb1805878cbb4ae",
+      "effectiveDigest": "56f93ce8e243385ff25907edb47c8973c399cd4cf71f9d6030423004f9343850",
+      "effective": {
+        "schema": "proof.liskov.application-policy",
+        "schemaVersion": 8,
+        "applicationId": "cargo-payload",
+        "applicationUid": "app_0123456789abcdef",
+        "release": {
+          "mode": "pinned",
+          "authoredArtifactDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "artifact": {
+          "kind": "native_payload",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "descriptorDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "runtime": {
+          "kind": "native_payload",
+          "catalog": "liskov-runtime-images",
+          "name": "generic-cargo",
+          "version": "1.0",
+          "imageDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "helperDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "bootstrapDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "bootstrapCid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+          "entrypoint": {
+            "file": "bin/app",
+            "args": [
+              "--serve",
+              ""
+            ]
+          }
+        },
+        "execution": {
+          "mode": "continuous"
+        },
+        "deployment": {
+          "jobs": 1,
+          "durationMs": 1800000,
+          "phasing": {
+            "mode": "simultaneous",
+            "jobsPerPhase": 1
+          },
+          "lifecycle": {
+            "renewalLead": {
+              "mode": "automatic"
+            },
+            "updateTiming": "next_renewal",
+            "existingJobs": "stop_when_successor_ready",
+            "updateMethod": {
+              "mode": "supervised_payload",
+              "shutdownGraceMs": 5000,
+              "readiness": {
+                "mode": "exec",
+                "file": "bin/readiness",
+                "args": [
+                  "--check"
+                ],
+                "timeoutMs": 2000,
+                "maxWaitMs": 20000
+              },
+              "onActivationFailure": {
+                "mode": "stop"
+              }
+            }
+          },
+          "spend": {
+            "unit": "service_credit_micros",
+            "perJob": "1000000",
+            "rate": {
+              "amount": "5000000",
+              "windowMs": 3600000
+            }
+          }
+        },
+        "state": {
+          "mode": "off"
+        },
+        "holdOnFailure": false
+      },
+      "policyDiagnostics": [
+        {
+          "severity": "info",
+          "code": "successor_overlap_default_applied",
+          "message": "existing jobs default to stop_when_successor_ready",
+          "pointer": "/deployment/lifecycle/update/existingJobs"
+        }
+      ],
+      "corpusVerdict": "refused_internal_rehearsal",
+      "refusals": [
+        {
+          "code": "v8_production_registration_not_activated",
+          "pointer": "/schemaVersion"
+        }
+      ]
+    }
+  ]
+}
