@@ -2601,7 +2601,7 @@
   "booking": {
     "just-in-time": {
       "authoredDigest": "8c9501daf8135c3ac3925049344454baf7f126b4a092bce1382d8275ed9691d2",
-      "releaseIntentDigest": "79bd918dbd500747a2fb30ccd66bd4aa1e218e1fd499ea43eab27ee5d9772c79",
+      "releaseIntentDigest": "ed93cbe9b4db66bbabe7ac73aefed52bab2308c6199ee9c222798849080b3172",
       "effectiveDigest": "77703033d34bed04fb952a581678bf19ae14ba11d26b65be0280bdee635823bd",
       "effective": {
         "schema": "proof.liskov.application-policy",
@@ -2693,7 +2693,7 @@
     },
     "ahead-one-hour": {
       "authoredDigest": "d107875a5b564be08bafe85c2a47a256c6b63e6ddee6d9fe584bda664742aa61",
-      "releaseIntentDigest": "d7eb29f2177898c34369125ccfd7ecf4c25b9e07698abc6fc3213b0bd474c8b9",
+      "releaseIntentDigest": "ed93cbe9b4db66bbabe7ac73aefed52bab2308c6199ee9c222798849080b3172",
       "effectiveDigest": "e5a2076b388da6804ac98905d935c1ff49ea2ab7d00f7796c4805ebacd2be2c4",
       "effective": {
         "schema": "proof.liskov.application-policy",
@@ -2786,7 +2786,7 @@
     },
     "ahead-six-hours": {
       "authoredDigest": "29bf949a3f97a3503b2507d0ef2a67f900ebbeb4df17a88bb378567f57de000f",
-      "releaseIntentDigest": "cd23acfbf83587669d84efcbf6da0408ba27b42d0566779b6c3f196a8286680b",
+      "releaseIntentDigest": "ed93cbe9b4db66bbabe7ac73aefed52bab2308c6199ee9c222798849080b3172",
       "effectiveDigest": "8cb8a146531277b356d7eef4ab22a3c6437e2e985457420af90a80be588186be",
       "effective": {
         "schema": "proof.liskov.application-policy",
@@ -2879,7 +2879,7 @@
     },
     "ahead-twenty-three-hours": {
       "authoredDigest": "c4fda12277069d9f4f1f6e5df699e49a79ef1e40c771b69d56ebb2654f55b235",
-      "releaseIntentDigest": "52fc357bbcc43ead96d10510c4ab28cbc83350df8985439fa90c9d1dcf26a24c",
+      "releaseIntentDigest": "ed93cbe9b4db66bbabe7ac73aefed52bab2308c6199ee9c222798849080b3172",
       "effectiveDigest": "5d5d6a7c22d2401251566281d1cfae09c4b096c3fa3cee094db9263514832086",
       "effective": {
         "schema": "proof.liskov.application-policy",
