@@ -5,7 +5,9 @@ import { describe, it } from "node:test";
 
 import {
   evaluateApplicationManifestText,
-  isRegisteredSourcePublicationPair
+  isRegisteredPublicationPair,
+  isRegisteredSourcePublicationPair,
+  setPolicyContractForTesting
 } from "../src/application-policy.js";
 
 // Base documents and refusal expectations come from the owner's corpus;
@@ -192,6 +194,27 @@ describe("V6 application-manifest validation through the vendored contract", () 
     assert.equal(result.valid, true);
     assert.equal(result.pair?.schemaVersion, 5);
     assert.equal(isRegisteredSourcePublicationPair(result), true);
+  });
+
+  it("registers V6 for publication when the owner contract registers its pair", () => {
+    const sample = corpusCase("v6/fetch");
+    const result = evaluate(sample);
+    assert.equal(result.disposition, "supported");
+    assert.equal(result.valid, true);
+    assert.ok(result.pair);
+    setPolicyContractForTesting({
+      manifest: { publicationPairs: [{ ...result.pair, releaseMode: "source" }] },
+      evaluate: () => result
+    });
+    try {
+      const registered = evaluate(sample);
+      assert.equal(isRegisteredPublicationPair(registered), true);
+      assert.equal(isRegisteredSourcePublicationPair(registered), true);
+    } finally {
+      setPolicyContractForTesting(undefined);
+    }
+    assert.equal(isRegisteredPublicationPair(evaluate(sample)), false);
+    assert.equal(isRegisteredSourcePublicationPair(evaluate(sample)), false);
   });
 
   // Producer 13f039d41 prepares V8 and owns this V9 unknown-pair vector.

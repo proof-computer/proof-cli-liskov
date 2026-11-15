@@ -4989,6 +4989,545 @@
       }
     },
     {
+      "name": "v6/materialize/booking/just-in-time",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-telegram-bot`.\n##\n## Upstream declares maxExecutionTimeInMs of 3,600,000,000 \u2014 roughly 1,000\n## hours. That is not a one-shot; it is a service with the timeout set to\n## \"forever\" because Acurast has no other way to say it (finding #6).\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: telegram-bot\n\nmetadata:\n  description: Run a Telegram bot that responds to messages.\n  labels: [liskov, example, javascript, service]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: continuous\n\ndeployment:\n  booking: {\"mode\": \"just_in_time\"}\n  schedule:\n    duration: 1h\n  spend:\n    unit: service_credit_micros\n    perJob: \"600000\"\n    rate:\n      amount: \"15000000\"\n      window: 1d\n\nconfiguration:\n  secrets:\n    # The bot token rides the ADR-0014 Lockbox path, which works today.\n    - secretId: telegram-bot-token\n      required: true\n      destination:\n        kind: environment\n        name: TELEGRAM_BOT_TOKEN\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "ipfs_bundle",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/booking",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "8c9501daf8135c3ac3925049344454baf7f126b4a092bce1382d8275ed9691d2",
+        "releaseIntentDigest": "ed93cbe9b4db66bbabe7ac73aefed52bab2308c6199ee9c222798849080b3172",
+        "policyDigest": "77703033d34bed04fb952a581678bf19ae14ba11d26b65be0280bdee635823bd",
+        "effective": {
+          "schema": "proof.liskov.application-policy",
+          "schemaVersion": 6,
+          "applicationId": "telegram-bot",
+          "applicationUid": "app_0123456789abcdef",
+          "release": {
+            "mode": "source",
+            "binding": {
+              "organizationId": "org_fixture",
+              "applicationUid": "app_0123456789abcdef",
+              "revision": 1,
+              "repository": "proof-computer/booking",
+              "allowedRefs": [
+                "refs/heads/main"
+              ],
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "manifestPath": "liskov.draft.yaml",
+              "revocationEpoch": 0
+            },
+            "sourceCommit": "0123456789abcdef",
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "artifactDigests": [
+              "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ]
+          },
+          "artifact": {
+            "kind": "ipfs_bundle",
+            "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+          },
+          "runtime": {
+            "kind": "javascript",
+            "engine": "nodejs",
+            "entrypointFile": "bundle.js"
+          },
+          "execution": {
+            "mode": "continuous"
+          },
+          "deployment": {
+            "jobs": 1,
+            "durationMs": 3600000,
+            "phasing": {
+              "mode": "simultaneous",
+              "jobsPerPhase": 1
+            },
+            "lifecycle": {
+              "renewalLead": {
+                "mode": "automatic"
+              },
+              "updateTiming": "immediate",
+              "existingJobs": "stop_when_successor_ready"
+            },
+            "spend": {
+              "unit": "service_credit_micros",
+              "perJob": "600000",
+              "rate": {
+                "amount": "15000000",
+                "windowMs": 86400000
+              }
+            },
+            "booking": {
+              "mode": "just_in_time"
+            }
+          },
+          "configuration": {
+            "secrets": [
+              {
+                "secretId": "telegram-bot-token",
+                "required": true,
+                "destination": {
+                  "kind": "environment",
+                  "name": "TELEGRAM_BOT_TOKEN"
+                }
+              }
+            ]
+          },
+          "observability": {
+            "logs": {
+              "enabled": true
+            }
+          },
+          "state": {
+            "mode": "off"
+          },
+          "holdOnFailure": false
+        }
+      }
+    },
+    {
+      "name": "v6/materialize/booking/ahead-one-hour",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-telegram-bot`.\n##\n## Upstream declares maxExecutionTimeInMs of 3,600,000,000 \u2014 roughly 1,000\n## hours. That is not a one-shot; it is a service with the timeout set to\n## \"forever\" because Acurast has no other way to say it (finding #6).\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: telegram-bot\n\nmetadata:\n  description: Run a Telegram bot that responds to messages.\n  labels: [liskov, example, javascript, service]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: continuous\n\ndeployment:\n  booking: {\"mode\": \"ahead_of_time\", \"horizon\": \"1h\"}\n  schedule:\n    duration: 1h\n  spend:\n    unit: service_credit_micros\n    perJob: \"600000\"\n    rate:\n      amount: \"15000000\"\n      window: 1d\n\nconfiguration:\n  secrets:\n    # The bot token rides the ADR-0014 Lockbox path, which works today.\n    - secretId: telegram-bot-token\n      required: true\n      destination:\n        kind: environment\n        name: TELEGRAM_BOT_TOKEN\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "ipfs_bundle",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/booking",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "d107875a5b564be08bafe85c2a47a256c6b63e6ddee6d9fe584bda664742aa61",
+        "releaseIntentDigest": "ed93cbe9b4db66bbabe7ac73aefed52bab2308c6199ee9c222798849080b3172",
+        "policyDigest": "e5a2076b388da6804ac98905d935c1ff49ea2ab7d00f7796c4805ebacd2be2c4",
+        "effective": {
+          "schema": "proof.liskov.application-policy",
+          "schemaVersion": 6,
+          "applicationId": "telegram-bot",
+          "applicationUid": "app_0123456789abcdef",
+          "release": {
+            "mode": "source",
+            "binding": {
+              "organizationId": "org_fixture",
+              "applicationUid": "app_0123456789abcdef",
+              "revision": 1,
+              "repository": "proof-computer/booking",
+              "allowedRefs": [
+                "refs/heads/main"
+              ],
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "manifestPath": "liskov.draft.yaml",
+              "revocationEpoch": 0
+            },
+            "sourceCommit": "0123456789abcdef",
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "artifactDigests": [
+              "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ]
+          },
+          "artifact": {
+            "kind": "ipfs_bundle",
+            "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+          },
+          "runtime": {
+            "kind": "javascript",
+            "engine": "nodejs",
+            "entrypointFile": "bundle.js"
+          },
+          "execution": {
+            "mode": "continuous"
+          },
+          "deployment": {
+            "jobs": 1,
+            "durationMs": 3600000,
+            "phasing": {
+              "mode": "simultaneous",
+              "jobsPerPhase": 1
+            },
+            "lifecycle": {
+              "renewalLead": {
+                "mode": "automatic"
+              },
+              "updateTiming": "immediate",
+              "existingJobs": "stop_when_successor_ready"
+            },
+            "spend": {
+              "unit": "service_credit_micros",
+              "perJob": "600000",
+              "rate": {
+                "amount": "15000000",
+                "windowMs": 86400000
+              }
+            },
+            "booking": {
+              "mode": "ahead_of_time",
+              "horizon": "1h"
+            }
+          },
+          "configuration": {
+            "secrets": [
+              {
+                "secretId": "telegram-bot-token",
+                "required": true,
+                "destination": {
+                  "kind": "environment",
+                  "name": "TELEGRAM_BOT_TOKEN"
+                }
+              }
+            ]
+          },
+          "observability": {
+            "logs": {
+              "enabled": true
+            }
+          },
+          "state": {
+            "mode": "off"
+          },
+          "holdOnFailure": false
+        }
+      }
+    },
+    {
+      "name": "v6/materialize/booking/ahead-six-hours",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-telegram-bot`.\n##\n## Upstream declares maxExecutionTimeInMs of 3,600,000,000 \u2014 roughly 1,000\n## hours. That is not a one-shot; it is a service with the timeout set to\n## \"forever\" because Acurast has no other way to say it (finding #6).\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: telegram-bot\n\nmetadata:\n  description: Run a Telegram bot that responds to messages.\n  labels: [liskov, example, javascript, service]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: continuous\n\ndeployment:\n  booking: {\"mode\": \"ahead_of_time\", \"horizon\": \"6h\"}\n  schedule:\n    duration: 1h\n  spend:\n    unit: service_credit_micros\n    perJob: \"600000\"\n    rate:\n      amount: \"15000000\"\n      window: 1d\n\nconfiguration:\n  secrets:\n    # The bot token rides the ADR-0014 Lockbox path, which works today.\n    - secretId: telegram-bot-token\n      required: true\n      destination:\n        kind: environment\n        name: TELEGRAM_BOT_TOKEN\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "ipfs_bundle",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/booking",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "29bf949a3f97a3503b2507d0ef2a67f900ebbeb4df17a88bb378567f57de000f",
+        "releaseIntentDigest": "ed93cbe9b4db66bbabe7ac73aefed52bab2308c6199ee9c222798849080b3172",
+        "policyDigest": "8cb8a146531277b356d7eef4ab22a3c6437e2e985457420af90a80be588186be",
+        "effective": {
+          "schema": "proof.liskov.application-policy",
+          "schemaVersion": 6,
+          "applicationId": "telegram-bot",
+          "applicationUid": "app_0123456789abcdef",
+          "release": {
+            "mode": "source",
+            "binding": {
+              "organizationId": "org_fixture",
+              "applicationUid": "app_0123456789abcdef",
+              "revision": 1,
+              "repository": "proof-computer/booking",
+              "allowedRefs": [
+                "refs/heads/main"
+              ],
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "manifestPath": "liskov.draft.yaml",
+              "revocationEpoch": 0
+            },
+            "sourceCommit": "0123456789abcdef",
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "artifactDigests": [
+              "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ]
+          },
+          "artifact": {
+            "kind": "ipfs_bundle",
+            "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+          },
+          "runtime": {
+            "kind": "javascript",
+            "engine": "nodejs",
+            "entrypointFile": "bundle.js"
+          },
+          "execution": {
+            "mode": "continuous"
+          },
+          "deployment": {
+            "jobs": 1,
+            "durationMs": 3600000,
+            "phasing": {
+              "mode": "simultaneous",
+              "jobsPerPhase": 1
+            },
+            "lifecycle": {
+              "renewalLead": {
+                "mode": "automatic"
+              },
+              "updateTiming": "immediate",
+              "existingJobs": "stop_when_successor_ready"
+            },
+            "spend": {
+              "unit": "service_credit_micros",
+              "perJob": "600000",
+              "rate": {
+                "amount": "15000000",
+                "windowMs": 86400000
+              }
+            },
+            "booking": {
+              "mode": "ahead_of_time",
+              "horizon": "6h"
+            }
+          },
+          "configuration": {
+            "secrets": [
+              {
+                "secretId": "telegram-bot-token",
+                "required": true,
+                "destination": {
+                  "kind": "environment",
+                  "name": "TELEGRAM_BOT_TOKEN"
+                }
+              }
+            ]
+          },
+          "observability": {
+            "logs": {
+              "enabled": true
+            }
+          },
+          "state": {
+            "mode": "off"
+          },
+          "holdOnFailure": false
+        }
+      }
+    },
+    {
+      "name": "v6/materialize/booking/ahead-twenty-three-hours",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "materialize",
+        "encoding": "yaml",
+        "document": "## DRAFT \u2014 validates against the proposed V5 schema. Not publishable.\n##\n## Port of Acurast `apps/app-telegram-bot`.\n##\n## Upstream declares maxExecutionTimeInMs of 3,600,000,000 \u2014 roughly 1,000\n## hours. That is not a one-shot; it is a service with the timeout set to\n## \"forever\" because Acurast has no other way to say it (finding #6).\n\nschema: proof.liskov.application-manifest\n\nschemaVersion: 6\n\napplicationId: telegram-bot\n\nmetadata:\n  description: Run a Telegram bot that responds to messages.\n  labels: [liskov, example, javascript, service]\n\nrelease:\n  mode: source\n\nruntime:\n  kind: javascript\n  engine: nodejs\n  entrypoint:\n    file: bundle.js\nexecution:\n  mode: continuous\n\ndeployment:\n  booking: {\"mode\": \"ahead_of_time\", \"horizon\": \"23h\"}\n  schedule:\n    duration: 1h\n  spend:\n    unit: service_credit_micros\n    perJob: \"600000\"\n    rate:\n      amount: \"15000000\"\n      window: 1d\n\nconfiguration:\n  secrets:\n    # The bot token rides the ADR-0014 Lockbox path, which works today.\n    - secretId: telegram-bot-token\n      required: true\n      destination:\n        kind: environment\n        name: TELEGRAM_BOT_TOKEN\n\nstate:\n  mode: off\n\nobservability:\n  logs:\n    enabled: true\n",
+        "materialization": {
+          "applicationUid": "app_0123456789abcdef",
+          "evidence": {
+            "artifact": {
+              "kind": "ipfs_bundle",
+              "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+            },
+            "provenance": {
+              "mode": "source",
+              "binding": {
+                "organizationId": "org_fixture",
+                "applicationUid": "app_0123456789abcdef",
+                "revision": 1,
+                "repository": "proof-computer/booking",
+                "allowedRefs": [
+                  "refs/heads/main"
+                ],
+                "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+                "manifestPath": "liskov.draft.yaml",
+                "revocationEpoch": 0
+              },
+              "sourceCommit": "0123456789abcdef",
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "artifactDigests": [
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "pair": {
+          "schema": "proof.liskov.application-manifest",
+          "schemaVersion": 6
+        },
+        "authoredDigest": "c4fda12277069d9f4f1f6e5df699e49a79ef1e40c771b69d56ebb2654f55b235",
+        "releaseIntentDigest": "ed93cbe9b4db66bbabe7ac73aefed52bab2308c6199ee9c222798849080b3172",
+        "policyDigest": "5d5d6a7c22d2401251566281d1cfae09c4b096c3fa3cee094db9263514832086",
+        "effective": {
+          "schema": "proof.liskov.application-policy",
+          "schemaVersion": 6,
+          "applicationId": "telegram-bot",
+          "applicationUid": "app_0123456789abcdef",
+          "release": {
+            "mode": "source",
+            "binding": {
+              "organizationId": "org_fixture",
+              "applicationUid": "app_0123456789abcdef",
+              "revision": 1,
+              "repository": "proof-computer/booking",
+              "allowedRefs": [
+                "refs/heads/main"
+              ],
+              "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+              "manifestPath": "liskov.draft.yaml",
+              "revocationEpoch": 0
+            },
+            "sourceCommit": "0123456789abcdef",
+            "workflowIdentity": ".github/workflows/liskov.yml@refs/heads/main",
+            "artifactDigests": [
+              "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ]
+          },
+          "artifact": {
+            "kind": "ipfs_bundle",
+            "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "cid": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+          },
+          "runtime": {
+            "kind": "javascript",
+            "engine": "nodejs",
+            "entrypointFile": "bundle.js"
+          },
+          "execution": {
+            "mode": "continuous"
+          },
+          "deployment": {
+            "jobs": 1,
+            "durationMs": 3600000,
+            "phasing": {
+              "mode": "simultaneous",
+              "jobsPerPhase": 1
+            },
+            "lifecycle": {
+              "renewalLead": {
+                "mode": "automatic"
+              },
+              "updateTiming": "immediate",
+              "existingJobs": "stop_when_successor_ready"
+            },
+            "spend": {
+              "unit": "service_credit_micros",
+              "perJob": "600000",
+              "rate": {
+                "amount": "15000000",
+                "windowMs": 86400000
+              }
+            },
+            "booking": {
+              "mode": "ahead_of_time",
+              "horizon": "23h"
+            }
+          },
+          "configuration": {
+            "secrets": [
+              {
+                "secretId": "telegram-bot-token",
+                "required": true,
+                "destination": {
+                  "kind": "environment",
+                  "name": "TELEGRAM_BOT_TOKEN"
+                }
+              }
+            ]
+          },
+          "observability": {
+            "logs": {
+              "enabled": true
+            }
+          },
+          "state": {
+            "mode": "off"
+          },
+          "holdOnFailure": false
+        }
+      }
+    },
+    {
       "name": "v7/acurast-public-http",
       "request": {
         "schema": "proof.liskov.policy-client-request.v1",
@@ -6590,6 +7129,28 @@
       },
       "expectedCode": "unknown_field",
       "expectedPointer": "/hooks"
+    },
+    {
+      "name": "v6/invalid/inbound-reachability-is-allow-only",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: inbound_reachability is allow-only\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/exclude/0/by\n# ADR-0276: inbound reachability is allow-only, with the exact value v6.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-inbound-reachability\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    exclude: [{by: inbound_reachability, values: [\"v6\"]}]\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/exclude/0/by"
+    },
+    {
+      "name": "v6/invalid/inbound-reachability-value-is-v6",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: inbound_reachability requires the exact value v6\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /deployment/placement/allow/0/values/0\n# ADR-0276: inbound reachability is allow-only, with the exact value v6.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-inbound-reachability\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  placement:\n    allow: [{by: inbound_reachability, values: [\"v4\"]}]\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/deployment/placement/allow/0/values/0"
     },
     {
       "name": "v6/invalid/ingress-tcp-is-deferred",

@@ -1,15 +1,15 @@
 {
   "repository": "https://github.com/proof-computer/liskov-rs",
-  "commit": "0444b93c77ee0509aa9dde36b68cd0c9e37d44e9",
-  "packet": "BKLG-20261013-buih",
+  "commit": "002bcea654adc2922c56485e3fa33ffd10ecdaef",
+  "packet": "BKLG-20261115-ns72",
   "files": {
     "policy-client-bundle.json": {
       "source": "crates/liskov-policy-client-contract/bundle/policy-client-bundle.json",
-      "sha256": "sha256:14a9eb8b64ccc9e2d0600f102dd3ec29f52190a49031735d63e88a2453384e23"
+      "sha256": "sha256:8aa247f9352995ab15cab1bf5051b2fd98de27ce15c1b6c601cbaf8823de9257"
     },
     "policy-client-contract.wasm.gz": {
       "source": "crates/liskov-policy-client-contract/bundle/policy-client-contract.wasm.gz",
-      "sha256": "sha256:1877eea89d9ce8a064b61294a9947dd1adf15b28b97f9ac95fa3711cef2461c5"
+      "sha256": "sha256:6e560ec7a1b2aa27e820ee24228508073f75285c3421c17dfbbe50098c331a94"
     },
     "policy-client.cjs": {
       "source": "crates/liskov-policy-client-contract/bundle/policy-client.cjs",
@@ -21,7 +21,7 @@
     },
     "policy-client-conformance.json": {
       "source": "crates/liskov-policy-client-contract/bundle/policy-client-conformance.json",
-      "sha256": "sha256:8581f6471b84c1c7a1d7f23869a5b12f85a7215d6ca56a50b1029ba5c3b1e820"
+      "sha256": "sha256:03f1b2346b357a5d36d48a6eaf4ce71dae5186b17f54e7544f6d9df222f5c56b"
     },
     "test/fixtures/booking-v6/booking-fragments.json": {
       "source": "crates/liskov-application-policy/fixtures/v6/booking-fragments.json",
@@ -29,7 +29,7 @@
     },
     "test/fixtures/booking-v6/materialization-digest-goldens.json": {
       "source": "crates/liskov-application-policy/fixtures/v6/materialization-digest-goldens.json",
-      "sha256": "sha256:c0d8b6fdaced73c19088e512a29b022e2cd245d41522a0f9517e854cc1702c12"
+      "sha256": "sha256:439ffe49022d1f58ae193a4e0c80f25149f4c30b2626b1e1cb002ff733840e61"
     },
     "test/fixtures/payload-v8/payload-replace.json": {
       "source": "crates/liskov-application-policy/fixtures/v8/payload-replace.json",

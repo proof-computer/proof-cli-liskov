@@ -116,10 +116,7 @@ export function isRegisteredPublicationPair(result: PolicyContractEvaluation): b
 }
 
 function publicationEnabled(result: PolicyContractEvaluation): boolean {
-  if (result.disposition !== "supported" || !result.pair) return false;
-  // BKLG-20260907-ie6x owns V6 activation. The owner's expected client
-  // surfaces register offline publication support, not rollout authority.
-  return !(result.pair.schema === APPLICATION_MANIFEST_SCHEMA && result.pair.schemaVersion === 6);
+  return result.disposition === "supported" && result.pair !== undefined;
 }
 
 export function validateApplicationManifest(value: unknown): PolicyValidationError[] {

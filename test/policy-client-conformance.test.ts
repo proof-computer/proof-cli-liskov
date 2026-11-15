@@ -37,12 +37,12 @@ test("vendored policy contract matches the complete shared corpus", () => {
 });
 
 test("vendored artifacts match the complete merged producer bundle", () => {
-  // BKLG-20261013-buih, liskov-rs PR #2073 (ADR-0232):
-  // 0444b93c77ee0509aa9dde36b68cd0c9e37d44e9. Pin the manifest itself so
+  // BKLG-20261115-ns72, liskov-rs PR #2080 (after #2079):
+  // 002bcea654adc2922c56485e3fa33ffd10ecdaef. Pin the manifest itself so
   // a coherent but different bundle cannot silently replace the owner's bytes.
   const manifestBytes = readFileSync(path.join(bundleDirectory, "policy-client-bundle.json"));
   const digest = (bytes: Uint8Array) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
-  assert.equal(digest(manifestBytes), "sha256:14a9eb8b64ccc9e2d0600f102dd3ec29f52190a49031735d63e88a2453384e23");
+  assert.equal(digest(manifestBytes), "sha256:8aa247f9352995ab15cab1bf5051b2fd98de27ce15c1b6c601cbaf8823de9257");
   const manifest = JSON.parse(manifestBytes.toString("utf8")) as {
     artifact: { file: string; sha256: string; uncompressedSha256: string };
     adapter: { file: string; sha256: string };
@@ -59,8 +59,6 @@ test("vendored artifacts match the complete merged producer bundle", () => {
   );
   assert.deepEqual(manifest.publicationPairs, [{
     schema: "proof.liskov.application-manifest", schemaVersion: 5, releaseMode: "source"
-  }, {
-    schema: "proof.liskov.application-manifest", schemaVersion: 6, releaseMode: "source"
   }]);
 });
 
