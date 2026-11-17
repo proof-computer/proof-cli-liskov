@@ -46,6 +46,7 @@ update, or version change and before push:
 ```sh
 pnpm install --frozen-lockfile
 pnpm typecheck
+pnpm check:floor
 pnpm test
 pnpm build
 node scripts/verify-package.mjs
@@ -63,6 +64,48 @@ oclif/package artifacts, version assertions and release metadata. Do not assume
 the lockfile records the root package version. Search for the old version and
 explain every intentional retained occurrence; a green build alone is not
 version-bump evidence.
+
+## Code floor (ADR-0284)
+
+`pnpm typecheck` runs strict `tsc` over `src/`; tests run through `tsx`
+and are not type-checked. `pnpm lint` checks hand-written `src/`, `test/`
+and `scripts/` with ESLint's and typescript-eslint's recommended presets
+(without type information), Node globals and unused disable directives as
+errors. This configuration adds no disabled rules; the presets own their
+TypeScript-specific overrides. `pnpm check:floor` runs lint and the marker
+and size checks together.
+
+A deferral comment beginning TODO, FIXME, XXX or HACK needs a `BKLG-…`,
+`EPIC-…` or `Q-…` id on its line or the line above. A suppression of lint,
+type checking, formatting, coverage or a test needs an id or a permanent,
+justified reason. For comment directives, a reason follows ` -- `; for
+`@ts-expect-error`, it follows the directive. `@ts-ignore` and `@ts-nocheck`
+are refused by lint. A non-empty skip/todo option string or test-context
+skip/todo string is its reason; a config setting or skipped test may instead
+have a reason comment on its line or the line above. A test name alone is
+not a reason. Strings, fixtures, generated-output ignores and `skipLibCheck`
+are not markers. Existing anonymous markers are counted, not converted;
+a touched marker gains its id or reason, or is removed.
+
+The design target is 1,000 lines per module. A new hand-written source file
+may not exceed 2,000 lines; a file already above 2,000 may not grow.
+`src/session.ts`, `test/slipway.test.ts` and `test/runtime-ssh.test.ts` are
+held at their counts in `scripts/floor-baseline.json`. A change adding lines
+to one first moves at least as many lines into a module of its own in the
+same change. Generated and vendored code, build output, JSON and fixtures
+are outside the size hold.
+
+`scripts/floor-baseline.json` records anonymous markers, bulk lint
+suppressions and held files. These numbers only go down: lower the matching
+baseline in the same change that removes a marker, fixes a suppressed
+finding (also prune `eslint-suppressions.json`) or shrinks a held file.
+Remove a held file from the list when it reaches 2,000 lines or fewer.
+BKLG-20261108-fwlp records the initial lint and size debt; existing code is
+counted and held rather than converted or split (ADR-0284 D24).
+
+The factory gate must run the same checks as CI. `pnpm check:floor` is the
+floor command; BKLG-20261108-e65a (D5) adds it to the pack's
+`gates/proof-cli-liskov.sh` after this packet lands.
 
 ## Release preflight
 
