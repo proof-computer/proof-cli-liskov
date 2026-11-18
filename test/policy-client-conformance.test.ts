@@ -37,12 +37,14 @@ test("vendored policy contract matches the complete shared corpus", () => {
 });
 
 test("vendored artifacts match the complete merged producer bundle", () => {
-  // BKLG-20261115-ns72, liskov-rs PR #2080 (after #2079):
-  // 002bcea654adc2922c56485e3fa33ffd10ecdaef. Pin the manifest itself so
+  // BKLG-20261118-ouys, liskov-rs PR #2133 (BKLG-20261118-pztg):
+  // 4473cf26b26f4ed6d2960b086506254fe4d7dea3. Pin the manifest itself so
   // a coherent but different bundle cannot silently replace the owner's bytes.
+  const source = JSON.parse(readFileSync(path.join(bundleDirectory, "source.json"), "utf8")) as { commit: string };
+  assert.equal(source.commit, "4473cf26b26f4ed6d2960b086506254fe4d7dea3");
   const manifestBytes = readFileSync(path.join(bundleDirectory, "policy-client-bundle.json"));
   const digest = (bytes: Uint8Array) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
-  assert.equal(digest(manifestBytes), "sha256:8aa247f9352995ab15cab1bf5051b2fd98de27ce15c1b6c601cbaf8823de9257");
+  assert.equal(digest(manifestBytes), "sha256:54bd5f14b62fa425915045cb414326bb9cc1b6ea0dbed60d0e6fac30ebd67dc0");
   const manifest = JSON.parse(manifestBytes.toString("utf8")) as {
     artifact: { file: string; sha256: string; uncompressedSha256: string };
     adapter: { file: string; sha256: string };
