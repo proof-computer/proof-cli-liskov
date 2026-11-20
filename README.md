@@ -24,6 +24,7 @@ proof liskov application list
 proof liskov application list --organization org-123
 LISKOV_ORGANIZATION=team-slug proof liskov application status proof-docs
 proof liskov application status proof-docs
+proof liskov application workload-revisions proof-docs --json
 proof liskov application plans proof-docs --json
 proof liskov application secrets proof-docs
 proof liskov application secrets proof-docs --json
@@ -117,7 +118,21 @@ normal builder-facing command.
 Liskov commands report one bounded completion event to the Liskov API by
 default: the command id, plugin version, and success or failure. Arguments,
 flag values, output, local paths, application names, and token material are not
-included. Add `--no-analytics` to any invocation to suppress that event.
+included. Add `--no-analytics` to suppress that event. The workload-revisions
+command always skips analytics.
+
+`proof liskov application workload-revisions APP` reads the registered
+provider artifact and the desired, staged, and serving payload state from
+the selected organization. The revisions are server observations.
+A serving-ready revision can coexist with a failed update or rollback.
+Stale observations include retry guidance. This command sends only GET requests.
+
+With `--json`, a successful read emits `{revisions, truncated}`. Each revision
+contains `registration`, `desired`, `staged`, `serving`, and `availability`
+(`current` or `stale`). An empty list means the server recorded no revisions
+for the application. An unavailable read exits nonzero and reports
+`availability: "unavailable"` in its error object. An older endpoint may lack
+this read.
 
 Organization billing, Service Credit, and billing-transaction commands are
 read-only projections of the existing Liskov routes. Network-backed
