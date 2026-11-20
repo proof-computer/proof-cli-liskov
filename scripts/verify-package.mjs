@@ -88,8 +88,9 @@ if (packageJson.name !== "@proof-computer/proof-cli-liskov") {
   errors.push("package.json name must be @proof-computer/proof-cli-liskov");
 }
 
-if (packageJson.license !== "FSL-1.1-Apache-2.0") {
-  errors.push("package.json license must be FSL-1.1-Apache-2.0");
+const expectedLicense = "FSL-1.1-ALv2";
+if (packageJson.license !== expectedLicense) {
+  errors.push(`package.json license must be ${expectedLicense}`);
 }
 
 if (packageJson.bin) {
