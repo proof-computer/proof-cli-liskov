@@ -944,7 +944,7 @@ export type PublicSlipwayIdentity =
   | { kind: "native"; email?: string; via?: string; sub?: string }
   | { kind?: string; [key: string]: unknown };
 
-interface SlipwayApiSessionResponse {
+export interface SlipwayApiSessionResponse {
   ok?: boolean;
   session?: PublicSlipwaySession;
   organization?: LiskovOrganizationSummary;
@@ -4619,7 +4619,7 @@ export async function runSlipwayApplicationArtifactUpload(input: SlipwayApplicat
       message: "Error (SLIPWAY_APPLICATION_ARTIFACT_UPLOAD_REFUSED): Liskov refused the session."
     });
   }
-  const organizationId = canonicalUploadOrganizationId(session.body);
+  const organizationId = canonicalSessionOrganizationId(session.body);
   if (!organizationId) {
     return writeArtifactUploadRefusal(options, input.json, {
       status: session.response.status,
@@ -4801,7 +4801,7 @@ async function runNativePayloadUpload(
     fetchFailedMessage: "could not read the Liskov session", wordsOwnRefusals: true, redactFetchError: true
   }, options);
   if (!session.ok) return session.exitCode;
-  const org = session.body === undefined ? undefined : canonicalUploadOrganizationId(session.body);
+  const org = session.body === undefined ? undefined : canonicalSessionOrganizationId(session.body);
   if (!session.response.ok || session.body?.ok !== true || !session.body.session || org === undefined) {
     return fail("invalid_session_organization", session.response.status);
   }
@@ -4918,9 +4918,9 @@ async function artifactUploadSecrets(input: SlipwayApplicationArtifactUploadInpu
   }
 }
 
-function canonicalUploadOrganizationId(body: SlipwayApiSessionResponse): string | undefined {
+export function canonicalSessionOrganizationId(body: SlipwayApiSessionResponse): string | undefined {
   const id = body.organizationContext !== undefined
-    ? body.organizationContext.effective?.id
+    ? body.organizationContext?.effective?.id
     : body.organization?.id;
   return typeof id === "string" && id.length > 0 && id.trim() === id ? id : undefined;
 }
@@ -5066,7 +5066,7 @@ function redactArtifactText(value: string | undefined, secrets: readonly string[
   );
 }
 
-function containsSecret(value: unknown, secrets: readonly string[]): boolean {
+export function containsSecret(value: unknown, secrets: readonly string[]): boolean {
   if (typeof value === "string") return secrets.some((secret) => secret.length > 0 && value.includes(secret));
   if (Array.isArray(value)) return value.some((item) => containsSecret(item, secrets));
   if (value && typeof value === "object") return Object.values(value).some((item) => containsSecret(item, secrets));
@@ -8233,7 +8233,7 @@ export async function readSlipwaySession(sessionFile: string): Promise<SlipwaySe
   }
 }
 
-async function readJsonResponse<T>(response: Response): Promise<T | undefined> {
+export async function readJsonResponse<T>(response: Response): Promise<T | undefined> {
   const text = await response.text();
   if (!text.trim()) return undefined;
   try {
@@ -8273,7 +8273,7 @@ function emitError(options: SlipwayCliOptions, line: string): void {
   (options.stderr ?? console.error)(line);
 }
 
-function normalizeBaseUrl(value: string): string {
+export function normalizeBaseUrl(value: string): string {
   const url = new URL(value);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("Liskov URL must use http or https");

@@ -1,0 +1,174 @@
+{
+  "observed": {
+    "revisions": [
+      {
+        "registration": {
+          "launchId": "launch-1",
+          "processorId": "processor-1",
+          "runtimeInstanceId": "runtime-1",
+          "originKind": "acurast",
+          "originKey": "job-origin-1",
+          "sequence": "0",
+          "launchPolicyDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registrationDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "bootstrapDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "rootfsDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "helperDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+          "phaseGridDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "providerConstraintsDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "paidStartMs": 1000,
+          "paidEndMs": 100000
+        },
+        "desired": {
+          "targetEpoch": 2,
+          "targetRevisionDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "desiredPolicyDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "desiredReleaseDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "sourceRevisionDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "notBeforeMs": 1000,
+          "expiresAtMs": 90000,
+          "scheduleDeadlineMs": 100000
+        },
+        "staged": {
+          "stage": "failed",
+          "stagedRequestDigest": null
+        },
+        "serving": {
+          "currentEpoch": 1,
+          "currentRevisionDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "servingReady": true,
+          "converged": false,
+          "rolledBack": false
+        },
+        "availability": "current"
+      },
+      {
+        "registration": {
+          "launchId": "launch-2",
+          "processorId": "processor-2",
+          "runtimeInstanceId": "runtime-2",
+          "originKind": "acurast",
+          "originKey": "job-origin-1",
+          "sequence": "1",
+          "launchPolicyDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registrationDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "bootstrapDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "rootfsDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "helperDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+          "phaseGridDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "providerConstraintsDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "paidStartMs": 1000,
+          "paidEndMs": 100000
+        },
+        "desired": {
+          "targetEpoch": 2,
+          "targetRevisionDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "desiredPolicyDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "desiredReleaseDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "sourceRevisionDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "notBeforeMs": 1000,
+          "expiresAtMs": 90000,
+          "scheduleDeadlineMs": 100000
+        },
+        "staged": {
+          "stage": "rolled_back",
+          "stagedRequestDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        "serving": {
+          "currentEpoch": 1,
+          "currentRevisionDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "servingReady": true,
+          "converged": false,
+          "rolledBack": true
+        },
+        "availability": "current"
+      },
+      {
+        "registration": {
+          "launchId": "launch-3",
+          "processorId": "processor-3",
+          "runtimeInstanceId": "runtime-3",
+          "originKind": "acurast",
+          "originKey": "job-origin-1",
+          "sequence": "2",
+          "launchPolicyDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registrationDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "bootstrapDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "rootfsDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "helperDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+          "phaseGridDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "providerConstraintsDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "paidStartMs": 1000,
+          "paidEndMs": 100000
+        },
+        "desired": {
+          "targetEpoch": 2,
+          "targetRevisionDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "desiredPolicyDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "desiredReleaseDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "sourceRevisionDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "notBeforeMs": 1000,
+          "expiresAtMs": 90000,
+          "scheduleDeadlineMs": 100000
+        },
+        "staged": {
+          "stage": "staged",
+          "stagedRequestDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        "serving": {
+          "currentEpoch": 0,
+          "currentRevisionDigest": null,
+          "servingReady": false,
+          "converged": false,
+          "rolledBack": false
+        },
+        "availability": "stale"
+      },
+      {
+        "registration": {
+          "launchId": "launch-4",
+          "processorId": "processor-4",
+          "runtimeInstanceId": "runtime-4",
+          "originKind": "acurast",
+          "originKey": "job-origin-1",
+          "sequence": "3",
+          "launchPolicyDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "registrationDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "bootstrapDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "rootfsDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "helperDigest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+          "phaseGridDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "providerConstraintsDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "paidStartMs": 1000,
+          "paidEndMs": 100000
+        },
+        "desired": {
+          "targetEpoch": 2,
+          "targetRevisionDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "desiredPolicyDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "desiredReleaseDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "sourceRevisionDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "notBeforeMs": 1000,
+          "expiresAtMs": 90000,
+          "scheduleDeadlineMs": 100000
+        },
+        "staged": {
+          "stage": "ready",
+          "stagedRequestDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        "serving": {
+          "currentEpoch": 2,
+          "currentRevisionDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "servingReady": true,
+          "converged": true,
+          "rolledBack": false
+        },
+        "availability": "current"
+      }
+    ],
+    "truncated": true
+  },
+  "unavailable": {
+    "availability": "unavailable"
+  }
+}
