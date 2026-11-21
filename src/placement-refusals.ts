@@ -23,6 +23,8 @@ export interface PlacementRefusalObservation {
   launchReason: string;
   country: PlacementRefusalCountryReason[];
   spread: PlacementRefusalSpreadReason[];
+  /** Absent on an older server. Same recorded-candidate shape as country (ADR-0276 §6). */
+  inbound?: PlacementRefusalCountryReason[];
 }
 export interface ApplicationPlacementRefusals {
   ok: true;
@@ -50,13 +52,15 @@ const count = (value: unknown): value is number => Number.isSafeInteger(value) &
 const countryReason = (value: unknown): boolean =>
   record(value) && text(value.reason) && text(value.predicate) && text(value.source) &&
   text(value.nextAction) && count(value.candidates);
+const candidateReasons = (value: unknown): boolean => Array.isArray(value) && value.every(countryReason);
 const spreadReason = (value: unknown): boolean =>
   record(value) && text(value.reason) && (value.key === null || text(value.key)) &&
   text(value.nextAction) && count(value.observations);
 const observation = (value: unknown): boolean =>
   record(value) && count(value.windowStartMs) && text(value.placementCode) && text(value.launchReason) &&
-  Array.isArray(value.country) && value.country.every(countryReason) &&
-  Array.isArray(value.spread) && value.spread.every(spreadReason);
+  candidateReasons(value.country) &&
+  Array.isArray(value.spread) && value.spread.every(spreadReason) &&
+  (value.inbound === undefined || candidateReasons(value.inbound));
 
 /** A cursor on a page the server calls complete contradicts the owner's rule. */
 export function isApplicationPlacementRefusals(body: unknown): body is ApplicationPlacementRefusals {
@@ -95,6 +99,17 @@ export function placementRefusalsPath(applicationId: string, query: PlacementRef
   return `/api/applications/${encodeURIComponent(applicationId)}/placement/refusals?${params.toString()}`;
 }
 
+function candidateReasonLines(label: string, reasons: PlacementRefusalCountryReason[]): string[] {
+  const lines: string[] = [];
+  for (const reason of reasons) {
+    lines.push(
+      `  ${label}: ${reason.reason} (predicate ${reason.predicate}, source ${reason.source}, recorded candidates ${reason.candidates})`,
+      `    Next action: ${reason.nextAction}`
+    );
+  }
+  return lines;
+}
+
 export function formatPlacementRefusals(body: ApplicationPlacementRefusals): string {
   const lines = [
     "Placement refusals recorded in this page",
@@ -102,25 +117,26 @@ export function formatPlacementRefusals(body: ApplicationPlacementRefusals): str
   ];
   if (body.observations.length === 0) lines.push("There are no recorded refusals in this page.");
   for (const row of body.observations) {
+    const inbound = row.inbound ?? [];
     lines.push(`Window ${row.windowStartMs}: ${row.placementCode} (launch reason ${row.launchReason})`);
-    for (const reason of row.country) {
-      lines.push(
-        `  Country: ${reason.reason} (predicate ${reason.predicate}, source ${reason.source}, recorded candidates ${reason.candidates})`,
-        `    Next action: ${reason.nextAction}`
-      );
-    }
+    lines.push(...candidateReasonLines("Country", row.country));
     for (const reason of row.spread) {
       lines.push(
         `  Spread: ${reason.reason} (key ${reason.key ?? "none"}, observations ${reason.observations})`,
         `    Next action: ${reason.nextAction}`
       );
     }
-    if (row.country.length === 0 && row.spread.length === 0) lines.push("  No country or spread reason is recorded for this refusal.");
+    lines.push(...candidateReasonLines("Inbound", inbound));
+    if (row.country.length === 0 && row.spread.length === 0 && inbound.length === 0) {
+      lines.push("  No country or spread reason is recorded for this refusal.");
+    }
   }
   lines.push(body.incomplete
     ? "Page incomplete: another page exists, or a recorded refusal left out a candidate or a reason. This marks the whole page, not one row, and a reason absent here may still have occurred."
     : "Page not marked incomplete: this does not mean every refusal is present. Only the first refusal of each Application, code and hour is kept, and a refusal whose write failed has no row.");
-  if (body.observations.some((row) => row.country.length > 0)) lines.push("Recorded candidates count only what was recorded, not every candidate refused.");
+  if (body.observations.some((row) => row.country.length > 0 || (row.inbound ?? []).length > 0)) {
+    lines.push("Recorded candidates count only what was recorded, not every candidate refused.");
+  }
   lines.push("This read does not say placement succeeded, and it does not cover all Application history.");
   if (body.nextCursor !== null) lines.push(`Next page: repeat with the same --from-ms and --to-ms and --cursor ${body.nextCursor}`);
   return lines.join("\n");

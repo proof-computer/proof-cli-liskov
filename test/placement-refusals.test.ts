@@ -9,7 +9,7 @@ import Command from "../src/commands/liskov/application/placement-refusals.js";
 import { isApplicationPlacementRefusals, parsePlacementRefusalsQuery, placementRefusalsPath } from "../src/placement-refusals.js";
 import { runSlipwayApplicationPlacementRefusals } from "../src/session.js";
 
-// Byte-for-byte owner vector at liskov-rs 62844b0acad63509b32a1833f213a70488d86f6c,
+// Byte-for-byte owner vector at liskov-rs af15276f39cb366916f96cd9277cf44de5f85a96,
 // crates/liskov-control-plane-api/vectors/application_placement_refusals.json.
 const { badRequests, ...envelopes } = JSON.parse(await readFile(new URL("./fixtures/application-placement-refusals.json", import.meta.url), "utf8"));
 const token = "session-token-that-must-not-be-printed";
@@ -47,7 +47,7 @@ async function read(served: Served, input: Partial<Parameters<typeof runSlipwayA
 }
 
 test("every owner envelope comes back unchanged as JSON, field order included", async () => {
-  assert.ok(Object.keys(envelopes).length >= 6);
+  assert.ok(Object.keys(envelopes).length >= 7);
   for (const body of Object.values(envelopes)) {
     const result = await read({ body }, { json: true });
     assert.equal(result.code, 0);
@@ -89,7 +89,7 @@ test("no cursor flag sends no cursor; a served cursor passes back untouched; zer
 });
 
 test("human output carries each typed reason and its server-owned next action", async () => {
-  for (const body of Object.values(envelopes) as { observations: { windowStartMs: number; placementCode: string; launchReason: string; country: Record<string, string | number>[]; spread: Record<string, string | number | null>[] }[] }[]) {
+  for (const body of Object.values(envelopes) as { observations: { windowStartMs: number; placementCode: string; launchReason: string; country: Record<string, string | number>[]; spread: Record<string, string | number | null>[]; inbound?: Record<string, string | number>[] }[] }[]) {
     const { code, output } = await read({ body });
     assert.equal(code, 0);
     for (const row of body.observations) {
@@ -100,8 +100,37 @@ test("human output carries each typed reason and its server-owned next action", 
       for (const reason of row.spread) {
         assert.ok(output.includes(`Spread: ${reason.reason} (key ${reason.key ?? "none"}, observations ${reason.observations})\n    Next action: ${reason.nextAction}`));
       }
+      for (const reason of row.inbound ?? []) {
+        assert.ok(output.includes(`Inbound: ${reason.reason} (predicate ${reason.predicate}, source ${reason.source}, recorded candidates ${reason.candidates})\n    Next action: ${reason.nextAction}`));
+      }
     }
   }
+});
+
+test("an inbound refusal prints each reason, and the no-reason line only when every list is empty", async () => {
+  const body = envelopes.inboundRefusal;
+  const reason = body.observations[0].inbound[0];
+  const printed = await read({ body });
+  assert.equal(printed.code, 0);
+  assert.ok(printed.output.includes(`Inbound: ${reason.reason} (predicate ${reason.predicate}, source ${reason.source}, recorded candidates ${reason.candidates})\n    Next action: ${reason.nextAction}`));
+  assert.match(printed.output, /Recorded candidates count only what was recorded/u);
+  assert.doesNotMatch(printed.output, /No country or spread reason is recorded for this refusal\./u);
+
+  const emptied = structuredClone(body);
+  emptied.observations[0].inbound = [];
+  const emptyInbound = await read({ body: emptied });
+  assert.equal(emptyInbound.code, 0);
+  assert.notEqual(printed.output, emptyInbound.output);
+  assert.match(emptyInbound.output, /No country or spread reason is recorded for this refusal\./u);
+  assert.doesNotMatch(emptyInbound.output, /Inbound:/u);
+
+  const older = structuredClone(body);
+  delete older.observations[0].inbound;
+  assert.equal(isApplicationPlacementRefusals(older), true);
+  const accepted = await read({ body: older }, { json: true });
+  assert.equal(accepted.code, 0);
+  assert.equal(accepted.output, JSON.stringify(older));
+  assert.equal(JSON.parse(accepted.output).observations[0].inbound, undefined);
 });
 
 test("an empty page says so and claims neither success nor a whole history", async () => {
@@ -231,6 +260,12 @@ test("a malformed envelope or unknown schema fails closed", async () => {
   for (const key of ["reason", "predicate", "source", "nextAction", "candidates"]) {
     const body = structuredClone(envelopes.countryRefusal); delete body.observations[0].country[0][key]; invalid.push(body);
   }
+  for (const key of ["reason", "predicate", "source", "nextAction", "candidates"]) {
+    const body = structuredClone(envelopes.inboundRefusal); delete body.observations[0].inbound[0][key]; invalid.push(body);
+  }
+  const inboundNotAList = structuredClone(envelopes.inboundRefusal);
+  inboundNotAList.observations[0].inbound = null;
+  invalid.push(inboundNotAList);
   for (const key of ["reason", "key", "nextAction", "observations"]) {
     const body = structuredClone(envelopes.spreadRefusal); delete body.observations[0].spread[0][key]; invalid.push(body);
   }
