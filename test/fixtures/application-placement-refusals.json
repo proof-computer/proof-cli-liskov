@@ -34,7 +34,8 @@
             "candidates": 1
           }
         ],
-        "spread": []
+        "spread": [],
+        "inbound": []
       }
     ],
     "nextCursor": null,
@@ -57,6 +58,33 @@
             "key": "manager",
             "nextAction": "review_required_manager_spread",
             "observations": 1
+          }
+        ],
+        "inbound": []
+      }
+    ],
+    "nextCursor": null,
+    "incomplete": false
+  },
+  "inboundRefusal": {
+    "ok": true,
+    "schema": "application_placement_refusals_v1",
+    "applicationId": "app_canonical",
+    "generatedAtMs": 1758000000000,
+    "observations": [
+      {
+        "windowStartMs": 1757998800000,
+        "placementCode": "placement_no_eligible_candidate",
+        "launchReason": "inbound_fleet_empty",
+        "country": [],
+        "spread": [],
+        "inbound": [
+          {
+            "reason": "inbound_stale",
+            "predicate": "inbound_reachability",
+            "source": "inbound_reachability",
+            "nextAction": "retry_after_inbound_probe",
+            "candidates": 1
           }
         ]
       }
@@ -82,7 +110,8 @@
             "nextAction": "retry_bounded_spread_discovery",
             "observations": 1
           }
-        ]
+        ],
+        "inbound": []
       },
       {
         "windowStartMs": 1757998800000,
@@ -96,7 +125,8 @@
             "nextAction": "review_required_manager_spread",
             "observations": 1
           }
-        ]
+        ],
+        "inbound": []
       },
       {
         "windowStartMs": 1757995200000,
@@ -110,7 +140,8 @@
             "nextAction": "retry_spread_plan_revalidation",
             "observations": 1
           }
-        ]
+        ],
+        "inbound": []
       },
       {
         "windowStartMs": 1757995200000,
@@ -125,7 +156,8 @@
             "candidates": 1
           }
         ],
-        "spread": []
+        "spread": [],
+        "inbound": []
       }
     ],
     "nextCursor": null,
@@ -157,7 +189,8 @@
             "candidates": 1
           }
         ],
-        "spread": []
+        "spread": [],
+        "inbound": []
       }
     ],
     "nextCursor": "eyJ2IjoxLCJzY29wZSI6ImY1YzE3ZjJiYzQ2NGU5ODY5ZmE4ZDlkZjdmNTY4NjNhZjU4ZjdhZjhmMGYyZWVjMTM3YmYxYjVhMDI3NzZmMzgiLCJ3aW5kb3dTdGFydE1zIjoxNzU3OTk1MjAwMDAwLCJwbGFjZW1lbnRDb2RlIjoicGxhY2VtZW50X25vX2VsaWdpYmxlX2NhbmRpZGF0ZSJ9",
@@ -174,7 +207,8 @@
         "placementCode": "placement_no_eligible_candidate",
         "launchReason": "processor_metric_floor_fleet_empty",
         "country": [],
-        "spread": []
+        "spread": [],
+        "inbound": []
       }
     ],
     "nextCursor": null,
