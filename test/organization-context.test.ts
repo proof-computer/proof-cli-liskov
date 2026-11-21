@@ -8,7 +8,8 @@ import {
   OrganizationScopedCommand,
   OrganizationSelectorError,
   organizationRequestHeaders,
-  organizationSelector
+  organizationSelector,
+  organizationSelectorRefusal
 } from "../src/organization-context.js";
 
 test("organization selectors trim once, preserve exact case, and reject empty or oversized input", () => {
@@ -67,4 +68,26 @@ test("the inherited organization flag advertises its environment source and has 
   assert.equal(flag.env, LISKOV_ORGANIZATION_ENV);
   assert.equal(flag.helpLabel, "--organization <selector>");
   assert.equal(flag.char, undefined);
+});
+
+test("a display-name selector is refused with the slug and ID to use, never resolved", () => {
+  const organizations = [
+    { id: "org-personal", name: "octo", slug: "personal-p1", isPersonal: true, role: "admin" },
+    { id: "org-agentic", name: "agentic_organic", slug: "agentic-organic", isPersonal: false, role: "admin" }
+  ];
+  assert.equal(canonicalOrganizationId("agentic_organic", organizations), undefined);
+  const refusal = organizationSelectorRefusal("agentic_organic", organizations);
+  assert.deepEqual(refusal.body, {
+    ok: false,
+    error: "not_a_member",
+    selector: "agentic_organic",
+    suggestion: { slug: "agentic-organic", organizationId: "org-agentic" }
+  });
+  assert.match(refusal.message, /display name of agentic-organic \(org-agentic\)/u);
+  const ambiguous = [...organizations, { ...organizations[1], id: "org-other", slug: "other" }];
+  assert.deepEqual(organizationSelectorRefusal("agentic_organic", ambiguous).body, {
+    ok: false,
+    error: "not_a_member",
+    selector: "agentic_organic"
+  });
 });
