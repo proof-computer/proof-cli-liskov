@@ -130,7 +130,9 @@ Stale observations include retry guidance. This command sends only GET requests.
 With `--json`, a successful read emits `{revisions, truncated}`. Each revision
 contains `registration`, `desired`, `staged`, `serving`, and `availability`
 (`current` or `stale`). An empty list means the server recorded no revisions
-for the application. An unavailable read exits nonzero and reports
+for the application. Revisions are recorded only for V8 supervised payload jobs,
+which are not released yet, so a retained V5 Application reads an empty
+list. An unavailable read exits nonzero and reports
 `availability: "unavailable"` in its error object. An older endpoint may lack
 this read.
 
@@ -426,7 +428,7 @@ published under. See [`LICENSE`](LICENSE) for the full text.
 
 ## Native Cargo payloads and dark V8 authoring
 
-The source candidate adds an unencrypted native payload upload through the member
+Version 0.19.0 adds an unencrypted native payload upload through the member
 session, with no GitHub account or repository required:
 
 ```sh
@@ -460,6 +462,7 @@ V8 remains dark: `firstPublicReady` is false and policy publication refuses with
 `v8_production_registration_not_activated`. Existing V5/V6/V7 behavior is retained.
 
 Artifact readiness is separate from policy publication and running code. This
-candidate provides no encryption, npm release, public availability or production
-runtime proof. Those require the person-owned package, canary, documentation and
-promotion handoffs for EPIC-20261013-otop.
+release provides no encryption, public availability or production runtime proof.
+V8 policy publication is refused, so an uploaded payload cannot run. Those
+require the person-owned canary, documentation and promotion handoffs for
+EPIC-20261013-otop.
