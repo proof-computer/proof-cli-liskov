@@ -93,3 +93,23 @@ export function canonicalOrganizationId(
   return organizations.find((organization) => organization.id === selector)?.id ??
     organizations.find((organization) => organization.slug === selector)?.id;
 }
+
+/**
+ * The `not_a_member` refusal for a selector that names no membership. Selection
+ * stays exact (ADR-0047); when the selector is exactly one membership's display
+ * name, the refusal says which slug and ID to use instead of guessing.
+ */
+export function organizationSelectorRefusal(
+  selectorValue: string,
+  organizations: readonly LiskovOrganizationSummary[]
+): { body: Record<string, unknown>; message: string } {
+  const selector = organizationSelector(selectorValue, { required: true })!;
+  const named = organizations.filter((organization) => organization.name === selector);
+  const base = `Error (not_a_member): no active organization membership exactly matches ${selector}.`;
+  if (named.length !== 1) return { body: { ok: false, error: "not_a_member", selector }, message: base };
+  const [organization] = named;
+  return {
+    body: { ok: false, error: "not_a_member", selector, suggestion: { slug: organization.slug, organizationId: organization.id } },
+    message: `${base} "${selector}" is the display name of ${organization.slug} (${organization.id}); select it by slug or ID.`
+  };
+}

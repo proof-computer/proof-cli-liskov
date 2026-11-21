@@ -1,6 +1,6 @@
 import { isApplicationPlacementPlan, formatPlacementPlan, placementPlanPath } from "./placement-plan.js";
 import { isApplicationPlacementRefusals, formatPlacementRefusals, parsePlacementRefusalsQuery, placementRefusalsPath } from "./placement-refusals.js";
-import { spawn } from "node:child_process";
+import { openBrowser } from "./browser-open.js";
 import { createHash, randomBytes } from "node:crypto";
 import { access, mkdir, readFile, rm, writeFile, chmod } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -41,6 +41,7 @@ import {
   LISKOV_SESSION_FILE_ENV,
   organizationRequestHeaders,
   organizationSelector,
+  organizationSelectorRefusal,
   OrganizationSelectorError
 } from "./organization-context.js";
 import {
@@ -2397,12 +2398,8 @@ async function resolveExplicitOrganization(
   }
   const organizationId = canonicalOrganizationId(selector, request.body.organizations);
   if (organizationId === undefined) {
-    writeStructuredOrHuman(
-      options,
-      input.json,
-      { ok: false, error: "not_a_member", selector },
-      `Error (not_a_member): no active organization membership exactly matches ${selector}.`
-    );
+    const refusal = organizationSelectorRefusal(selector, request.body.organizations);
+    writeStructuredOrHuman(options, input.json, refusal.body, refusal.message);
     return { ok: false, exitCode: 1 };
   }
   return { ok: true, organizationId };
@@ -8338,22 +8335,6 @@ function resolveVerificationUrl(value: string, slipwayUrl: string): string {
 async function openVerificationUrl(url: string, options: SlipwayCliOptions): Promise<boolean> {
   if (options.openBrowser) return Boolean(await options.openBrowser(url));
   return openBrowser(url);
-}
-
-function openBrowser(url: string): boolean {
-  const platform = process.platform;
-  const command = platform === "darwin" ? "open" : platform === "win32" ? "cmd" : "xdg-open";
-  const args = platform === "win32" ? ["/c", "start", "", url] : [url];
-  try {
-    const child = spawn(command, args, {
-      detached: true,
-      stdio: "ignore"
-    });
-    child.unref();
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function emitLoginInstruction(
