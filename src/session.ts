@@ -6292,7 +6292,7 @@ export async function runSlipwayApplicationPlacementPlan(input: {
 }
 
 /**
- * One page of an application's recorded country and spread refusals. `--json`
+ * One page of an application's recorded placement refusals. `--json`
  * prints the server's body unchanged. A failure prints no rows, and nothing here
  * reads absent rows as a successful placement.
  */

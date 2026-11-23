@@ -8,7 +8,7 @@ export default class LiskovApplicationPlacementRefusals extends OrganizationScop
   };
   // BKLG-20260907-ie6x alone promotes V6 availability.
   static hidden = true;
-  static summary = "Read one page of recorded country and spread placement refusals.";
+  static summary = "Read one page of recorded placement refusals.";
   static description = "Read one page of an Application's recorded placement refusals in an explicit hourly window, with the server's reason and next action for each. Absent rows never mean placement succeeded: only the first refusal of each Application, code and hour is kept, a refusal whose write failed has no row, and `incomplete: false` does not mean every refusal is present. `incomplete` describes the whole page, one cut row marks all of it, and candidate counts cover only what was recorded. There is no default window and no automatic paging.";
   static examples = [
     "<%= config.bin %> liskov application placement-refusals proof-docs --from-ms 1757995200000 --to-ms 1758002400000 --limit 25",

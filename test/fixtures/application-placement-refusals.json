@@ -24,6 +24,7 @@
             "predicate": "allowed_countries",
             "source": "located_country",
             "nextAction": "widen_or_remove_allowed_countries",
+            "customerCanAct": true,
             "candidates": 2
           },
           {
@@ -31,11 +32,15 @@
             "predicate": "excluded_countries",
             "source": "located_country",
             "nextAction": "remove_excluded_country",
+            "customerCanAct": true,
             "candidates": 1
           }
         ],
         "spread": [],
-        "inbound": []
+        "inbound": [],
+        "processorCriteria": [],
+        "manager": [],
+        "policyDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       }
     ],
     "nextCursor": null,
@@ -57,10 +62,14 @@
             "reason": "required_manager_spread_unsatisfied",
             "key": "manager",
             "nextAction": "review_required_manager_spread",
+            "customerCanAct": true,
             "observations": 1
           }
         ],
-        "inbound": []
+        "inbound": [],
+        "processorCriteria": [],
+        "manager": [],
+        "policyDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       }
     ],
     "nextCursor": null,
@@ -84,9 +93,13 @@
             "predicate": "inbound_reachability",
             "source": "inbound_reachability",
             "nextAction": "retry_after_inbound_probe",
+            "customerCanAct": true,
             "candidates": 1
           }
-        ]
+        ],
+        "processorCriteria": [],
+        "manager": [],
+        "policyDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       }
     ],
     "nextCursor": null,
@@ -108,10 +121,14 @@
             "reason": "search_budget_exhausted",
             "key": null,
             "nextAction": "retry_bounded_spread_discovery",
+            "customerCanAct": false,
             "observations": 1
           }
         ],
-        "inbound": []
+        "inbound": [],
+        "processorCriteria": [],
+        "manager": [],
+        "policyDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       {
         "windowStartMs": 1757998800000,
@@ -123,10 +140,14 @@
             "reason": "required_manager_spread_unsatisfied",
             "key": "manager",
             "nextAction": "review_required_manager_spread",
+            "customerCanAct": true,
             "observations": 1
           }
         ],
-        "inbound": []
+        "inbound": [],
+        "processorCriteria": [],
+        "manager": [],
+        "policyDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       {
         "windowStartMs": 1757995200000,
@@ -138,10 +159,14 @@
             "reason": "plan_revalidation_required",
             "key": null,
             "nextAction": "retry_spread_plan_revalidation",
+            "customerCanAct": false,
             "observations": 1
           }
         ],
-        "inbound": []
+        "inbound": [],
+        "processorCriteria": [],
+        "manager": [],
+        "policyDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       {
         "windowStartMs": 1757995200000,
@@ -153,11 +178,15 @@
             "predicate": "country_rule",
             "source": "located_country",
             "nextAction": "retry_later",
+            "customerCanAct": false,
             "candidates": 1
           }
         ],
         "spread": [],
-        "inbound": []
+        "inbound": [],
+        "processorCriteria": [],
+        "manager": [],
+        "policyDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       }
     ],
     "nextCursor": null,
@@ -179,6 +208,7 @@
             "predicate": "allowed_countries",
             "source": "located_country",
             "nextAction": "widen_or_remove_allowed_countries",
+            "customerCanAct": true,
             "candidates": 2
           },
           {
@@ -186,11 +216,15 @@
             "predicate": "excluded_countries",
             "source": "located_country",
             "nextAction": "remove_excluded_country",
+            "customerCanAct": true,
             "candidates": 1
           }
         ],
         "spread": [],
-        "inbound": []
+        "inbound": [],
+        "processorCriteria": [],
+        "manager": [],
+        "policyDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       }
     ],
     "nextCursor": "eyJ2IjoxLCJzY29wZSI6ImY1YzE3ZjJiYzQ2NGU5ODY5ZmE4ZDlkZjdmNTY4NjNhZjU4ZjdhZjhmMGYyZWVjMTM3YmYxYjVhMDI3NzZmMzgiLCJ3aW5kb3dTdGFydE1zIjoxNzU3OTk1MjAwMDAwLCJwbGFjZW1lbnRDb2RlIjoicGxhY2VtZW50X25vX2VsaWdpYmxlX2NhbmRpZGF0ZSJ9",
@@ -208,11 +242,98 @@
         "launchReason": "processor_metric_floor_fleet_empty",
         "country": [],
         "spread": [],
-        "inbound": []
+        "inbound": [],
+        "processorCriteria": [],
+        "manager": [],
+        "policyDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       }
     ],
     "nextCursor": null,
     "incomplete": true
+  },
+  "processorCriteriaRefusal": {
+    "ok": true,
+    "schema": "application_placement_refusals_v1",
+    "applicationId": "app_canonical",
+    "generatedAtMs": 1758000000000,
+    "observations": [
+      {
+        "windowStartMs": 1757998800000,
+        "placementCode": "placement_no_eligible_candidate",
+        "launchReason": "processor_compatibility_fleet_empty",
+        "country": [],
+        "spread": [],
+        "inbound": [],
+        "processorCriteria": [
+          {
+            "reason": "android_major_below_floor",
+            "predicate": "minimum_android_major",
+            "source": "pinned_attestation_android_major",
+            "nextAction": "lower_minimum_android_major",
+            "customerCanAct": true,
+            "candidates": 1
+          }
+        ],
+        "manager": [],
+        "policyDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    ],
+    "nextCursor": null,
+    "incomplete": false
+  },
+  "managerRefusal": {
+    "ok": true,
+    "schema": "application_placement_refusals_v1",
+    "applicationId": "app_canonical",
+    "generatedAtMs": 1758000000000,
+    "observations": [
+      {
+        "windowStartMs": 1757998800000,
+        "placementCode": "placement_no_eligible_candidate",
+        "launchReason": "v5_manager_fleet_empty",
+        "country": [],
+        "spread": [],
+        "inbound": [],
+        "processorCriteria": [],
+        "manager": [
+          {
+            "reason": "manager_not_allowed",
+            "predicate": "allowed_managers",
+            "source": "manager_pairing",
+            "nextAction": "widen_or_remove_allowed_managers",
+            "customerCanAct": true,
+            "candidates": 1
+          },
+          {
+            "reason": "manager_excluded",
+            "predicate": "excluded_managers",
+            "source": "manager_pairing",
+            "nextAction": "remove_excluded_manager",
+            "customerCanAct": true,
+            "candidates": 1
+          },
+          {
+            "reason": "manager_unpaired",
+            "predicate": "allowed_managers",
+            "source": "manager_pairing",
+            "nextAction": "widen_or_remove_allowed_managers",
+            "customerCanAct": true,
+            "candidates": 1
+          },
+          {
+            "reason": "manager_unavailable",
+            "predicate": "manager_rule",
+            "source": "manager_pairing",
+            "nextAction": "retry_later",
+            "customerCanAct": false,
+            "candidates": 1
+          }
+        ],
+        "policyDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    ],
+    "nextCursor": null,
+    "incomplete": false
   },
   "badRequests": {
     "invalidApplicationRef": {
