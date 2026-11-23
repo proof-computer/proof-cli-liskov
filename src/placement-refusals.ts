@@ -4,27 +4,38 @@
  * country inference and no table from a refusal code to advice, so a token this
  * build has never seen prints like any other.
  */
-export interface PlacementRefusalCountryReason {
+/** Country, inbound, processor-criteria and manager reasons share this recorded-candidate shape. */
+export interface PlacementRefusalCandidateReason {
   reason: string;
   predicate: string;
   source: string;
   nextAction: string;
+  /** Absent on an older server. The human read prints the server's words, not this flag. */
+  customerCanAct?: boolean;
   candidates: number;
 }
 export interface PlacementRefusalSpreadReason {
   reason: string;
   key: string | null;
   nextAction: string;
+  /** Absent on an older server. The human read prints the server's words, not this flag. */
+  customerCanAct?: boolean;
   observations: number;
 }
 export interface PlacementRefusalObservation {
   windowStartMs: number;
   placementCode: string;
   launchReason: string;
-  country: PlacementRefusalCountryReason[];
+  country: PlacementRefusalCandidateReason[];
   spread: PlacementRefusalSpreadReason[];
   /** Absent on an older server. Same recorded-candidate shape as country (ADR-0276 §6). */
-  inbound?: PlacementRefusalCountryReason[];
+  inbound?: PlacementRefusalCandidateReason[];
+  /** Absent on an older server (BKLG-20261122-kh40). Same recorded-candidate shape as country. */
+  processorCriteria?: PlacementRefusalCandidateReason[];
+  /** Absent on an older server (BKLG-20261122-kh40). Same recorded-candidate shape as country. */
+  manager?: PlacementRefusalCandidateReason[];
+  /** Absent on an older server. The stored policy digest; human output does not print it. */
+  policyDigest?: string;
 }
 export interface ApplicationPlacementRefusals {
   ok: true;
@@ -49,18 +60,24 @@ const record = (value: unknown): value is Record<string, unknown> =>
 const text = (value: unknown): value is string => typeof value === "string" && value.length > 0;
 const count = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
 
+/** Older servers omit it. A present value is the owner's boolean, not a string. */
+const customerCanAct = (value: Record<string, unknown>): boolean =>
+  value.customerCanAct === undefined || typeof value.customerCanAct === "boolean";
 const countryReason = (value: unknown): boolean =>
   record(value) && text(value.reason) && text(value.predicate) && text(value.source) &&
-  text(value.nextAction) && count(value.candidates);
+  text(value.nextAction) && customerCanAct(value) && count(value.candidates);
 const candidateReasons = (value: unknown): boolean => Array.isArray(value) && value.every(countryReason);
 const spreadReason = (value: unknown): boolean =>
   record(value) && text(value.reason) && (value.key === null || text(value.key)) &&
-  text(value.nextAction) && count(value.observations);
+  text(value.nextAction) && customerCanAct(value) && count(value.observations);
 const observation = (value: unknown): boolean =>
   record(value) && count(value.windowStartMs) && text(value.placementCode) && text(value.launchReason) &&
   candidateReasons(value.country) &&
   Array.isArray(value.spread) && value.spread.every(spreadReason) &&
-  (value.inbound === undefined || candidateReasons(value.inbound));
+  (value.inbound === undefined || candidateReasons(value.inbound)) &&
+  (value.processorCriteria === undefined || candidateReasons(value.processorCriteria)) &&
+  (value.manager === undefined || candidateReasons(value.manager)) &&
+  (value.policyDigest === undefined || text(value.policyDigest));
 
 /** A cursor on a page the server calls complete contradicts the owner's rule. */
 export function isApplicationPlacementRefusals(body: unknown): body is ApplicationPlacementRefusals {
@@ -99,7 +116,7 @@ export function placementRefusalsPath(applicationId: string, query: PlacementRef
   return `/api/applications/${encodeURIComponent(applicationId)}/placement/refusals?${params.toString()}`;
 }
 
-function candidateReasonLines(label: string, reasons: PlacementRefusalCountryReason[]): string[] {
+function candidateReasonLines(label: string, reasons: PlacementRefusalCandidateReason[]): string[] {
   const lines: string[] = [];
   for (const reason of reasons) {
     lines.push(
@@ -116,8 +133,11 @@ export function formatPlacementRefusals(body: ApplicationPlacementRefusals): str
     `Application: ${body.applicationId}`
   ];
   if (body.observations.length === 0) lines.push("There are no recorded refusals in this page.");
+  let recordedCandidates = false;
   for (const row of body.observations) {
     const inbound = row.inbound ?? [];
+    const processorCriteria = row.processorCriteria ?? [];
+    const manager = row.manager ?? [];
     lines.push(`Window ${row.windowStartMs}: ${row.placementCode} (launch reason ${row.launchReason})`);
     lines.push(...candidateReasonLines("Country", row.country));
     for (const reason of row.spread) {
@@ -127,14 +147,20 @@ export function formatPlacementRefusals(body: ApplicationPlacementRefusals): str
       );
     }
     lines.push(...candidateReasonLines("Inbound", inbound));
-    if (row.country.length === 0 && row.spread.length === 0 && inbound.length === 0) {
+    lines.push(...candidateReasonLines("Processor criteria", processorCriteria));
+    lines.push(...candidateReasonLines("Manager", manager));
+    if (row.country.length > 0 || inbound.length > 0 || processorCriteria.length > 0 || manager.length > 0) {
+      recordedCandidates = true;
+    }
+    if (row.country.length === 0 && row.spread.length === 0 && inbound.length === 0 &&
+      processorCriteria.length === 0 && manager.length === 0) {
       lines.push("  No country or spread reason is recorded for this refusal.");
     }
   }
   lines.push(body.incomplete
     ? "Page incomplete: another page exists, or a recorded refusal left out a candidate or a reason. This marks the whole page, not one row, and a reason absent here may still have occurred."
     : "Page not marked incomplete: this does not mean every refusal is present. Only the first refusal of each Application, code and hour is kept, and a refusal whose write failed has no row.");
-  if (body.observations.some((row) => row.country.length > 0 || (row.inbound ?? []).length > 0)) {
+  if (recordedCandidates) {
     lines.push("Recorded candidates count only what was recorded, not every candidate refused.");
   }
   lines.push("This read does not say placement succeeded, and it does not cover all Application history.");

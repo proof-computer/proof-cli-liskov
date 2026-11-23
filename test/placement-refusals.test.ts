@@ -9,12 +9,18 @@ import Command from "../src/commands/liskov/application/placement-refusals.js";
 import { isApplicationPlacementRefusals, parsePlacementRefusalsQuery, placementRefusalsPath } from "../src/placement-refusals.js";
 import { runSlipwayApplicationPlacementRefusals } from "../src/session.js";
 
-// Byte-for-byte owner vector at liskov-rs af15276f39cb366916f96cd9277cf44de5f85a96,
-// crates/liskov-control-plane-api/vectors/application_placement_refusals.json.
+// Byte-for-byte owner vector at liskov-rs 5ca3428e57f7802075b07e5130e0f66275ee826f,
+// crates/liskov-control-plane-api/vectors/application_placement_refusals.json
+// (BKLG-20261122-kh40's merged tenant vector).
 const { badRequests, ...envelopes } = JSON.parse(await readFile(new URL("./fixtures/application-placement-refusals.json", import.meta.url), "utf8"));
 const token = "session-token-that-must-not-be-printed";
 const window = { fromMs: "1757995200000", toMs: "1758002400000", limit: "25" };
 const windowQuery = "fromMs=1757995200000&toMs=1758002400000&limit=25";
+const noReasonLine = /No country or spread reason is recorded for this refusal\./u;
+
+type CandidateReason = { reason: string; predicate: string; source: string; nextAction: string; candidates: number };
+const candidateLine = (label: string, reason: CandidateReason) =>
+  `${label}: ${reason.reason} (predicate ${reason.predicate}, source ${reason.source}, recorded candidates ${reason.candidates})\n    Next action: ${reason.nextAction}`;
 
 type Served = { status?: number; body?: unknown; raw?: string };
 
@@ -89,20 +95,18 @@ test("no cursor flag sends no cursor; a served cursor passes back untouched; zer
 });
 
 test("human output carries each typed reason and its server-owned next action", async () => {
-  for (const body of Object.values(envelopes) as { observations: { windowStartMs: number; placementCode: string; launchReason: string; country: Record<string, string | number>[]; spread: Record<string, string | number | null>[]; inbound?: Record<string, string | number>[] }[] }[]) {
+  for (const body of Object.values(envelopes) as { observations: { windowStartMs: number; placementCode: string; launchReason: string; country: CandidateReason[]; spread: { reason: string; key: string | null; nextAction: string; observations: number }[]; inbound?: CandidateReason[]; processorCriteria?: CandidateReason[]; manager?: CandidateReason[] }[] }[]) {
     const { code, output } = await read({ body });
     assert.equal(code, 0);
     for (const row of body.observations) {
       assert.ok(output.includes(`Window ${row.windowStartMs}: ${row.placementCode} (launch reason ${row.launchReason})`));
-      for (const reason of row.country) {
-        assert.ok(output.includes(`Country: ${reason.reason} (predicate ${reason.predicate}, source ${reason.source}, recorded candidates ${reason.candidates})\n    Next action: ${reason.nextAction}`));
-      }
+      for (const reason of row.country) assert.ok(output.includes(candidateLine("Country", reason)));
       for (const reason of row.spread) {
         assert.ok(output.includes(`Spread: ${reason.reason} (key ${reason.key ?? "none"}, observations ${reason.observations})\n    Next action: ${reason.nextAction}`));
       }
-      for (const reason of row.inbound ?? []) {
-        assert.ok(output.includes(`Inbound: ${reason.reason} (predicate ${reason.predicate}, source ${reason.source}, recorded candidates ${reason.candidates})\n    Next action: ${reason.nextAction}`));
-      }
+      for (const reason of row.inbound ?? []) assert.ok(output.includes(candidateLine("Inbound", reason)));
+      for (const reason of row.processorCriteria ?? []) assert.ok(output.includes(candidateLine("Processor criteria", reason)));
+      for (const reason of row.manager ?? []) assert.ok(output.includes(candidateLine("Manager", reason)));
     }
   }
 });
@@ -112,16 +116,16 @@ test("an inbound refusal prints each reason, and the no-reason line only when ev
   const reason = body.observations[0].inbound[0];
   const printed = await read({ body });
   assert.equal(printed.code, 0);
-  assert.ok(printed.output.includes(`Inbound: ${reason.reason} (predicate ${reason.predicate}, source ${reason.source}, recorded candidates ${reason.candidates})\n    Next action: ${reason.nextAction}`));
+  assert.ok(printed.output.includes(candidateLine("Inbound", reason)));
   assert.match(printed.output, /Recorded candidates count only what was recorded/u);
-  assert.doesNotMatch(printed.output, /No country or spread reason is recorded for this refusal\./u);
+  assert.doesNotMatch(printed.output, noReasonLine);
 
   const emptied = structuredClone(body);
   emptied.observations[0].inbound = [];
   const emptyInbound = await read({ body: emptied });
   assert.equal(emptyInbound.code, 0);
   assert.notEqual(printed.output, emptyInbound.output);
-  assert.match(emptyInbound.output, /No country or spread reason is recorded for this refusal\./u);
+  assert.match(emptyInbound.output, noReasonLine);
   assert.doesNotMatch(emptyInbound.output, /Inbound:/u);
 
   const older = structuredClone(body);
@@ -131,6 +135,57 @@ test("an inbound refusal prints each reason, and the no-reason line only when ev
   assert.equal(accepted.code, 0);
   assert.equal(accepted.output, JSON.stringify(older));
   assert.equal(JSON.parse(accepted.output).observations[0].inbound, undefined);
+});
+
+test("a manager refusal and a processor-criteria refusal print their reasons, and five empty lists print the no-reason line", async () => {
+  for (const [body, label, list] of [
+    [envelopes.managerRefusal, "Manager", "manager"],
+    [envelopes.processorCriteriaRefusal, "Processor criteria", "processorCriteria"]
+  ] as const) {
+    const printed = await read({ body });
+    assert.equal(printed.code, 0);
+    assert.doesNotMatch(printed.output, noReasonLine);
+    assert.doesNotMatch(printed.output, /sha256:|customerCanAct/u);
+    for (const reason of body.observations[0][list]) assert.ok(printed.output.includes(candidateLine(label, reason)), reason.reason);
+    const emptied = structuredClone(body);
+    emptied.observations[0][list] = [];
+    const emptyList = await read({ body: emptied });
+    assert.equal(emptyList.code, 0);
+    assert.notEqual(printed.output, emptyList.output);
+    assert.match(emptyList.output, noReasonLine);
+    assert.doesNotMatch(emptyList.output, new RegExp(`${label}:`, "u"));
+  }
+});
+
+test("customerCanAct and policyDigest pass through JSON and change no human line", async () => {
+  const body = envelopes.managerRefusal;
+  const printed = await read({ body });
+  const flipped = structuredClone(body);
+  const reason = flipped.observations[0].manager[0];
+  reason.customerCanAct = !reason.customerCanAct;
+  flipped.observations[0].policyDigest = "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+  assert.equal((await read({ body: flipped })).output, printed.output);
+  const json = await read({ body: flipped }, { json: true });
+  assert.equal(json.code, 0);
+  assert.equal(json.output, JSON.stringify(flipped));
+});
+
+test("a document without the new fields is accepted and prints as before", async () => {
+  const older = structuredClone(envelopes.countryRefusal);
+  const row = older.observations[0];
+  delete row.processorCriteria;
+  delete row.manager;
+  delete row.policyDigest;
+  for (const reason of [...row.country, ...row.spread]) delete reason.customerCanAct;
+  assert.equal(isApplicationPlacementRefusals(older), true);
+  const json = await read({ body: older }, { json: true });
+  assert.equal(json.code, 0);
+  assert.equal(json.output, JSON.stringify(older));
+  const human = await read({ body: older });
+  assert.equal(human.code, 0);
+  assert.ok(human.output.includes(candidateLine("Country", envelopes.countryRefusal.observations[0].country[0])));
+  assert.doesNotMatch(human.output, /Processor criteria:|Manager:|sha256:/u);
+  assert.doesNotMatch(human.output, noReasonLine);
 });
 
 test("an empty page says so and claims neither success nor a whole history", async () => {
@@ -153,7 +208,7 @@ test("incomplete is a page statement, and complete is never all refusals", async
   assert.ok(page.includes(`--cursor ${envelopes.truncatedPage.nextCursor}`));
 
   const cut = (await read({ body: envelopes.truncatedCandidates })).output;
-  assert.match(cut, /No country or spread reason is recorded for this refusal\./u);
+  assert.match(cut, noReasonLine);
   assert.match(cut, /a reason absent here may still have occurred/u);
   assert.doesNotMatch(cut, /--cursor/u);
 
@@ -266,6 +321,35 @@ test("a malformed envelope or unknown schema fails closed", async () => {
   const inboundNotAList = structuredClone(envelopes.inboundRefusal);
   inboundNotAList.observations[0].inbound = null;
   invalid.push(inboundNotAList);
+  for (const [envelope, list] of [
+    [envelopes.processorCriteriaRefusal, "processorCriteria"],
+    [envelopes.managerRefusal, "manager"]
+  ] as const) {
+    const notAList = structuredClone(envelope);
+    notAList.observations[0][list] = null;
+    invalid.push(notAList);
+    for (const key of ["reason", "predicate", "source", "nextAction", "candidates"] as const) {
+      const body = structuredClone(envelope);
+      delete body.observations[0][list][0][key];
+      invalid.push(body);
+    }
+  }
+  for (const [body, key] of [
+    [structuredClone(envelopes.countryRefusal), "country"],
+    [structuredClone(envelopes.managerRefusal), "manager"],
+    [structuredClone(envelopes.processorCriteriaRefusal), "processorCriteria"]
+  ] as const) {
+    body.observations[0][key][0].customerCanAct = "yes";
+    invalid.push(body);
+  }
+  const spreadFlag = structuredClone(envelopes.spreadRefusal);
+  spreadFlag.observations[0].spread[0].customerCanAct = "yes";
+  invalid.push(spreadFlag);
+  for (const policyDigest of ["", 1, null]) {
+    const body = structuredClone(envelopes.countryRefusal);
+    body.observations[0].policyDigest = policyDigest;
+    invalid.push(body);
+  }
   for (const key of ["reason", "key", "nextAction", "observations"]) {
     const body = structuredClone(envelopes.spreadRefusal); delete body.observations[0].spread[0][key]; invalid.push(body);
   }
