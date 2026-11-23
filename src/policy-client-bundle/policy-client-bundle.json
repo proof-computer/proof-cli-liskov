@@ -3,8 +3,8 @@
   "abiVersion": 1,
   "artifact": {
     "file": "policy-client-contract.wasm.gz",
-    "sha256": "sha256:7b40b5dbfde1e2d7c517d1ca83cbfbd7405e5d391533d5492523ea54b43a0438",
-    "uncompressedSha256": "sha256:a93e882c495ac1a68687393b551db50086f0b42cb658e79b8b36b325e823e1aa"
+    "sha256": "sha256:2500baa2d577f18ed1e6dc96377ac47614d788c1a3978813ef4368e32d712ad5",
+    "uncompressedSha256": "sha256:fd29920708abff8fa6ce9959dea42fef9bda0c92a65c2812bedb59cf67e899c2"
   },
   "adapter": {
     "file": "policy-client.cjs",
@@ -64,6 +64,11 @@
     {
       "schema": "proof.liskov.application-manifest",
       "schemaVersion": 5,
+      "releaseMode": "source"
+    },
+    {
+      "schema": "proof.liskov.application-manifest",
+      "schemaVersion": 6,
       "releaseMode": "source"
     }
   ],
@@ -132,11 +137,11 @@
             "crates/slipway-application-policy/fixtures/v6/semantic-matrix.json": "sha256:0ee41e528e08710fdff4bf0e21ecbb15a05ad913e1b287f0cfca83dbf3a693ea",
             "crates/slipway-application-policy/fixtures/v6/corpus-manifest.json": "sha256:9637566db2362b1f869af5ce7eb44ced7c7028695c9a89a9db3d3223ff5b338a",
             "crates/slipway-application-policy/fixtures/v6/invalid-fixture-manifest.json": "sha256:0fa360bd61fdb9fc2ed787f1a3757f6ee2ab71af0368d252f6e64d34ca30de13",
-            "crates/slipway-application-policy/fixtures/v6/materialization-digest-goldens.json": "sha256:c03bb0d82d14e3fa404245aefb48a4f94fb002346aaef83a69ac19584df98a8f",
+            "crates/slipway-application-policy/fixtures/v6/materialization-digest-goldens.json": "sha256:2c7a15fe8a3a6b5a97cfe23665d5ce80f724e050a1c904f5f10e312d33ce2d6d",
             "crates/slipway-application-policy/fixtures/v6/diagnostic-registry.json": "sha256:b9f637045a46558858ac768280da330a565ab75f7259c2bd8bef306b0f877748"
           }
         },
-        "rcDigest": "sha256:6e7d22cf6a62b4dc72d501ed402226487d5543e5227790fd90095dfbceed3389"
+        "rcDigest": "sha256:48dc5f4df0fe85aadf8654a4c52abe02fac1a65b5ed298a59cc46a9812a89c55"
       },
       "source": {
         "root": "crates/liskov-application-policy/fixtures/v6/corpus",
@@ -150,7 +155,7 @@
       "expectedClientSurfaces": [
         {
           "repository": "proof-cli-liskov",
-          "surface": "offline-validation"
+          "surface": "offline-validation-and-publication"
         },
         {
           "repository": "liskov-github-actions",
@@ -246,6 +251,6 @@
       ]
     }
   ],
-  "sourceDigest": "sha256:199861f912ffab4e6e12a250248117c11074f42328dd571acccb5c0ac1608c29",
+  "sourceDigest": "sha256:1da16ea6817fde65dfe19ff2f06510d2255b309890e113846d89c076924733f1",
   "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)"
 }

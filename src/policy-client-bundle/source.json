@@ -1,15 +1,15 @@
 {
   "repository": "https://github.com/proof-computer/liskov-rs",
-  "commit": "4473cf26b26f4ed6d2960b086506254fe4d7dea3",
-  "packet": "BKLG-20261118-ouys",
+  "commit": "bf93a1f675f3adbf5ff1abefc62fb3b24bb33d7c",
+  "packet": "BKLG-20261123-ab14",
   "files": {
     "policy-client-bundle.json": {
       "source": "crates/liskov-policy-client-contract/bundle/policy-client-bundle.json",
-      "sha256": "sha256:54bd5f14b62fa425915045cb414326bb9cc1b6ea0dbed60d0e6fac30ebd67dc0"
+      "sha256": "sha256:d081e6de316015b58e2be8eb9bddd63cbc3a345955be13eb85e87a33637d7e9a"
     },
     "policy-client-contract.wasm.gz": {
       "source": "crates/liskov-policy-client-contract/bundle/policy-client-contract.wasm.gz",
-      "sha256": "sha256:7b40b5dbfde1e2d7c517d1ca83cbfbd7405e5d391533d5492523ea54b43a0438"
+      "sha256": "sha256:2500baa2d577f18ed1e6dc96377ac47614d788c1a3978813ef4368e32d712ad5"
     },
     "policy-client.cjs": {
       "source": "crates/liskov-policy-client-contract/bundle/policy-client.cjs",
