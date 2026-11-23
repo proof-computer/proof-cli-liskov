@@ -9,7 +9,7 @@ export default class SlipwayApplicationSigner extends OrganizationScopedCommand 
   };
   // Hidden until V6 is released: `BKLG-20260907-ie6x` un-hides and documents it.
   static hidden = true;
-  static description = "Show an application's self-custody signer as the server observed it: the policy it is paired against, each signer's liveness, open sign requests, terminal counts and dispatch lag. Observed (executed) funding is reported as unavailable with the server's reason, never as a figure.";
+  static description = "Show an application's self-custody signer as the server observed it: the policy it is paired against, each signer's liveness, open sign requests, terminal counts and dispatch lag. Observed funding includes admissions, open reserves, settled ACU, closed jobs with unknown amounts, and holds. When unavailable, the command shows the server's reason.";
   static examples = [
     "<%= config.bin %> liskov application signer my-app",
     "<%= config.bin %> liskov application signer my-app --json"

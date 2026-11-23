@@ -32,7 +32,7 @@
     },
     "executedFunding": {
       "available": false,
-      "unavailableReason": "v6_custody_execution_not_built"
+      "unavailableReason": "no_customer_funded_execution"
     }
   },
   "managed": {
@@ -68,7 +68,7 @@
     },
     "executedFunding": {
       "available": false,
-      "unavailableReason": "v6_custody_execution_not_built"
+      "unavailableReason": "no_customer_funded_execution"
     }
   },
   "live": {
@@ -112,7 +112,7 @@
     },
     "executedFunding": {
       "available": false,
-      "unavailableReason": "v6_custody_execution_not_built"
+      "unavailableReason": "no_customer_funded_execution"
     }
   },
   "stalled": {
@@ -156,7 +156,7 @@
     },
     "executedFunding": {
       "available": false,
-      "unavailableReason": "v6_custody_execution_not_built"
+      "unavailableReason": "no_customer_funded_execution"
     }
   },
   "oldProtocol": {
@@ -200,7 +200,7 @@
     },
     "executedFunding": {
       "available": false,
-      "unavailableReason": "v6_custody_execution_not_built"
+      "unavailableReason": "no_customer_funded_execution"
     }
   },
   "waiting": {
@@ -254,7 +254,7 @@
     },
     "executedFunding": {
       "available": false,
-      "unavailableReason": "v6_custody_execution_not_built"
+      "unavailableReason": "no_customer_funded_execution"
     }
   },
   "claimed": {
@@ -308,7 +308,7 @@
     },
     "executedFunding": {
       "available": false,
-      "unavailableReason": "v6_custody_execution_not_built"
+      "unavailableReason": "no_customer_funded_execution"
     }
   },
   "sent": {
@@ -362,7 +362,7 @@
     },
     "executedFunding": {
       "available": false,
-      "unavailableReason": "v6_custody_execution_not_built"
+      "unavailableReason": "no_customer_funded_execution"
     }
   },
   "ambiguous": {
@@ -406,7 +406,225 @@
     },
     "executedFunding": {
       "available": false,
-      "unavailableReason": "v6_custody_execution_not_built"
+      "unavailableReason": "no_customer_funded_execution"
+    }
+  },
+  "fundedNothingSettled": {
+    "ok": true,
+    "schema": "application_custody_signer_v1",
+    "applicationId": "app_01j8canonical",
+    "activePolicyDigest": "sha256:5d41402abc4b2a76b9719d911017c592ae2f1c9e5d8b3a7c6e4f2a1b0c9d8e7f",
+    "generatedAtMs": 1758000000000,
+    "signerReadback": {
+      "stallAfterMs": 90000,
+      "signers": [
+        {
+          "signerAddress": "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
+          "connected": true,
+          "online": true,
+          "heartbeatAgeMs": 1000,
+          "protocolVersion": 2
+        }
+      ],
+      "signersTruncated": false,
+      "openRequests": [],
+      "openRequestsTruncated": false,
+      "counts": {
+        "boundSigners": 1,
+        "onlineSigners": 1,
+        "openRequests": 0,
+        "pending": 0,
+        "claimed": 0,
+        "completed": 0,
+        "refused": 0,
+        "signed": 0,
+        "expired": 0,
+        "ambiguous": 0
+      },
+      "dispatchLag": {
+        "oldestUnclaimedAgeMs": null,
+        "oldestClaimedAgeMs": null,
+        "lastSuccessAgeMs": null
+      },
+      "lastSuccessAtMs": null
+    },
+    "executedFunding": {
+      "available": true,
+      "source": "self_custody",
+      "unit": "acu_planck",
+      "admitted": 1,
+      "openReserves": 1,
+      "settled": 0,
+      "settledPlanck": "0",
+      "unresolvedHolds": 0,
+      "closedAmountUnknown": 0,
+      "closedAmountUnknownByReason": {},
+      "oldestUnresolvedHoldAgeMs": null
+    }
+  },
+  "fundedSettled": {
+    "ok": true,
+    "schema": "application_custody_signer_v1",
+    "applicationId": "app_01j8canonical",
+    "activePolicyDigest": "sha256:5d41402abc4b2a76b9719d911017c592ae2f1c9e5d8b3a7c6e4f2a1b0c9d8e7f",
+    "generatedAtMs": 1758000000000,
+    "signerReadback": {
+      "stallAfterMs": 90000,
+      "signers": [
+        {
+          "signerAddress": "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
+          "connected": true,
+          "online": true,
+          "heartbeatAgeMs": 1000,
+          "protocolVersion": 2
+        }
+      ],
+      "signersTruncated": false,
+      "openRequests": [],
+      "openRequestsTruncated": false,
+      "counts": {
+        "boundSigners": 1,
+        "onlineSigners": 1,
+        "openRequests": 0,
+        "pending": 0,
+        "claimed": 0,
+        "completed": 0,
+        "refused": 0,
+        "signed": 0,
+        "expired": 0,
+        "ambiguous": 0
+      },
+      "dispatchLag": {
+        "oldestUnclaimedAgeMs": null,
+        "oldestClaimedAgeMs": null,
+        "lastSuccessAgeMs": null
+      },
+      "lastSuccessAtMs": null
+    },
+    "executedFunding": {
+      "available": true,
+      "source": "self_custody",
+      "unit": "acu_planck",
+      "admitted": 3,
+      "openReserves": 1,
+      "settled": 2,
+      "settledPlanck": "340282366920938463463374607431768211455",
+      "unresolvedHolds": 0,
+      "closedAmountUnknown": 0,
+      "closedAmountUnknownByReason": {},
+      "oldestUnresolvedHoldAgeMs": null
+    }
+  },
+  "fundedHeld": {
+    "ok": true,
+    "schema": "application_custody_signer_v1",
+    "applicationId": "app_01j8canonical",
+    "activePolicyDigest": "sha256:5d41402abc4b2a76b9719d911017c592ae2f1c9e5d8b3a7c6e4f2a1b0c9d8e7f",
+    "generatedAtMs": 1758000000000,
+    "signerReadback": {
+      "stallAfterMs": 90000,
+      "signers": [
+        {
+          "signerAddress": "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
+          "connected": true,
+          "online": true,
+          "heartbeatAgeMs": 1000,
+          "protocolVersion": 2
+        }
+      ],
+      "signersTruncated": false,
+      "openRequests": [],
+      "openRequestsTruncated": false,
+      "counts": {
+        "boundSigners": 1,
+        "onlineSigners": 1,
+        "openRequests": 0,
+        "pending": 0,
+        "claimed": 0,
+        "completed": 0,
+        "refused": 0,
+        "signed": 0,
+        "expired": 0,
+        "ambiguous": 0
+      },
+      "dispatchLag": {
+        "oldestUnclaimedAgeMs": null,
+        "oldestClaimedAgeMs": null,
+        "lastSuccessAgeMs": null
+      },
+      "lastSuccessAtMs": null
+    },
+    "executedFunding": {
+      "available": true,
+      "source": "self_custody",
+      "unit": "acu_planck",
+      "admitted": 3,
+      "openReserves": 1,
+      "settled": 1,
+      "settledPlanck": "750000",
+      "unresolvedHolds": 2,
+      "closedAmountUnknown": 1,
+      "closedAmountUnknownByReason": {
+        "missing_execution_report": 1
+      },
+      "deregistrationHolds": 1,
+      "deregistrationHoldsByReason": {
+        "deregister_signer_retired": 1
+      },
+      "oldestUnresolvedHoldAgeMs": 600000
+    }
+  },
+  "fundedSettlementUnreadable": {
+    "ok": true,
+    "schema": "application_custody_signer_v1",
+    "applicationId": "app_01j8canonical",
+    "activePolicyDigest": "sha256:5d41402abc4b2a76b9719d911017c592ae2f1c9e5d8b3a7c6e4f2a1b0c9d8e7f",
+    "generatedAtMs": 1758000000000,
+    "signerReadback": {
+      "stallAfterMs": 90000,
+      "signers": [
+        {
+          "signerAddress": "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
+          "connected": true,
+          "online": true,
+          "heartbeatAgeMs": 1000,
+          "protocolVersion": 2
+        }
+      ],
+      "signersTruncated": false,
+      "openRequests": [],
+      "openRequestsTruncated": false,
+      "counts": {
+        "boundSigners": 1,
+        "onlineSigners": 1,
+        "openRequests": 0,
+        "pending": 0,
+        "claimed": 0,
+        "completed": 0,
+        "refused": 0,
+        "signed": 0,
+        "expired": 0,
+        "ambiguous": 0
+      },
+      "dispatchLag": {
+        "oldestUnclaimedAgeMs": null,
+        "oldestClaimedAgeMs": null,
+        "lastSuccessAgeMs": null
+      },
+      "lastSuccessAtMs": null
+    },
+    "executedFunding": {
+      "available": true,
+      "source": "self_custody",
+      "unit": "acu_planck",
+      "admitted": 1,
+      "openReserves": 0,
+      "settled": 0,
+      "settledPlanck": null,
+      "unresolvedHolds": 1,
+      "closedAmountUnknown": 0,
+      "closedAmountUnknownByReason": {},
+      "oldestUnresolvedHoldAgeMs": 600000
     }
   }
 }
