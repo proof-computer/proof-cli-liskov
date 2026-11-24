@@ -7,8 +7,6 @@ export default class SlipwayPlacementManagerFleet extends OrganizationScopedComm
   static args = {
     manager_id: Args.string({ description: "The processor manager id as it appears on chain and in `deployment.placement` rules.", required: true })
   };
-  // Hidden until V6 is released: `BKLG-20260907-ie6x` un-hides and documents it.
-  static hidden = true;
   static description = "Count the processors a manager rule in a manifest's `deployment.placement` would reach: how many eligible processors the served placement projection knows under the manager, how many a filtered placement reaches now, which projection answered and how old the manager evidence is. No processor is listed. When no projection can answer, the count is unavailable, not zero.";
   static examples = [
     "<%= config.bin %> liskov placement manager-fleet 9470",

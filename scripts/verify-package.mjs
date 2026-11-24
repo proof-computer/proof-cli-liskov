@@ -169,9 +169,19 @@ for (const command of scopedLeafCommands) {
   }
 }
 
-for (const id of ["liskov:application:placement-plan", "liskov:application:placement-refusals"]) {
-  if (oclifManifest.commands[id]?.hidden !== true) {
-    errors.push(`${id} must stay hidden until V6 release`);
+for (const id of [
+  "liskov:placement",
+  "liskov:placement:manager-fleet",
+  "liskov:application:signer",
+  "liskov:application:signer:pair",
+  "liskov:application:signer:unpair",
+  "liskov:application:placement-plan",
+  "liskov:application:placement-refusals",
+  "liskov:runtime-ssh:attachment:endpoints"
+]) {
+  const command = oclifManifest.commands[id];
+  if (!command || command.hidden === true) {
+    errors.push(`${id} must be present and visible in help`);
   }
 }
 

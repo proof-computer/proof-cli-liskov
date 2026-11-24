@@ -8,8 +8,6 @@ export default class RuntimeSshAttachmentEndpoints extends OrganizationScopedCom
     app: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true }),
     attachment_id: Args.string({ description: "Exact attachment ID from `attachment list`.", required: false })
   };
-  // Hidden until V6 is released: `BKLG-20260907-ie6x` un-hides and documents it.
-  static hidden = true;
   static description = "Show the private endpoints one Runtime SSH attachment publishes, as the server observed them. The columns are the use site, service, local port, state, address and, when degraded, the reason. The state is the only readiness fact: a published endpoint has an address but has not been observed ready.";
   static examples = [
     "<%= config.bin %> liskov runtime-ssh attachment endpoints my-app att_1a2b3c",

@@ -4,8 +4,6 @@ import { runSlipwayApplicationSignerUnpair } from "../../../../application-signe
 import { liskovUrlFlag, OrganizationScopedCommand } from "../../../../organization-context.js";
 
 export default class LiskovApplicationSignerUnpair extends OrganizationScopedCommand {
-  // Hidden until V6 is released: BKLG-20261123-irb3 un-hides it.
-  static hidden = true;
   static args = {
     app_ref: Args.string({ description: "Liskov Application uid, name, or legacy id.", required: true })
   };

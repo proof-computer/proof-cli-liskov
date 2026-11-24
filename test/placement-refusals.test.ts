@@ -370,8 +370,8 @@ test("a malformed envelope or unknown schema fails closed", async () => {
   for (const raw of ["", "not json", "<html></html>"]) assert.equal((await read({ raw })).code, 1);
 });
 
-test("the command stays hidden, needs its bounds, and its help carries the semantics", () => {
-  assert.equal(Command.hidden, true);
+test("the command is listed in help, needs its bounds, and its help carries the semantics", () => {
+  assert.notEqual(Command.hidden, true);
   assert.equal(Command.args.application_id.required, true);
   for (const flag of ["from-ms", "to-ms", "limit"]) assert.equal(Command.flags[flag].required, true, flag);
   assert.ok(!Command.flags.cursor.required);

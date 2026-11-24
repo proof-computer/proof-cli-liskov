@@ -31,6 +31,7 @@ try {
 
   const help = run(process.execPath, [proofDevBin, "liskov", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(help.stdout, "Liskov application deployment commands");
+  assertIncludes(help.stdout, "liskov placement");
   assertIncludes(help.stdout.replace(/\s+/g, " "), "Live custody commands are operator-only and hidden");
   if (/^\s+liskov custody\b/m.test(help.stdout)) {
     throw new Error("Expected liskov --help not to list the operator-only custody topic");
@@ -46,6 +47,12 @@ try {
   assertIncludes(applicationHelp.stdout, "liskov application deployment");
   assertIncludes(applicationHelp.stdout, "liskov application logs");
   assertIncludes(applicationHelp.stdout, "liskov application vars");
+  assertIncludes(applicationHelp.stdout, "liskov application signer");
+  assertIncludes(applicationHelp.stdout, "liskov application placement-plan");
+  assertIncludes(applicationHelp.stdout, "liskov application placement-refusals");
+
+  const attachmentHelp = run(process.execPath, [proofDevBin, "liskov", "runtime-ssh", "attachment", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(attachmentHelp.stdout, "liskov runtime-ssh attachment endpoints");
 
   const signerHelp = run(process.execPath, [proofDevBin, "liskov", "application", "signer", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(signerHelp.stdout, "APP_REF");
@@ -55,7 +62,6 @@ try {
   assertIncludes(signerUnpairHelp.stdout.replace(/\s+/g, " "), "liskov application signer unpair APP_REF");
   assertIncludes(signerUnpairHelp.stdout, "--yes");
 
-  assertExcludes(applicationHelp.stdout, "placement-plan");
   const placementPlanHelp = run(process.execPath, [proofDevBin, "liskov", "application", "placement-plan", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(placementPlanHelp.stdout, "OCCURRENCE_AUTHORITY_DIGEST");
   assertIncludes(placementPlanHelp.stdout, "--organization");
@@ -107,7 +113,6 @@ try {
     await new Promise((resolve) => planServer.close(resolve));
   }
 
-  assertExcludes(applicationHelp.stdout, "placement-refusals");
   const placementRefusalsHelp = run(process.execPath, [proofDevBin, "liskov", "application", "placement-refusals", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(placementRefusalsHelp.stdout, "APPLICATION_ID");
   for (const flag of ["--from-ms", "--to-ms", "--limit", "--cursor", "--json", "--organization"]) assertIncludes(placementRefusalsHelp.stdout, flag);
