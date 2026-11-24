@@ -1,0 +1,20 @@
+Execution (proof.liskov.policy-explanation.v1)
+execution: satisfied [occurrence_in_progress]
+  next: The occurrence is in progress on the server; wait for the next executor tick.
+  occurrence policy-occurrence:sha256:11
+  attempt v5-attempt:app_1:slot-0:g1:r6 (authority revision 6)
+  stage: occurrence_authority_persisted ✓ > occurrence_domains_bound ✓ > effect_intent_committed ✓ > effect_submitted ✓ > [effect_observed] > effect_closed
+  effect: provider_deploy v5-attempt:app_1:slot-0:g1:r6:provider_deploy:job-0 r1 state observation_pending
+    receipts: submission not reported, observation yes, reconciliation no, closeout no
+    job 155065; observation terminal
+  attempts (newest first):
+    * v5-attempt:app_1:slot-0:g1:r6: provider_deploy=observation_pending
+  trace: 2 entries, complete through 2
+    1 external_mutation intended intent_committed: entry 1
+    2 external_mutation observed observed_terminal: entry 2
+spendCloseout: satisfied [spend_reserved]
+  next: A reserve is open; settlement follows closeout.
+  reservation v5-reserve:app_1:g1:r6; reserves 1, settlements 0
+  lineage v5-reserve:app_1:g1:r6: reserved 0 service_credit_micros; open_reserve
+  trace: 0 entries, complete through 0
+schedule: next run at 2026-09-21T15:13:20.000Z

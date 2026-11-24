@@ -8,7 +8,7 @@ export default class LiskovApplicationExecutionShow extends OrganizationScopedCo
     application_id: Args.string({ description: "Liskov Application id.", required: true })
   };
   static description =
-    "Render the application's typed-spine execution — occurrence, attempt, effects, receipts, spend lineage, blocker and decision trace — from the canonical policy explanation envelope. Nothing is inferred locally; --watch reports one record per semantic change.";
+    "Render the application's typed-spine execution — occurrence, attempt, effects, receipts, spend lineage, blocker and decision trace — from the canonical policy explanation envelope. A one-shot read adds job provenance when available. --watch reports one record per semantic change.";
   static examples = [
     "<%= config.bin %> liskov application execution show proof-docs",
     "<%= config.bin %> liskov application execution show proof-docs --json",
@@ -18,7 +18,7 @@ export default class LiskovApplicationExecutionShow extends OrganizationScopedCo
   static flags: Interfaces.FlagInput = {
     config: Flags.string({ description: "Path to the local Liskov session file." }),
     help: Flags.help({ char: "h" }),
-    json: Flags.boolean({ description: "Emit the verbatim server envelope (NDJSON change records with --watch)." }),
+    json: Flags.boolean({ description: "Emit explanation, schedule and executions as JSON (NDJSON change records with --watch)." }),
     "poll-ms": Flags.integer({ description: "Watch poll interval in milliseconds (minimum 500).", min: 500 }),
     "slipway-url": Flags.string({ description: "Liskov service URL." }),
     "timeout-seconds": Flags.integer({ description: "Stop watching after this many seconds (maximum 1800).", min: 1, max: 1800 }),

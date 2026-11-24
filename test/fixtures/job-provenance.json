@@ -1,0 +1,331 @@
+{
+  "source": {
+    "liskovRsCommit": "0f394b42918c4b904a4dd4db79a4b53693a23db1",
+    "files": [
+      "crates/liskov-core/tests/pg_policy/explanation_execution/job_provenance.rs",
+      "crates/liskov-acurast-contracts/src/provenance.rs",
+      "crates/liskov-control-plane-api/src/policy_explanation/executions_page.rs"
+    ],
+    "adaptations": "Copied the first job and renewal vectors from each_registered_job_keeps_its_own_chain_provenance and the pending-change and partial-status vectors from the wire tests. Added the second key to the first job, and varied job IDs, raw revocation and the nullable processor to exercise the CLI branches in one page."
+  },
+  "response": {
+    "ok": true,
+    "generatedAtMs": 27000,
+    "executions": {
+      "attempts": [
+        {
+          "effects": [
+            {
+              "effectKind": "provider_deploy",
+              "provenance": {
+                "jobId": "[{\"Acurast\":\"5HC1mDQWVtxaDYysSNrmTTj2SNuP1YKjwWerLbUS8VA6ZTdN\"},\"155065\"]",
+                "processorId": "5CjMEeAZvXKhcyxzUdGzr63Jc72fZWSsx4xonauP4aP7Gi5Q",
+                "jobPublicKeys": {
+                  "ed25519": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "secp256r1Encryption": "02cc"
+                },
+                "acknowledgement": {
+                  "block": 299,
+                  "blockHash": "0x000000000000000000000000000000000000000000000000000000000000012b",
+                  "blockTimestampMs": 10000,
+                  "extrinsicIndex": 2,
+                  "extrinsicHash": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                  "eventIndex": 1,
+                  "observedAtMs": 16000
+                },
+                "attestation": {
+                  "verdict": "excluded",
+                  "expiresAtMs": 100000,
+                  "asOfMs": 10000,
+                  "readAt": {
+                    "block": 200,
+                    "blockHash": "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+                  },
+                  "window": "in_window",
+                  "coreCompatible": true,
+                  "revocation": "not_revoked",
+                  "acurastMatch": "admits",
+                  "notBeforeMs": 0,
+                  "notAfterMs": 100000
+                },
+                "status": "complete",
+                "registration": {
+                  "blockHash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                  "extrinsicIndex": 0,
+                  "extrinsicHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "status": "recorded"
+                },
+                "deregistration": {
+                  "blockHash": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                  "extrinsicIndex": 7,
+                  "extrinsicHash": "0x1111111111111111111111111111111111111111111111111111111111111111",
+                  "status": "recorded"
+                },
+                "predecessor": null,
+                "successor": {
+                  "occurrenceGeneration": 2,
+                  "jobId": "[{\"Acurast\":\"5HC1mDQWVtxaDYysSNrmTTj2SNuP1YKjwWerLbUS8VA6ZTdN\"},\"155066\"]"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "effects": [
+            {
+              "effectKind": "provider_deploy",
+              "provenance": {
+                "jobId": "[{\"Acurast\":\"5HC1mDQWVtxaDYysSNrmTTj2SNuP1YKjwWerLbUS8VA6ZTdN\"},\"155066\"]",
+                "processorId": "5CjMEeAZvXKhcyxzUdGzr63Jc72fZWSsx4xonauP4aP7Gi5Q",
+                "jobPublicKeys": {
+                  "ed25519": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                "acknowledgement": {
+                  "block": 301,
+                  "blockHash": "0x000000000000000000000000000000000000000000000000000000000000012d",
+                  "blockTimestampMs": 25000,
+                  "extrinsicIndex": 2,
+                  "extrinsicHash": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                  "eventIndex": 1,
+                  "observedAtMs": 31000
+                },
+                "attestation": {
+                  "verdict": "strictly_eligible",
+                  "expiresAtMs": 100000,
+                  "asOfMs": 25000,
+                  "readAt": {
+                    "block": 300,
+                    "blockHash": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+                  },
+                  "window": "in_window",
+                  "coreCompatible": true,
+                  "revocation": "not_revoked",
+                  "acurastMatch": "admits",
+                  "notBeforeMs": 0,
+                  "notAfterMs": 100000
+                },
+                "status": "complete",
+                "registration": {
+                  "blockHash": null,
+                  "extrinsicIndex": null,
+                  "extrinsicHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "status": "block_not_recorded"
+                },
+                "deregistration": {
+                  "blockHash": null,
+                  "extrinsicIndex": null,
+                  "extrinsicHash": null,
+                  "status": "not_recorded"
+                },
+                "predecessor": {
+                  "occurrenceGeneration": 1,
+                  "jobId": "[{\"Acurast\":\"5HC1mDQWVtxaDYysSNrmTTj2SNuP1YKjwWerLbUS8VA6ZTdN\"},\"155065\"]"
+                },
+                "successor": null
+              }
+            }
+          ]
+        },
+        {
+          "effects": [
+            {
+              "effectKind": "provider_deploy",
+              "provenance": {
+                "jobId": "[{\"Acurast\":\"5HC1mDQWVtxaDYysSNrmTTj2SNuP1YKjwWerLbUS8VA6ZTdN\"},\"175450\"]",
+                "processorId": "5CjMEeAZvXKhcyxzUdGzr63Jc72fZWSsx4xonauP4aP7Gi5Q",
+                "jobPublicKeys": {
+                  "ed25519": "ab01000000000000000000000000000000000000000000000000000000000000",
+                  "secp256r1Encryption": "02cc"
+                },
+                "acknowledgement": {
+                  "block": 5123456,
+                  "blockHash": "0xblock",
+                  "blockTimestampMs": 1758722400000,
+                  "extrinsicIndex": 7,
+                  "extrinsicHash": "0xextrinsic",
+                  "eventIndex": 12,
+                  "observedAtMs": 1758722406000
+                },
+                "attestation": {
+                  "verdict": "change_pending_resnapshot",
+                  "expiresAtMs": null,
+                  "asOfMs": 1234,
+                  "readAt": null,
+                  "pendingChange": {
+                    "block": 100,
+                    "eventIndex": 0
+                  }
+                },
+                "status": "complete",
+                "registration": {
+                  "blockHash": null,
+                  "extrinsicIndex": null,
+                  "extrinsicHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "status": "block_not_recorded"
+                },
+                "deregistration": {
+                  "blockHash": null,
+                  "extrinsicIndex": null,
+                  "extrinsicHash": null,
+                  "status": "not_recorded"
+                },
+                "predecessor": null,
+                "successor": null
+              }
+            }
+          ]
+        },
+        {
+          "effects": [
+            {
+              "effectKind": "provider_deploy",
+              "provenance": {
+                "jobId": "[{\"Acurast\":\"5HC1mDQWVtxaDYysSNrmTTj2SNuP1YKjwWerLbUS8VA6ZTdN\"},\"155067\"]",
+                "processorId": "5CjMEeAZvXKhcyxzUdGzr63Jc72fZWSsx4xonauP4aP7Gi5Q",
+                "jobPublicKeys": {
+                  "ed25519": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                },
+                "acknowledgement": {
+                  "block": 302,
+                  "blockHash": "0x000000000000000000000000000000000000000000000000000000000000012e",
+                  "blockTimestampMs": 26000,
+                  "extrinsicIndex": 2,
+                  "extrinsicHash": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                  "eventIndex": 1,
+                  "observedAtMs": 32000
+                },
+                "attestation": {
+                  "verdict": "excluded",
+                  "expiresAtMs": 100000,
+                  "asOfMs": 26000,
+                  "readAt": {
+                    "block": 300,
+                    "blockHash": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+                  },
+                  "window": "in_window",
+                  "coreCompatible": true,
+                  "revocation": "revoked",
+                  "acurastMatch": "admits",
+                  "notBeforeMs": 0,
+                  "notAfterMs": 100000
+                },
+                "status": "complete",
+                "registration": {
+                  "blockHash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                  "extrinsicIndex": 0,
+                  "extrinsicHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "status": "recorded"
+                },
+                "deregistration": {
+                  "blockHash": null,
+                  "extrinsicIndex": null,
+                  "extrinsicHash": null,
+                  "status": "not_recorded"
+                },
+                "predecessor": null,
+                "successor": null
+              }
+            }
+          ]
+        },
+        {
+          "effects": [
+            {
+              "effectKind": "provider_deploy",
+              "provenance": {
+                "jobId": "[{\"Acurast\":\"5HC1mDQWVtxaDYysSNrmTTj2SNuP1YKjwWerLbUS8VA6ZTdN\"},\"155068\"]",
+                "processorId": "5CjMEeAZvXKhcyxzUdGzr63Jc72fZWSsx4xonauP4aP7Gi5Q",
+                "jobPublicKeys": {
+                  "ed25519": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                },
+                "acknowledgement": {
+                  "block": 303,
+                  "blockHash": "0x000000000000000000000000000000000000000000000000000000000000012f",
+                  "blockTimestampMs": 27000,
+                  "extrinsicIndex": 2,
+                  "extrinsicHash": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                  "eventIndex": 1,
+                  "observedAtMs": 33000
+                },
+                "status": "attestation_unknown",
+                "registration": {
+                  "blockHash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                  "extrinsicIndex": 0,
+                  "extrinsicHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "status": "recorded"
+                },
+                "deregistration": {
+                  "blockHash": null,
+                  "extrinsicIndex": null,
+                  "extrinsicHash": null,
+                  "status": "not_recorded"
+                },
+                "predecessor": null,
+                "successor": null
+              }
+            }
+          ]
+        },
+        {
+          "effects": [
+            {
+              "effectKind": "provider_deploy",
+              "provenance": {
+                "jobId": "[{\"Acurast\":\"5HC1mDQWVtxaDYysSNrmTTj2SNuP1YKjwWerLbUS8VA6ZTdN\"},\"155069\"]",
+                "processorId": null,
+                "status": "keys_pending",
+                "registration": {
+                  "blockHash": null,
+                  "extrinsicIndex": null,
+                  "extrinsicHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "status": "block_not_recorded"
+                },
+                "deregistration": {
+                  "blockHash": null,
+                  "extrinsicIndex": null,
+                  "extrinsicHash": null,
+                  "status": "not_recorded"
+                },
+                "predecessor": null,
+                "successor": null
+              }
+            }
+          ]
+        },
+        {
+          "effects": [
+            {
+              "effectKind": "provider_deploy",
+              "provenance": {
+                "jobId": "legacy-unparseable-job",
+                "processorId": "5CjMEeAZvXKhcyxzUdGzr63Jc72fZWSsx4xonauP4aP7Gi5Q",
+                "acknowledgement": null,
+                "status": "location_unknown",
+                "registration": {
+                  "blockHash": null,
+                  "extrinsicIndex": null,
+                  "extrinsicHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "status": "block_not_recorded"
+                },
+                "deregistration": {
+                  "blockHash": null,
+                  "extrinsicIndex": null,
+                  "extrinsicHash": null,
+                  "status": "not_recorded"
+                },
+                "predecessor": null,
+                "successor": null
+              }
+            }
+          ]
+        }
+      ],
+      "nextCursor": null,
+      "generationCount": 7,
+      "pageSize": 50,
+      "blockerProse": {},
+      "readHealthProse": {},
+      "schedule": null
+    }
+  }
+}
