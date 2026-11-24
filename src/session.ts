@@ -1,6 +1,7 @@
 import { isApplicationPlacementPlan, formatPlacementPlan, placementPlanPath } from "./placement-plan.js";
 import { isApplicationPlacementRefusals, formatPlacementRefusals, parsePlacementRefusalsQuery, placementRefusalsPath } from "./placement-refusals.js";
 import { openBrowser } from "./browser-open.js";
+import { formatApplicationSigner, type SlipwayApplicationSignerResponse } from "./application-signer.js";
 import { createHash, randomBytes } from "node:crypto";
 import { access, mkdir, readFile, rm, writeFile, chmod } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -1057,24 +1058,6 @@ interface SlipwayCustodySignerStatusResponse {
   organizationId?: string;
   applicationId?: string;
   selfCustodySigner?: PublicSelfCustodySigner;
-  error?: string;
-  reason?: string;
-  [key: string]: unknown;
-}
-
-/**
- * `application_custody_signer_v1` (`liskov-rs` `application_custody_signer.rs`):
- * every nullable field is an explicit `null`. `executedFunding` is the absence
- * envelope while customer-funded execution is unbuilt; it is never a figure.
- */
-interface SlipwayApplicationSignerResponse {
-  ok?: boolean;
-  schema?: string;
-  applicationId?: string;
-  activePolicyDigest?: string | null;
-  generatedAtMs?: number;
-  signerReadback?: Record<string, unknown>;
-  executedFunding?: { available?: boolean; unavailableReason?: string; [key: string]: unknown };
   error?: string;
   reason?: string;
   [key: string]: unknown;
@@ -6396,82 +6379,6 @@ export async function runSlipwayApplicationSigner(input: SlipwayApplicationSigne
   return 0;
 }
 
-/**
- * Only served fields. Liveness is the served `online`, never `connected` or a
- * heartbeat age; every served count prints, `0` included; and executed funding
- * is never a figure or a unit — declared caps are the `/policy` read's.
- */
-function formatApplicationSigner(requestedApplicationRef: string, body: SlipwayApplicationSignerResponse): string {
-  const readback = objectRecord(body.signerReadback);
-  const signers = arrayValue(readback.signers).map(objectRecord);
-  const requests = arrayValue(readback.openRequests).map(objectRecord);
-  const counts = objectRecord(readback.counts);
-  const lag = objectRecord(readback.dispatchLag);
-  const funding = objectRecord(body.executedFunding);
-  const value = (served: unknown): string => String(numberValue(served) ?? "-");
-  const ms = (served: unknown): string => numberValue(served) === undefined ? "-" : `${value(served)} ms`;
-  const truncated = "(list truncated; counts below are complete)";
-  const lastSuccess = numberValue(lag.lastSuccessAgeMs) === undefined ? "-" : `${ms(lag.lastSuccessAgeMs)} ago`;
-  return [
-    `Self-custody signer for ${stringValue(body.applicationId) ?? requestedApplicationRef}`,
-    `Policy: ${stringValue(body.activePolicyDigest) ?? "none"}`,
-    `Standing: ${applicationSignerStanding(signers, counts, lag, readback.stallAfterMs)}`,
-    ...(signers.length === 0
-      ? ["No signer is paired to this application."]
-      : ["Signers:", ...signers.map((signer) => [
-          stringValue(signer.signerAddress) ?? "-",
-          signer.online === true ? "online" : "offline",
-          signer.connected === true ? "connected" : "disconnected",
-          `heartbeat ${ms(signer.heartbeatAgeMs)}`,
-          `protocol ${value(signer.protocolVersion)}`
-        ].join("\t"))]),
-    readback.signersTruncated === true ? truncated : undefined,
-    ...(requests.length === 0
-      ? ["No open sign requests."]
-      : ["Open requests:", ...requests.map((request) => [
-          stringValue(request.operationId) ?? "-",
-          stringValue(request.status) ?? "-",
-          stringValue(request.signerAddress) ?? "-",
-          `sent ${request.sent === true ? "yes" : "no"}`,
-          `attempt ${value(request.attemptSeq)}`,
-          `deadline ${isoFromEpochMs(request.deadlineMs) ?? "-"}`
-        ].join("\t"))]),
-    readback.openRequestsTruncated === true ? truncated : undefined,
-    `Counts: bound ${value(counts.boundSigners)}, online ${value(counts.onlineSigners)}, open ${value(counts.openRequests)}, pending ${value(counts.pending)}, claimed ${value(counts.claimed)}, completed ${value(counts.completed)}, signed ${value(counts.signed)}, refused ${value(counts.refused)}, expired ${value(counts.expired)}, ambiguous ${value(counts.ambiguous)}`,
-    `Dispatch lag: oldest unclaimed ${ms(lag.oldestUnclaimedAgeMs)}, oldest claimed ${ms(lag.oldestClaimedAgeMs)}, last success ${lastSuccess}`,
-    `Last signature: ${isoFromEpochMs(readback.lastSuccessAtMs) ?? "none"}`,
-    funding.available === true
-      ? "Observed funding: reported by the server; this CLI does not render it yet."
-      : `Observed funding: not reported (${stringValue(funding.unavailableReason) ?? "-"}).`
-  ].filter((line) => line !== undefined).join("\n");
-}
-
-/** The first standing that applies, in the order the Console agreed (`driw`). */
-function applicationSignerStanding(
-  signers: Record<string, unknown>[],
-  counts: Record<string, unknown>,
-  lag: Record<string, unknown>,
-  stallAfterMs: unknown
-): string {
-  if (signers.length === 0) return "unpaired";
-  const offline = signers.find((signer) => signer.online !== true);
-  if (offline) {
-    return offline.connected === true
-      ? `offline (connected, heartbeat ${numberValue(offline.heartbeatAgeMs) ?? "-"} ms ago; online after ${numberValue(stallAfterMs) ?? "-"} ms of silence is not assumed)`
-      : "offline (disconnected)";
-  }
-  const oldProtocol = signers.find((signer) => {
-    const protocol = numberValue(signer.protocolVersion);
-    return protocol !== undefined && protocol < 2;
-  });
-  if (oldProtocol) return `signer protocol ${numberValue(oldProtocol.protocolVersion)} is below 2`;
-  const ambiguous = numberValue(counts.ambiguous) ?? 0;
-  if (ambiguous > 0) return `${ambiguous} sent request(s) with no legible outcome`;
-  const pending = numberValue(counts.pending) ?? 0;
-  if (pending > 0) return `${pending} request(s) waiting ${numberValue(lag.oldestUnclaimedAgeMs) ?? "-"} ms for a signer`;
-  return "online";
-}
-
 /** The server's own rule for a manager id (`manager_fleet_ports.rs`): 1–39 ASCII digits. */
 const PLACEMENT_MANAGER_ID = /^[0-9]{1,39}$/u;
 
@@ -8378,15 +8285,15 @@ function randomHex(bytes: number): string {
   return randomBytes(bytes).toString("hex");
 }
 
-function stringValue(value: unknown): string | undefined {
+export function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
 }
 
-function numberValue(value: unknown): number | undefined {
+export function numberValue(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-function arrayValue(value: unknown): unknown[] {
+export function arrayValue(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
@@ -8401,7 +8308,7 @@ function formatPolicyDiagnosticLines(value: unknown): string[] {
   });
 }
 
-function objectRecord(value: unknown): Record<string, unknown> {
+export function objectRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
@@ -8919,7 +8826,7 @@ function formatSelfCustodySignerStatus(applicationId: string, signer: PublicSelf
   ].filter(Boolean).join("\n");
 }
 
-function isoFromEpochMs(value: unknown): string | undefined {
+export function isoFromEpochMs(value: unknown): string | undefined {
   const ms = numberValue(value);
   if (ms === undefined) return undefined;
   const date = new Date(ms);

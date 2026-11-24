@@ -25,11 +25,16 @@ async function withSession(run: (sessionFile: string) => Promise<void>): Promise
 }
 
 type Body = Record<string, unknown>;
-type Vector = Record<"unpaired" | "managed" | "live" | "stalled" | "oldProtocol" | "waiting" | "claimed" | "sent" | "ambiguous", Body>;
+type SignerBody = Body & { signerReadback: Body; executedFunding: Body };
+type Vector = Record<
+  "unpaired" | "managed" | "live" | "stalled" | "oldProtocol" | "waiting" | "claimed" | "sent" | "ambiguous" |
+  "fundedNothingSettled" | "fundedSettled" | "fundedHeld" | "fundedSettlementUnreadable",
+  SignerBody
+>;
 
-/** The owner's vector, copied byte for byte from `liskov-rs`
- *  `crates/liskov-control-plane-api/vectors/application_custody_signer.json`:
- *  the bodies below are what the server sends, not what this side expects. */
+/** The owner's vector, copied byte for byte from `liskov-rs` main at
+ *  `0a27c13319da46c5afeec25226665c2d75324a43`,
+ *  `crates/liskov-control-plane-api/vectors/application_custody_signer.json`. */
 const vector = async (): Promise<Vector> =>
   JSON.parse(await readFile(new URL("./fixtures/application_custody_signer.json", import.meta.url), "utf8"));
 
@@ -80,7 +85,7 @@ test("application signer reads a live signer from the application-scoped route",
       "Counts: bound 1, online 1, open 0, pending 0, claimed 0, completed 3, signed 2, refused 1, expired 0, ambiguous 0",
       "Dispatch lag: oldest unclaimed -, oldest claimed -, last success 60000 ms ago",
       "Last signature: 2025-09-16T05:19:00.000Z",
-      "Observed funding: not reported (v6_custody_execution_not_built)."
+      "Observed funding: not reported (no_customer_funded_execution)."
     ]);
   });
 });
@@ -194,29 +199,144 @@ test("application signer --json prints every served body unchanged", async () =>
   });
 });
 
-test("application signer never words executed funding as a figure, a unit or Service Credits", async () => {
-  const bodies = await vector();
+const fundingCases = {
+  fundedNothingSettled: [
+    "Observed funding (self_custody, acu_planck):",
+    "  Admitted 1, open reserves 1, settled 0",
+    "  Settled amount: 0 ACU (0 planck)",
+    "  Closed, amount unknown: 0",
+    "  Unresolved holds: 0"
+  ],
+  fundedSettled: [
+    "Observed funding (self_custody, acu_planck):",
+    "  Admitted 3, open reserves 1, settled 2",
+    "  Settled amount: 340282366920938463463374607.431768211455 ACU (340282366920938463463374607431768211455 planck)",
+    "  Closed, amount unknown: 0",
+    "  Unresolved holds: 0"
+  ],
+  fundedHeld: [
+    "Observed funding (self_custody, acu_planck):",
+    "  Admitted 3, open reserves 1, settled 1",
+    "  Settled amount: 0.00000075 ACU (750000 planck)",
+    "  Closed, amount unknown: 1 (missing_execution_report 1)",
+    "  Unresolved holds: 2, oldest 600000 ms",
+    "  Deregistration holds: 1 (deregister_signer_retired 1)"
+  ],
+  fundedSettlementUnreadable: [
+    "Observed funding (self_custody, acu_planck):",
+    "  Admitted 1, open reserves 0, settled 0",
+    "  Settled amount: not provable (a settled job has no settlement Liskov can prove)",
+    "  Closed, amount unknown: 0",
+    "  Unresolved holds: 1, oldest 600000 ms"
+  ]
+} satisfies Partial<Record<keyof Vector, string[]>>;
+
+for (const name of Object.keys(fundingCases) as (keyof typeof fundingCases)[]) {
+  test(`application signer renders observed funding for ${name}`, async () => {
+    const bodies = await vector();
+    await withSession(async (sessionFile) => {
+      const out = await readSigner(sessionFile, {}, () => Response.json(bodies[name]));
+      assert.equal(out.code, 0);
+      assert.equal(standing(out.lines), "Standing: online");
+      const start = out.lines.findIndex((line) => line.startsWith("Observed funding ("));
+      assert.ok(start > 0);
+      assert.equal(out.lines[start - 1], "Last signature: none");
+      assert.deepEqual(out.lines.slice(start), fundingCases[name]);
+    });
+  });
+}
+
+test("application signer formats whole ACU without a decimal point", async () => {
+  const { fundedSettled } = await vector();
+  const body = { ...fundedSettled, executedFunding: { ...fundedSettled.executedFunding, settledPlanck: "1000000000000" } };
   await withSession(async (sessionFile) => {
-    for (const [name, body] of Object.entries(bodies)) {
-      const out = await readSigner(sessionFile, {}, () => Response.json(body));
-      assert.equal(out.code, 0, name);
-      const text = out.stdout.join("\n");
-      for (const banned of ["Service Credits", "credits", "$", "ACU", "0 spent", "spent"]) {
-        assert.ok(!text.includes(banned), `${name} printed ${banned}`);
-      }
-      assert.ok(out.lines.includes("Observed funding: not reported (v6_custody_execution_not_built)."), name);
-    }
+    const original = await readSigner(sessionFile, {}, () => Response.json(fundedSettled));
+    const whole = await readSigner(sessionFile, {}, () => Response.json(body));
+    assert.equal(original.code, 0);
+    assert.equal(whole.code, 0);
+    const amount = whole.lines.find((line) => line.startsWith("  Settled amount:"));
+    assert.equal(amount, "  Settled amount: 1 ACU (1000000000000 planck)");
+    assert.notEqual(amount, original.lines.find((line) => line.startsWith("  Settled amount:")));
   });
 });
 
-test("application signer never renders a served funding value it has no contract for", async () => {
+test("application signer preserves other funding units, served reason order, and zero hold age", async () => {
+  const { fundedHeld } = await vector();
+  const body = {
+    ...fundedHeld,
+    executedFunding: {
+      ...fundedHeld.executedFunding,
+      unit: "other_unit",
+      closedAmountUnknown: 3,
+      closedAmountUnknownByReason: { second_reason: 1, first_reason: 2 },
+      oldestUnresolvedHoldAgeMs: 0
+    }
+  };
+  await withSession(async (sessionFile) => {
+    const out = await readSigner(sessionFile, {}, () => Response.json(body));
+    assert.equal(out.code, 0);
+    const start = out.lines.indexOf("Observed funding (self_custody, other_unit):");
+    assert.ok(start > 0);
+    assert.deepEqual(out.lines.slice(start), [
+      "Observed funding (self_custody, other_unit):",
+      "  Admitted 3, open reserves 1, settled 1",
+      "  Settled amount: 750000 other_unit",
+      "  Closed, amount unknown: 3 (second_reason 1, first_reason 2)",
+      "  Unresolved holds: 2, oldest 0 ms",
+      "  Deregistration holds: 1 (deregister_signer_retired 1)"
+    ]);
+  });
+});
+
+test("application signer reports unavailable funding with the server's reason", async () => {
+  const { live } = await vector();
+  await withSession(async (sessionFile) => {
+    const out = await readSigner(sessionFile, {}, () => Response.json(live));
+    assert.equal(out.code, 0);
+    assert.ok(out.lines.includes("Observed funding: not reported (no_customer_funded_execution)."));
+    assert.ok(out.lines.every((line) => !line.startsWith("Observed funding (")));
+  });
+});
+
+test("application signer reads settlement only from the contracted amount field", async () => {
   const { live } = await vector();
   const body = { ...live, executedFunding: { available: true, spent: "12345" } };
   await withSession(async (sessionFile) => {
     const out = await readSigner(sessionFile, {}, () => Response.json(body));
     assert.equal(out.code, 0);
-    assert.ok(out.lines.includes("Observed funding: reported by the server; this CLI does not render it yet."));
+    assert.ok(out.lines.includes("  Settled amount: -"));
     assert.ok(!out.stdout.join("\n").includes("12345"));
+  });
+});
+
+test("application signer shows the bound address and any replaced signer rows", async () => {
+  const { live } = await vector();
+  const replacedAddress = "5GrwvaEF5zXb26Fz9rcQpDWS64yFKWzjH4PPev67wCMFJL42";
+  const body = {
+    ...live,
+    signerReadback: {
+      ...live.signerReadback,
+      boundSignerAddress: address,
+      replacedSigners: [{ signerAddress: replacedAddress, online: false, connected: true, heartbeatAgeMs: 95000, protocolVersion: 2 }]
+    }
+  };
+  await withSession(async (sessionFile) => {
+    const original = await readSigner(sessionFile, {}, () => Response.json(live));
+    const out = await readSigner(sessionFile, {}, () => Response.json(body));
+    assert.equal(original.code, 0);
+    assert.equal(out.code, 0);
+    assert.ok(original.lines.every((line) => !line.startsWith("Bound address:") && !line.startsWith("Replaced signers")));
+    const at = out.lines.indexOf("Standing: online");
+    assert.ok(at > 0);
+    assert.deepEqual(out.lines.slice(at, at + 7), [
+      "Standing: online",
+      `Bound address: ${address}`,
+      "Signers:",
+      `${address}\tonline\tconnected\theartbeat 0 ms\tprotocol 2`,
+      "Replaced signers (connected to settle jobs they registered):",
+      `${replacedAddress}\toffline\tconnected\theartbeat 95000 ms\tprotocol 2`,
+      "No open sign requests."
+    ]);
   });
 });
 
