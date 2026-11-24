@@ -37,14 +37,14 @@ test("vendored policy contract matches the complete shared corpus", () => {
 });
 
 test("vendored artifacts match the complete merged producer bundle", () => {
-  // BKLG-20261118-ouys, liskov-rs PR #2133 (BKLG-20261118-pztg):
-  // 4473cf26b26f4ed6d2960b086506254fe4d7dea3. Pin the manifest itself so
-  // a coherent but different bundle cannot silently replace the owner's bytes.
+  // BKLG-20261123-ab14, liskov-rs PR #2177 (BKLG-20261119-ziff).
+  // Pin the manifest so a coherent but different bundle cannot silently
+  // replace the owner's bytes.
   const source = JSON.parse(readFileSync(path.join(bundleDirectory, "source.json"), "utf8")) as { commit: string };
-  assert.equal(source.commit, "4473cf26b26f4ed6d2960b086506254fe4d7dea3");
+  assert.equal(source.commit, "bf93a1f675f3adbf5ff1abefc62fb3b24bb33d7c");
   const manifestBytes = readFileSync(path.join(bundleDirectory, "policy-client-bundle.json"));
   const digest = (bytes: Uint8Array) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
-  assert.equal(digest(manifestBytes), "sha256:54bd5f14b62fa425915045cb414326bb9cc1b6ea0dbed60d0e6fac30ebd67dc0");
+  assert.equal(digest(manifestBytes), "sha256:d081e6de316015b58e2be8eb9bddd63cbc3a345955be13eb85e87a33637d7e9a");
   const manifest = JSON.parse(manifestBytes.toString("utf8")) as {
     artifact: { file: string; sha256: string; uncompressedSha256: string };
     adapter: { file: string; sha256: string };
@@ -59,9 +59,10 @@ test("vendored artifacts match the complete merged producer bundle", () => {
     digest(gunzipSync(readFileSync(path.join(bundleDirectory, manifest.artifact.file)))),
     manifest.artifact.uncompressedSha256
   );
-  assert.deepEqual(manifest.publicationPairs, [{
-    schema: "proof.liskov.application-manifest", schemaVersion: 5, releaseMode: "source"
-  }]);
+  assert.deepEqual(manifest.publicationPairs, [
+    { schema: "proof.liskov.application-manifest", schemaVersion: 5, releaseMode: "source" },
+    { schema: "proof.liskov.application-manifest", schemaVersion: 6, releaseMode: "source" }
+  ]);
 });
 
 test("V7 provider-gated materialization accepts the owner's matching Access observation", () => {

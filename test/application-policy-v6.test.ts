@@ -72,7 +72,7 @@ describe("V6 application-manifest validation through the vendored contract", () 
   ];
 
   for (const choice of processorChoices) {
-    it(`accepts and reports ${choice.name} without enabling publication`, () => {
+    it(`accepts and reports ${choice.name} on a registered V6 document`, () => {
       const sample = corpusCase(choice.base);
       const document = sample.request.document.replace("  spend:", `  placement:\n${choice.placement}\n  spend:`);
       assert.notEqual(document, sample.request.document);
@@ -82,7 +82,7 @@ describe("V6 application-manifest validation through the vendored contract", () 
       assert.deepEqual(result.errors, []);
       assert.equal(result.pair?.schemaVersion, 6);
       assert.deepEqual((result.document as { deployment?: { placement?: unknown } })?.deployment?.placement, choice.expected);
-      assert.equal(isRegisteredSourcePublicationPair(result), false);
+      assert.equal(isRegisteredSourcePublicationPair(result), true);
     });
   }
 
@@ -113,7 +113,7 @@ describe("V6 application-manifest validation through the vendored contract", () 
   ];
 
   for (const choice of placementChoices) {
-    it(`accepts and preserves ${choice.name} without enabling publication`, () => {
+    it(`accepts and preserves ${choice.name} on a registered V6 document`, () => {
       const sample = corpusCase(choice.base);
       const document = sample.request.document.replace("  spend:", `  placement:\n${choice.placement}\n  spend:`);
       assert.notEqual(document, sample.request.document);
@@ -123,7 +123,7 @@ describe("V6 application-manifest validation through the vendored contract", () 
       assert.deepEqual(result.errors, []);
       assert.equal(result.pair?.schemaVersion, 6);
       assert.deepEqual((result.document as { deployment?: { placement?: unknown } })?.deployment?.placement, choice.expected);
-      assert.equal(isRegisteredSourcePublicationPair(result), false);
+      assert.equal(isRegisteredSourcePublicationPair(result), true);
     });
   }
 
@@ -174,7 +174,7 @@ describe("V6 application-manifest validation through the vendored contract", () 
   }
 
   for (const name of ["v6/fetch", "v6/clickhouse"]) {
-    it(`${name} validates as a supported V6 document and is refused for publication`, () => {
+    it(`${name} validates as a supported V6 document registered for publication`, () => {
       const sample = corpusCase(name);
       const result = evaluate(sample);
       assert.equal(result.disposition, "supported");
@@ -184,7 +184,7 @@ describe("V6 application-manifest validation through the vendored contract", () 
       assert.equal(result.pair?.schemaVersion, 6);
       assert.equal(result.authoredDigest, sample.expected.authoredDigest);
       assert.equal(result.releaseIntentDigest, sample.expected.releaseIntentDigest);
-      assert.equal(isRegisteredSourcePublicationPair(result), false);
+      assert.equal(isRegisteredSourcePublicationPair(result), true);
     });
   }
 
@@ -196,25 +196,26 @@ describe("V6 application-manifest validation through the vendored contract", () 
     assert.equal(isRegisteredSourcePublicationPair(result), true);
   });
 
-  it("registers V6 for publication when the owner contract registers its pair", () => {
+  it("requires the owner contract to register V6 for publication", () => {
     const sample = corpusCase("v6/fetch");
     const result = evaluate(sample);
     assert.equal(result.disposition, "supported");
     assert.equal(result.valid, true);
     assert.ok(result.pair);
+    assert.equal(isRegisteredPublicationPair(result), true);
+    assert.equal(isRegisteredSourcePublicationPair(result), true);
     setPolicyContractForTesting({
-      manifest: { publicationPairs: [{ ...result.pair, releaseMode: "source" }] },
+      manifest: { publicationPairs: [{ schema: result.pair.schema, schemaVersion: 5, releaseMode: "source" }] },
       evaluate: () => result
     });
     try {
-      const registered = evaluate(sample);
-      assert.equal(isRegisteredPublicationPair(registered), true);
-      assert.equal(isRegisteredSourcePublicationPair(registered), true);
+      const unregistered = evaluate(sample);
+      assert.equal(isRegisteredPublicationPair(unregistered), false);
+      assert.equal(isRegisteredSourcePublicationPair(unregistered), false);
     } finally {
       setPolicyContractForTesting(undefined);
     }
-    assert.equal(isRegisteredPublicationPair(evaluate(sample)), false);
-    assert.equal(isRegisteredSourcePublicationPair(evaluate(sample)), false);
+    assert.equal(isRegisteredSourcePublicationPair(evaluate(sample)), true);
   });
 
   // Producer 13f039d41 prepares V8 and owns this V9 unknown-pair vector.

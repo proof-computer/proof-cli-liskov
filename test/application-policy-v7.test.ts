@@ -88,12 +88,12 @@ describe("V7 application-manifest validation through the vendored contract", () 
     assert.equal(isRegisteredSourcePublicationPair(result), true);
   });
 
-  it("keeps a V6 corpus document supported and refused for publication", () => {
+  it("registers a supported V6 corpus document for publication", () => {
     const result = evaluate(corpusCase("v6/fetch"));
     assert.equal(result.disposition, "supported");
     assert.equal(result.valid, true);
     assert.equal(result.pair?.schemaVersion, 6);
-    assert.equal(isRegisteredSourcePublicationPair(result), false);
+    assert.equal(isRegisteredSourcePublicationPair(result), true);
   });
 
   // Producer 13f039d41b8febf36db37844a7a61cc405fcec79 also prepares V8;

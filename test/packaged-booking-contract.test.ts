@@ -19,10 +19,10 @@ interface CorpusSample {
   request: Record<string, unknown>;
 }
 
-// liskov-rs 4473cf26b26f4ed6d2960b086506254fe4d7dea3 (BKLG-20261118-pztg).
+// liskov-rs policy-client bundle with the V5 and V6 publication pairs (BKLG-20261119-ziff).
 // Each base is that version's own corpus document. A V6 document redeclared
 // as V4 is refused at /release/mode with or without booking.
-const OWNER_COMMIT = "4473cf26b26f4ed6d2960b086506254fe4d7dea3";
+const OWNER_COMMIT = "bf93a1f675f3adbf5ff1abefc62fb3b24bb33d7c";
 const BOOKING = { mode: "ahead_of_time", horizon: "1h" };
 const BASES: ReadonlyArray<readonly [string, number]> = [
   ["v4/golden", 4],
