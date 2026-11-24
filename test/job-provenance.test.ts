@@ -75,7 +75,7 @@ describe("job provenance", () => {
     const index = pendingLines.indexOf("    pendingChange:");
     assert.notEqual(index, -1);
     assert.deepEqual(pendingLines.slice(index + 1, index + 3), ["      block: 100", "      eventIndex: 0"]);
-    assert.doesNotMatch(pendingLines.join("\n"), /^    (?:window|coreCompatible|revocation|acurastMatch|notBeforeMs|notAfterMs):/m);
+    assert.doesNotMatch(pendingLines.join("\n"), /^ {4}(?:window|coreCompatible|revocation|acurastMatch|notBeforeMs|notAfterMs):/m);
     const revokedLines = lines(revoked);
     assert.ok(revokedLines.includes("    revocation: revoked"));
     assert.ok(!revokedLines.includes("    pendingChange:"));
@@ -89,7 +89,7 @@ describe("job provenance", () => {
     const unknown = lines(locationUnknown);
     assert.equal(unknown[0], "Job provenance: legacy-unparseable-job");
     assert.ok(unknown.includes("  status: location_unknown — Liskov could not parse this job's identity, so it cannot locate the job's acknowledgement"));
-    assert.doesNotMatch(unknown.join("\n"), /^  (?:acknowledgement:|acknowledgement on Acurast Hub:|deployment on Acurast Hub:)/m);
+    assert.doesNotMatch(unknown.join("\n"), /^ {2}(?:acknowledgement:|acknowledgement on Acurast Hub:|deployment on Acurast Hub:)/m);
     assert.ok(unknown.includes("    status: block_not_recorded"));
     assert.ok(unknown.includes("    status: not_recorded"));
     assert.ok(unknown.includes("    extrinsicIndex: null"));
@@ -98,7 +98,7 @@ describe("job provenance", () => {
     assert.ok(keys.includes("  status: keys_pending — no acknowledgement is recorded yet"));
     assert.ok(keys.includes("  processor not known yet"));
     assert.equal(keys.at(-1), `  ${custody}`);
-    assert.doesNotMatch(keys.join("\n"), /^  (?:processor on Acurast Hub:|deregistration on Acurast Hub:)/m);
+    assert.doesNotMatch(keys.join("\n"), /^ {2}(?:processor on Acurast Hub:|deregistration on Acurast Hub:)/m);
 
     const attestation = lines(attestationUnknown);
     assert.ok(attestation.includes("  acknowledgement:"));
