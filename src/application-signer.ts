@@ -304,6 +304,15 @@ function formatObservedFunding(funding: Record<string, unknown>): string[] {
   if (deregistrationHolds !== undefined) {
     lines.push(`  Deregistration holds: ${deregistrationHolds}${formatReasons(funding.deregistrationHoldsByReason)}`);
   }
+  const retiredSignerHolds = arrayValue(funding.retiredSignerHolds).map(objectRecord);
+  if (retiredSignerHolds.length > 0) {
+    lines.push("  Retired signers to reconnect:");
+    for (const hold of retiredSignerHolds) {
+      const address = stringValue(hold.signerAddress) ?? "address not provable";
+      const count = numberValue(hold.holds);
+      lines.push(`    ${address}  ${count ?? "-"} ${count === 1 ? "launch" : "launches"}`);
+    }
+  }
   return lines;
 }
 

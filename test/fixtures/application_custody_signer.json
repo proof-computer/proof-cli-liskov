@@ -571,6 +571,12 @@
       "deregistrationHoldsByReason": {
         "deregister_signer_retired": 1
       },
+      "retiredSignerHolds": [
+        {
+          "signerAddress": "5GrwvaEF5zXb26Fz9rcQpDWS64pDqm7EV1Bp24hUjZf419ck",
+          "holds": 1
+        }
+      ],
       "oldestUnresolvedHoldAgeMs": 600000
     }
   },
