@@ -40,12 +40,13 @@ type Vector = Record<
 >;
 
 /** The owner's vector, copied byte for byte from `liskov-rs` main at
- *  `0a27c13319da46c5afeec25226665c2d75324a43`,
+ *  `66c3f67fc5b6f3054cef8e093ec6f1df2dcae28e`,
  *  `crates/liskov-control-plane-api/vectors/application_custody_signer.json`. */
 const vector = async (): Promise<Vector> =>
   JSON.parse(await readFile(new URL("./fixtures/application_custody_signer.json", import.meta.url), "utf8"));
 
 const address = "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty";
+const retiredAddress = "5GrwvaEF5zXb26Fz9rcQpDWS64pDqm7EV1Bp24hUjZf419ck";
 
 async function readSigner(
   sessionFile: string,
@@ -201,12 +202,27 @@ test("application signer --json prints every served body unchanged", async () =>
       const out = await readSigner(sessionFile, { json: true }, () => Response.json(body));
       assert.equal(out.code, 0, name);
       assert.equal(out.stdout.length, 1, name);
-      assert.deepEqual(JSON.parse(out.stdout[0]!), body, name);
+      const printed = JSON.parse(out.stdout[0]!);
+      assert.deepEqual(printed, body, name);
+      if (name === "fundedHeld") {
+        assert.deepEqual(printed.executedFunding.retiredSignerHolds, [{ signerAddress: retiredAddress, holds: 1 }]);
+      }
     }
   });
 });
 
-const fundingCases = {
+const unavailableFunding = ["Observed funding: not reported (no_customer_funded_execution)."];
+const retiredSignerHeading = "  Retired signers to reconnect:";
+const fundingCases: Record<keyof Vector, string[]> = {
+  unpaired: unavailableFunding,
+  managed: unavailableFunding,
+  live: unavailableFunding,
+  stalled: unavailableFunding,
+  oldProtocol: unavailableFunding,
+  waiting: unavailableFunding,
+  claimed: unavailableFunding,
+  sent: unavailableFunding,
+  ambiguous: unavailableFunding,
   fundedNothingSettled: [
     "Observed funding (self_custody, acu_planck):",
     "  Admitted 1, open reserves 1, settled 0",
@@ -227,7 +243,9 @@ const fundingCases = {
     "  Settled amount: 0.00000075 ACU (750000 planck)",
     "  Closed, amount unknown: 1 (missing_execution_report 1)",
     "  Unresolved holds: 2, oldest 600000 ms",
-    "  Deregistration holds: 1 (deregister_signer_retired 1)"
+    "  Deregistration holds: 1 (deregister_signer_retired 1)",
+    retiredSignerHeading,
+    `    ${retiredAddress}  1 launch`
   ],
   fundedSettlementUnreadable: [
     "Observed funding (self_custody, acu_planck):",
@@ -236,7 +254,7 @@ const fundingCases = {
     "  Closed, amount unknown: 0",
     "  Unresolved holds: 1, oldest 600000 ms"
   ]
-} satisfies Partial<Record<keyof Vector, string[]>>;
+};
 
 for (const name of Object.keys(fundingCases) as (keyof typeof fundingCases)[]) {
   test(`application signer renders observed funding for ${name}`, async () => {
@@ -244,14 +262,45 @@ for (const name of Object.keys(fundingCases) as (keyof typeof fundingCases)[]) {
     await withSession(async (sessionFile) => {
       const out = await readSigner(sessionFile, {}, () => Response.json(bodies[name]));
       assert.equal(out.code, 0);
-      assert.equal(standing(out.lines), "Standing: online");
-      const start = out.lines.findIndex((line) => line.startsWith("Observed funding ("));
+      const start = out.lines.findIndex((line) => line.startsWith("Observed funding"));
       assert.ok(start > 0);
-      assert.equal(out.lines[start - 1], "Last signature: none");
+      if (name.startsWith("funded")) {
+        assert.equal(standing(out.lines), "Standing: online");
+        assert.equal(out.lines[start - 1], "Last signature: none");
+      }
       assert.deepEqual(out.lines.slice(start), fundingCases[name]);
     });
   });
 }
+
+test("application signer lists retired holds in served order and labels unprovable addresses", async () => {
+  const { fundedHeld } = await vector();
+  const secondAddress = "5DAAnrj7VHTznn2AWBemMuyBwZWs6FNFjdy7dQPTK7ErGvbA";
+  await withSession(async (sessionFile) => {
+    const valid = await readSigner(sessionFile, {}, () => Response.json(fundedHeld));
+    assert.equal(valid.code, 0);
+    const holdSummary = valid.lines.slice(0, -2);
+    const variants = [
+      {
+        holds: [{ signerAddress: secondAddress, holds: 2 }, { signerAddress: retiredAddress, holds: 1 }],
+        lines: [retiredSignerHeading, `    ${secondAddress}  2 launches`, `    ${retiredAddress}  1 launch`]
+      },
+      {
+        holds: [{ signerAddress: null, holds: 1 }],
+        lines: [retiredSignerHeading, "    address not provable  1 launch"]
+      },
+      { holds: [], lines: [] },
+      { holds: undefined, lines: [] }
+    ];
+    for (const { holds, lines } of variants) {
+      const body = { ...fundedHeld, executedFunding: { ...fundedHeld.executedFunding, retiredSignerHolds: holds } };
+      const out = await readSigner(sessionFile, {}, () => Response.json(body));
+      assert.equal(out.code, 0);
+      assert.deepEqual(out.lines, [...holdSummary, ...lines]);
+      assert.notDeepEqual(out.lines, valid.lines);
+    }
+  });
+});
 
 test("application signer formats whole ACU without a decimal point", async () => {
   const { fundedSettled } = await vector();
@@ -290,7 +339,9 @@ test("application signer preserves other funding units, served reason order, and
       "  Settled amount: 750000 other_unit",
       "  Closed, amount unknown: 3 (second_reason 1, first_reason 2)",
       "  Unresolved holds: 2, oldest 0 ms",
-      "  Deregistration holds: 1 (deregister_signer_retired 1)"
+      "  Deregistration holds: 1 (deregister_signer_retired 1)",
+      retiredSignerHeading,
+      `    ${retiredAddress}  1 launch`
     ]);
   });
 });
