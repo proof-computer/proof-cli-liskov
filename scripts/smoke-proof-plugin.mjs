@@ -47,6 +47,14 @@ try {
   assertIncludes(applicationHelp.stdout, "liskov application logs");
   assertIncludes(applicationHelp.stdout, "liskov application vars");
 
+  const signerHelp = run(process.execPath, [proofDevBin, "liskov", "application", "signer", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(signerHelp.stdout, "APP_REF");
+  const signerPairHelp = run(process.execPath, [proofDevBin, "liskov", "application", "signer", "pair", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(signerPairHelp.stdout.replace(/\s+/g, " "), "liskov application signer pair APP_REF");
+  const signerUnpairHelp = run(process.execPath, [proofDevBin, "liskov", "application", "signer", "unpair", "--help"], { cwd: proofCliRoot, env });
+  assertIncludes(signerUnpairHelp.stdout.replace(/\s+/g, " "), "liskov application signer unpair APP_REF");
+  assertIncludes(signerUnpairHelp.stdout, "--yes");
+
   assertExcludes(applicationHelp.stdout, "placement-plan");
   const placementPlanHelp = run(process.execPath, [proofDevBin, "liskov", "application", "placement-plan", "--help"], { cwd: proofCliRoot, env });
   assertIncludes(placementPlanHelp.stdout, "OCCURRENCE_AUTHORITY_DIGEST");

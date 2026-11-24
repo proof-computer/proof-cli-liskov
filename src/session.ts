@@ -1,7 +1,7 @@
 import { isApplicationPlacementPlan, formatPlacementPlan, placementPlanPath } from "./placement-plan.js";
 import { isApplicationPlacementRefusals, formatPlacementRefusals, parsePlacementRefusalsQuery, placementRefusalsPath } from "./placement-refusals.js";
 import { openBrowser } from "./browser-open.js";
-import { formatApplicationSigner, type SlipwayApplicationSignerResponse } from "./application-signer.js";
+import { applicationSignerPath, applicationSignerReadback, formatApplicationSigner, type SlipwayApplicationSignerResponse } from "./application-signer.js";
 import { createHash, randomBytes } from "node:crypto";
 import { access, mkdir, readFile, rm, writeFile, chmod } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -1468,19 +1468,6 @@ interface SlipwayApplicationImportResponse {
 
 interface SlipwayLiveCustodyCommandResponse {
   ok?: boolean;
-  error?: string;
-  reason?: string;
-  [key: string]: unknown;
-}
-
-interface SlipwayCustodyPairingTokenResponse {
-  ok?: boolean;
-  pairingToken?: string;
-  organizationId?: string;
-  applicationId?: string;
-  expiresAtMs?: number;
-  websocketPath?: string;
-  protocolVersion?: number;
   error?: string;
   reason?: string;
   [key: string]: unknown;
@@ -6136,59 +6123,7 @@ export async function runSlipwayCustodyPreflight(input: SlipwayCustodyPreflightI
   });
 }
 
-export async function runSlipwayCustodyPair(input: SlipwayCustodyPairInput, options: SlipwayCliOptions = {}): Promise<number> {
-  const request = await authenticatedSlipwayJsonRequest<SlipwayCustodyPairingTokenResponse>({
-    config: input.config,
-    slipwayUrl: input.slipwayUrl,
-    json: input.json,
-    method: "POST",
-    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/custody/signer/pairing-token`,
-    body: {},
-    requestErrorCode: "SLIPWAY_CUSTODY_PAIR_FAILED",
-    notFoundMessage: "No Liskov CLI session is stored locally.",
-    fetchFailedMessage: "could not issue Liskov self-custody signer pairing token"
-  }, options);
-  if (!request.ok) return request.exitCode;
-
-  const body = request.body;
-  const pairingToken = stringValue(body?.pairingToken);
-  if (!request.response.ok || body?.ok !== true || !pairingToken) {
-    const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_CUSTODY_PAIR_FAILED";
-    writeStructuredOrHuman(options, input.json, {
-      ok: false,
-      error,
-      status: request.response.status,
-      reason: body?.reason ?? body?.error,
-      slipwayUrl: request.slipwayUrl,
-      sessionFile: request.sessionFile
-    }, `Error (${error}): Liskov could not issue a self-custody signer pairing token.`);
-    return 1;
-  }
-
-  const controlPlaneUrl = signerControlPlaneUrl(request.slipwayUrl);
-  const websocketUrl = signerWebsocketUrl(request.slipwayUrl, body.websocketPath, pairingToken);
-  const signerCommand = `liskov-self-custody-signer --control-plane-url ${shellQuote(controlPlaneUrl)} --pairing-token ${shellQuote(pairingToken)}`;
-  const output = {
-    ...body,
-    controlPlaneUrl,
-    websocketUrl,
-    signerCommand
-  };
-  const expiresAtMs = numberValue(body.expiresAtMs);
-  const expiresAt = expiresAtMs === undefined ? "unknown" : new Date(expiresAtMs).toISOString();
-  writeStructuredOrHuman(
-    options,
-    input.json,
-    output,
-    [
-      `Issued self-custody signer pairing token for ${stringValue(body.applicationId) ?? input.applicationRef}.`,
-      `Control plane: ${controlPlaneUrl}`,
-      `Expires at: ${expiresAt}`,
-      `Run signer: ${signerCommand}`
-    ].join("\n")
-  );
-  return 0;
-}
+export { runSlipwayCustodyPair } from "./application-signer.js";
 
 /**
  * `GET /api/applications/:ref/custody` carries the self-custody signer block the
@@ -6349,7 +6284,7 @@ export async function runSlipwayApplicationSigner(input: SlipwayApplicationSigne
     config: input.config,
     slipwayUrl: input.slipwayUrl,
     json: input.json,
-    path: `/api/applications/${encodeURIComponent(input.applicationRef)}/custody/signer`,
+    path: applicationSignerPath(input.applicationRef),
     requestErrorCode: "SLIPWAY_APPLICATION_SIGNER_FAILED",
     notFoundMessage: "No Liskov CLI session is stored locally.",
     fetchFailedMessage: "could not read the application's self-custody signer"
@@ -6357,11 +6292,10 @@ export async function runSlipwayApplicationSigner(input: SlipwayApplicationSigne
   if (!request.ok) return request.exitCode;
 
   const body = request.body;
-  const readback = body?.signerReadback;
-  const readbackIsObject = readback !== null && typeof readback === "object" && !Array.isArray(readback);
-  if (!request.response.ok || body?.ok !== true || !readbackIsObject) {
+  const readback = applicationSignerReadback(body);
+  if (!request.response.ok || body?.ok !== true || readback === undefined) {
     const error = request.response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : "SLIPWAY_APPLICATION_SIGNER_FAILED";
-    const missingReadback = request.response.ok && body?.ok === true && !readbackIsObject;
+    const missingReadback = request.response.ok && body?.ok === true && readback === undefined;
     const reason = missingReadback ? "signer_readback_missing" : stringValue(body?.error) ?? stringValue(body?.reason);
     writeStructuredOrHuman(options, input.json, {
       ok: false,
@@ -7277,7 +7211,7 @@ function renderRuntimeImageWorkflow(input: {
   ].join("\n");
 }
 
-async function authenticatedSlipwayRequest<T>(
+export async function authenticatedSlipwayRequest<T>(
   input: {
     config?: string;
     slipwayUrl?: string;
@@ -7289,6 +7223,7 @@ async function authenticatedSlipwayRequest<T>(
     notFoundMessage: string;
     fetchFailedMessage: string;
     redactFetchError?: boolean;
+    protectSessionToken?: boolean;
     optional?: boolean;
     /** The caller words `capability_not_granted` and `application_repository_required` itself. */
     wordsOwnRefusals?: boolean;
@@ -7358,7 +7293,7 @@ async function authenticatedSlipwayRequest<T>(
       ok: false,
       error: input.requestErrorCode,
       message: withLiskovEndpointMigrationHint(
-        input.redactFetchError ? "Request failed." : errorMessage(error),
+        input.redactFetchError || input.protectSessionToken ? "Request failed." : errorMessage(error),
         slipwayUrl
       ),
       slipwayUrl,
@@ -7371,7 +7306,7 @@ async function authenticatedSlipwayRequest<T>(
     return { ok: false, exitCode: 1 };
   }
 
-  const body = await readJsonResponse<T>(response);
+  const body = await readJsonResponse<T>(response, input.protectSessionToken ? saved.sessionToken : undefined);
   if (!input.optional && !response.ok && writeOrganizationServerFailure(options, input.json, body)) {
     return { ok: false, exitCode: 1 };
   }
@@ -7411,7 +7346,7 @@ function applicationLogsInputError(input: SlipwayApplicationLogsInput): string |
   return undefined;
 }
 
-async function authenticatedSlipwayJsonRequest<T>(
+export async function authenticatedSlipwayJsonRequest<T>(
   input: {
     config?: string;
     slipwayUrl?: string;
@@ -7426,6 +7361,7 @@ async function authenticatedSlipwayJsonRequest<T>(
     fetchFailedMessage: string;
     requestFailureDetails?: Record<string, unknown>;
     redactFetchError?: boolean;
+    protectSessionToken?: boolean;
     /** The caller words `capability_not_granted` and `application_repository_required` itself. */
     wordsOwnRefusals?: boolean;
   },
@@ -7489,7 +7425,7 @@ async function authenticatedSlipwayJsonRequest<T>(
       ok: false,
       error: input.requestErrorCode,
       message: withLiskovEndpointMigrationHint(
-        input.redactFetchError ? "request_failed" : errorMessage(error),
+        input.redactFetchError || input.protectSessionToken ? "request_failed" : errorMessage(error),
         slipwayUrl
       ),
       slipwayUrl,
@@ -7503,7 +7439,7 @@ async function authenticatedSlipwayJsonRequest<T>(
     return { ok: false, exitCode: 1 };
   }
 
-  const responseBody = await readJsonResponse<T>(response);
+  const responseBody = await readJsonResponse<T>(response, input.protectSessionToken ? saved.sessionToken : undefined);
   if (!response.ok && writeOrganizationServerFailure(options, input.json, responseBody)) {
     return { ok: false, exitCode: 1 };
   }
@@ -7634,7 +7570,7 @@ const APPLICATION_REPOSITORY_REQUIRED_HUMAN = "create the Application with --rep
  * access. `409 application_repository_required` is a repository-bound
  * operation on an Application with no source repository.
  */
-function liskovAuthorityRefusal(
+export function liskovAuthorityRefusal(
   status: number,
   body: unknown,
   applicationRef: string | undefined
@@ -7734,7 +7670,7 @@ function writeMalformedReadResponse(
   return 1;
 }
 
-function writeConfirmationRequired(
+export function writeConfirmationRequired(
   options: SlipwayCliOptions,
   json: boolean | undefined,
   error: string,
@@ -8137,11 +8073,18 @@ export async function readSlipwaySession(sessionFile: string): Promise<SlipwaySe
   }
 }
 
-export async function readJsonResponse<T>(response: Response): Promise<T | undefined> {
+export async function readJsonResponse<T>(response: Response, sessionToken?: string): Promise<T | undefined> {
   const text = await response.text();
   if (!text.trim()) return undefined;
   try {
-    return JSON.parse(text) as T;
+    const body = JSON.parse(text) as T;
+    // Check the parsed form so JSON escapes cannot hide an echoed credential.
+    if (sessionToken !== undefined && sessionToken.length > 0) {
+      const serialized = JSON.stringify(body);
+      const escapedToken = JSON.stringify(sessionToken).slice(1, -1);
+      if (serialized.includes(escapedToken) || serialized.includes(encodeURIComponent(sessionToken))) return undefined;
+    }
+    return body;
   } catch {
     return undefined;
   }
@@ -8152,7 +8095,7 @@ export async function readJsonResponse<T>(response: Response): Promise<T | undef
 // the same either way. The sentence interpolates nothing: no token can reach it.
 const SESSION_UNAUTHORIZED_HUMAN = "Error (SLIPWAY_SESSION_UNAUTHORIZED): Liskov rejected the stored session — it has expired or is no longer valid. Run `proof liskov login` again.";
 
-function writeStructuredOrHuman(options: SlipwayCliOptions, json: boolean | undefined, value: unknown, human: string): void {
+export function writeStructuredOrHuman(options: SlipwayCliOptions, json: boolean | undefined, value: unknown, human: string): void {
   if (json) {
     emit(options, JSON.stringify(value));
     return;
@@ -8163,7 +8106,7 @@ function writeStructuredOrHuman(options: SlipwayCliOptions, json: boolean | unde
 
 // A 401 reads as a rejected session with its recovery, not as a sentence about
 // whichever command happened to meet it (BKLG-20260921-5lvo).
-function sessionUnauthorizedHuman(error: unknown, human: string): string {
+export function sessionUnauthorizedHuman(error: unknown, human: string): string {
   return error === "SLIPWAY_SESSION_UNAUTHORIZED" && !human.includes("proof liskov login")
     ? SESSION_UNAUTHORIZED_HUMAN
     : human;
@@ -8207,28 +8150,6 @@ function liskovEndpointMigrationDetails(value: string | URL): { suggestedLiskovU
   } catch {
     return {};
   }
-}
-
-function signerControlPlaneUrl(slipwayUrl: string): string {
-  return websocketUrl(new URL("/api/custody/signer", slipwayUrl));
-}
-
-function signerWebsocketUrl(slipwayUrl: string, websocketPath: string | undefined, pairingToken: string): string {
-  const path = stringValue(websocketPath) ?? "/api/custody/signer";
-  const url = new URL(path, slipwayUrl);
-  if (!url.searchParams.has("pairingToken")) url.searchParams.set("pairingToken", pairingToken);
-  return websocketUrl(url);
-}
-
-function websocketUrl(url: URL): string {
-  if (url.protocol === "https:") url.protocol = "wss:";
-  else if (url.protocol === "http:") url.protocol = "ws:";
-  else throw new Error("Liskov URL must use http or https");
-  return url.toString();
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/gu, "'\\''")}'`;
 }
 
 function resolveVerificationUrl(value: string, slipwayUrl: string): string {
