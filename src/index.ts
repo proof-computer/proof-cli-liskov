@@ -1,4 +1,9 @@
 export {
+  runSlipwayApplicationSignerPair,
+  runSlipwayApplicationSignerUnpair,
+  type SlipwayApplicationSignerUnpairInput
+} from "./application-signer.js";
+export {
   DEFAULT_SLIPWAY_URL,
   runSlipwayAdminDeploySubmitRecovery,
   runSlipwayAdminExecutorOperationReconcile,

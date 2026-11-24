@@ -4,7 +4,14 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { runSlipwayApplicationSigner } from "../src/session.js";
+import {
+  runSlipwayApplicationSigner,
+  runSlipwayApplicationSignerPair,
+  runSlipwayApplicationSignerUnpair,
+  runSlipwayCustodyPair,
+  type SlipwayApplicationSignerUnpairInput,
+  type SlipwayCliOptions
+} from "../src/index.js";
 
 const token = "session-token-that-must-not-be-printed";
 
@@ -401,6 +408,234 @@ test("application signer never prints the session token", async () => {
         const out = await readSigner(sessionFile, { json }, respond);
         assert.ok(out.stdout.every((line) => !line.includes(token)));
       }
+    }
+  });
+});
+
+const signerUrl = "https://liskov.test/api/applications/my-app/custody/signer";
+const pairingReply = {
+  ok: true,
+  applicationId: "my-app",
+  organizationId: "org-1",
+  pairingToken: "lsk_pair_for_signer",
+  expiresAtMs: 1_750_000_030_000,
+  websocketPath: "/api/custody/signer?pairingToken=lsk_pair_for_signer",
+  protocolVersion: 2
+};
+const pairingLines = [
+  "Issued self-custody signer pairing token for my-app.",
+  "Control plane: wss://liskov.test/api/custody/signer",
+  "Expires at: 2025-06-15T15:07:10.000Z",
+  "Run signer: liskov-self-custody-signer --control-plane-url 'wss://liskov.test/api/custody/signer' --pairing-token 'lsk_pair_for_signer'"
+];
+
+async function mutateSigner(
+  run: (input: SlipwayApplicationSignerUnpairInput, options: SlipwayCliOptions) => Promise<number>,
+  sessionFile: string,
+  input: { yes?: boolean; json?: boolean; organization?: string },
+  ...respond: (() => Response)[]
+) {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const requests: { url: string; method: string | undefined; auth: string | null; organization: string | null; body: RequestInit["body"] }[] = [];
+  const code = await run({ applicationRef: "my-app", config: sessionFile, json: input.json, yes: input.yes }, {
+    env: {},
+    organization: input.organization,
+    stdout: (line) => stdout.push(line),
+    stderr: (line) => stderr.push(line),
+    fetchImpl: async (url, init) => {
+      const headers = new Headers(init?.headers);
+      const response = respond[requests.length];
+      requests.push({
+        url: String(url),
+        method: init?.method,
+        auth: headers.get("authorization"),
+        organization: headers.get("x-liskov-organization"),
+        body: init?.body
+      });
+      if (!response) throw new Error("unexpected signer request");
+      return response();
+    }
+  });
+  assert.ok(![...stdout, ...stderr].join("\n").includes(token));
+  return { code, requests, output: stdout.join("\n") };
+}
+
+function signerReadback(boundSignerAddress: string | null): Response {
+  return Response.json({ ok: true, signerReadback: { boundSignerAddress } });
+}
+
+function noContent(): Response {
+  return new Response(null, { status: 204 });
+}
+
+test("application signer pair posts with the current session and prints the signer command", async () => {
+  await withSession(async (sessionFile) => {
+    const result = await mutateSigner(runSlipwayApplicationSignerPair, sessionFile, {}, () => Response.json(pairingReply));
+    assert.equal(result.code, 0);
+    assert.deepEqual(result.requests, [{
+      url: `${signerUrl}/pairing-token`, method: "POST", auth: `Bearer ${token}`, organization: null, body: "{}"
+    }]);
+    assert.deepEqual(result.output.split("\n"), pairingLines);
+  });
+});
+
+test("application signer pair adds the replacement warning only for a bound signer", async () => {
+  await withSession(async (sessionFile) => {
+    const unbound = await mutateSigner(runSlipwayApplicationSignerPair, sessionFile, {}, () => Response.json(pairingReply));
+    const respond = () => Response.json({ ...pairingReply, boundAddress: address });
+    const bound = await mutateSigner(runSlipwayApplicationSignerPair, sessionFile, {}, respond);
+    const operator = await mutateSigner(runSlipwayCustodyPair, sessionFile, {}, respond);
+    assert.equal(bound.code, 0);
+    assert.equal(operator.code, 0);
+    assert.deepEqual(bound.output.split("\n"), [
+      ...unbound.output.split("\n"),
+      `This replaces the paired signer ${address}. Jobs it registered still settle through it: keep it available, or run it again, until they finish.`
+    ]);
+    assert.equal(operator.output, unbound.output);
+  });
+});
+
+test("application signer pair --json matches operator pairing output and honors organization selection", async () => {
+  await withSession(async (sessionFile) => {
+    const respond = () => Response.json({ ...pairingReply, boundAddress: address });
+    const result = await mutateSigner(runSlipwayApplicationSignerPair, sessionFile, { json: true, organization: "my-org" }, respond);
+    const operator = await mutateSigner(runSlipwayCustodyPair, sessionFile, { json: true }, respond);
+    assert.equal(result.code, 0);
+    assert.equal(operator.code, 0);
+    assert.equal(result.requests[0].auth, `Liskov-Organization ${token}`);
+    assert.equal(result.requests[0].organization, "my-org");
+    assert.equal(result.output, operator.output);
+    assert.deepEqual(JSON.parse(result.output), {
+      ...pairingReply,
+      boundAddress: address,
+      controlPlaneUrl: "wss://liskov.test/api/custody/signer",
+      websocketUrl: `wss://liskov.test${pairingReply.websocketPath}`,
+      signerCommand: pairingLines[3].slice("Run signer: ".length)
+    });
+  });
+});
+
+test("application signer pair explains the plan refusal and never prints a refused pairing token", async () => {
+  await withSession(async (sessionFile) => {
+    const respond = () => Response.json({
+      ok: false, error: "self_custody_plan_required", pairingToken: pairingReply.pairingToken
+    }, { status: 403 });
+    const result = await mutateSigner(runSlipwayApplicationSignerPair, sessionFile, {}, respond);
+    assert.equal(result.code, 1);
+    assert.equal(result.output, "Error (LISKOV_APPLICATION_SIGNER_PAIR_FAILED): This organisation's plan does not include self-custody signing (self_custody_plan_required).");
+    const json = await mutateSigner(runSlipwayApplicationSignerPair, sessionFile, { json: true }, respond);
+    assert.equal(json.code, 1);
+    assert.equal(JSON.parse(json.output).reason, "self_custody_plan_required");
+    assert.ok(!json.output.includes(pairingReply.pairingToken));
+  });
+});
+
+test("application signer unpair requires confirmation before making a request", async () => {
+  await withSession(async (sessionFile) => {
+    const result = await mutateSigner(runSlipwayApplicationSignerUnpair, sessionFile, {});
+    assert.equal(result.code, 1);
+    assert.deepEqual(result.requests, []);
+    assert.equal(result.output, "Error (LISKOV_APPLICATION_SIGNER_UNPAIR_CONFIRMATION_REQUIRED): Removing a self-custody signer requires --yes.");
+  });
+});
+
+test("application signer unpair reads the bound address before DELETE", async () => {
+  await withSession(async (sessionFile) => {
+    const result = await mutateSigner(runSlipwayApplicationSignerUnpair, sessionFile, { yes: true }, () => signerReadback(address), noContent);
+    assert.equal(result.code, 0);
+    assert.deepEqual(result.requests, ["GET", "DELETE"].map((method) => ({
+      url: signerUrl, method, auth: `Bearer ${token}`, organization: null, body: undefined
+    })));
+    assert.equal(result.output, `Removed the self-custody signer ${address} from my-app.`);
+  });
+});
+
+test("application signer unpair reports an idempotent success for an unbound application", async () => {
+  await withSession(async (sessionFile) => {
+    const result = await mutateSigner(runSlipwayApplicationSignerUnpair, sessionFile, { yes: true }, () => signerReadback(null), noContent);
+    assert.equal(result.code, 0);
+    assert.deepEqual(result.requests.map(({ method }) => method), ["GET", "DELETE"]);
+    assert.equal(result.output, "No self-custody signer was paired to my-app; nothing changed.");
+  });
+});
+
+test("application signer unpair --json reports the observed address or null", async () => {
+  await withSession(async (sessionFile) => {
+    for (const removedAddress of [address, null]) {
+      const result = await mutateSigner(runSlipwayApplicationSignerUnpair, sessionFile, { yes: true, json: true },
+        () => signerReadback(removedAddress), noContent);
+      assert.equal(result.code, 0);
+      assert.deepEqual(JSON.parse(result.output), { ok: true, applicationRef: "my-app", removedAddress, status: 204 });
+    }
+  });
+});
+
+test("application signer unpair lists open requests and can be retried when they finish", async () => {
+  await withSession(async (sessionFile) => {
+    const requestIds = ["sign_1", "sign_2"];
+    const respond = () => Response.json({ ok: false, error: "self_custody_sign_request_open", requestIds }, { status: 409 });
+    const result = await mutateSigner(runSlipwayApplicationSignerUnpair, sessionFile, { yes: true }, () => signerReadback(address), respond);
+    assert.equal(result.code, 1);
+    assert.equal(result.output, "Error (LISKOV_APPLICATION_SIGNER_UNPAIR_FAILED): my-app has open sign requests: sign_1, sign_2. Run unpair again when they finish.");
+    const json = await mutateSigner(runSlipwayApplicationSignerUnpair, sessionFile, { yes: true, json: true }, () => signerReadback(address), respond);
+    assert.equal(json.code, 1);
+    assert.deepEqual(JSON.parse(json.output), {
+      ok: false, error: "LISKOV_APPLICATION_SIGNER_UNPAIR_FAILED", status: 409,
+      reason: "self_custody_sign_request_open", applicationRef: "my-app", requestIds
+    });
+  });
+});
+
+test("application signer unpair explains the plan refusal", async () => {
+  await withSession(async (sessionFile) => {
+    const result = await mutateSigner(runSlipwayApplicationSignerUnpair, sessionFile, { yes: true }, () => signerReadback(address),
+      () => Response.json({ ok: false, error: "self_custody_plan_required" }, { status: 403 }));
+    assert.equal(result.code, 1);
+    assert.equal(result.output, "Error (LISKOV_APPLICATION_SIGNER_UNPAIR_FAILED): This organisation's plan does not include self-custody signing (self_custody_plan_required).");
+  });
+});
+
+test("signer mutations report other server codes and unpair stops on a refused read", async () => {
+  await withSession(async (sessionFile) => {
+    const respond = () => Response.json({ ok: false, error: "application_not_found" }, { status: 404 });
+    const pair = await mutateSigner(runSlipwayApplicationSignerPair, sessionFile, {}, respond);
+    const unpair = await mutateSigner(runSlipwayApplicationSignerUnpair, sessionFile, { yes: true }, respond);
+    assert.equal(pair.code, 1);
+    assert.equal(unpair.code, 1);
+    assert.equal(pair.output, "Error (LISKOV_APPLICATION_SIGNER_PAIR_FAILED): application_not_found");
+    assert.equal(unpair.output, "Error (LISKOV_APPLICATION_SIGNER_UNPAIR_FAILED): application_not_found");
+    assert.deepEqual(unpair.requests.map(({ method }) => method), ["GET"]);
+  });
+});
+
+test("signer mutations keep the server code with actionable session and role refusals", async () => {
+  await withSession(async (sessionFile) => {
+    const unauthorized = await mutateSigner(runSlipwayApplicationSignerPair, sessionFile, {},
+      () => Response.json({ ok: false, error: "unauthorized" }, { status: 401 }));
+    assert.equal(unauthorized.code, 1);
+    assert.match(unauthorized.output, /SLIPWAY_SESSION_UNAUTHORIZED.*proof liskov login.*\(unauthorized\)/u);
+
+    const forbidden = await mutateSigner(runSlipwayApplicationSignerUnpair, sessionFile, { yes: true }, () => signerReadback(address),
+      () => Response.json({ ok: false, error: "forbidden", reasonCode: "capability_not_granted", capability: "custody.signer.pair" }, { status: 403 }));
+    assert.equal(forbidden.code, 1);
+    assert.match(forbidden.output, /SLIPWAY_ACCESS_DENIED.*custody\.signer\.pair.*Ask an organization admin.*\(forbidden\)/u);
+  });
+});
+
+test("signer mutations suppress reflected session credentials and transport exceptions", async () => {
+  await withSession(async (sessionFile) => {
+    for (const json of [false, true]) {
+      const pair = await mutateSigner(runSlipwayApplicationSignerPair, sessionFile, { json },
+        () => Response.json({ ...pairingReply, reflected: token }));
+      const unpair = await mutateSigner(runSlipwayApplicationSignerUnpair, sessionFile, { yes: true, json },
+        () => signerReadback(token), noContent);
+      const transportFailure = await mutateSigner(runSlipwayApplicationSignerPair, sessionFile, { json },
+        () => { throw new Error(`transport failure: ${token}`); });
+      assert.equal(pair.code, 1);
+      assert.equal(unpair.code, 1);
+      assert.deepEqual(unpair.requests.map(({ method }) => method), ["GET"]);
+      assert.equal(transportFailure.code, 1);
     }
   });
 });

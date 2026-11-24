@@ -1,4 +1,209 @@
-import { arrayValue, isoFromEpochMs, numberValue, objectRecord, stringValue } from "./session.js";
+import {
+  arrayValue,
+  authenticatedSlipwayJsonRequest,
+  authenticatedSlipwayRequest,
+  isoFromEpochMs,
+  liskovAuthorityRefusal,
+  numberValue,
+  objectRecord,
+  sessionUnauthorizedHuman,
+  stringValue,
+  writeConfirmationRequired,
+  writeStructuredOrHuman,
+  type SlipwayApplicationSignerInput,
+  type SlipwayCliOptions,
+  type SlipwayCustodyPairInput
+} from "./session.js";
+
+interface SlipwayCustodyPairingTokenResponse {
+  ok?: boolean;
+  pairingToken?: string;
+  organizationId?: string;
+  applicationId?: string;
+  expiresAtMs?: number;
+  websocketPath?: string;
+  protocolVersion?: number;
+  boundAddress?: string | null;
+  error?: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+interface SignerMutationRefusal {
+  error?: string;
+  reasonCode?: string;
+  capability?: string;
+  requestIds?: string[];
+}
+
+export interface SlipwayApplicationSignerUnpairInput extends SlipwayApplicationSignerInput {
+  yes?: boolean;
+}
+
+const APPLICATION_SIGNER_PAIR_FAILED = "LISKOV_APPLICATION_SIGNER_PAIR_FAILED";
+const APPLICATION_SIGNER_UNPAIR_FAILED = "LISKOV_APPLICATION_SIGNER_UNPAIR_FAILED";
+const CUSTODY_PAIR_FAILED = "SLIPWAY_CUSTODY_PAIR_FAILED";
+const PLAN_REQUIRED = "self_custody_plan_required";
+const SIGN_REQUEST_OPEN = "self_custody_sign_request_open";
+const SESSION_NOT_FOUND = "No Liskov CLI session is stored locally.";
+
+export function applicationSignerPath(applicationRef: string): string {
+  return `/api/applications/${encodeURIComponent(applicationRef)}/custody/signer`;
+}
+
+export function applicationSignerReadback(body: SlipwayApplicationSignerResponse | undefined): Record<string, unknown> | undefined {
+  const readback = body?.signerReadback;
+  return readback != null && typeof readback === "object" && !Array.isArray(readback) ? readback : undefined;
+}
+
+export function runSlipwayApplicationSignerPair(input: SlipwayApplicationSignerInput, options: SlipwayCliOptions = {}): Promise<number> {
+  return issueSignerPairingToken(input, options, APPLICATION_SIGNER_PAIR_FAILED);
+}
+
+export function runSlipwayCustodyPair(input: SlipwayCustodyPairInput, options: SlipwayCliOptions = {}): Promise<number> {
+  return issueSignerPairingToken(input, options, CUSTODY_PAIR_FAILED);
+}
+
+async function issueSignerPairingToken(
+  input: SlipwayApplicationSignerInput,
+  options: SlipwayCliOptions,
+  errorCode: typeof APPLICATION_SIGNER_PAIR_FAILED | typeof CUSTODY_PAIR_FAILED
+): Promise<number> {
+  const request = await authenticatedSlipwayJsonRequest<SlipwayCustodyPairingTokenResponse>({
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    method: "POST",
+    path: `${applicationSignerPath(input.applicationRef)}/pairing-token`,
+    body: {},
+    requestErrorCode: errorCode,
+    notFoundMessage: SESSION_NOT_FOUND,
+    fetchFailedMessage: "could not issue Liskov self-custody signer pairing token",
+    protectSessionToken: true,
+    wordsOwnRefusals: errorCode === APPLICATION_SIGNER_PAIR_FAILED
+  }, options);
+  if (!request.ok) return request.exitCode;
+
+  const { body, slipwayUrl, sessionFile, response } = request;
+  const pairingToken = stringValue(body?.pairingToken);
+  if (!response.ok || body?.ok !== true || pairingToken === undefined) {
+    if (errorCode === APPLICATION_SIGNER_PAIR_FAILED) {
+      return writeSignerMutationFailure(input, options, errorCode, response.status, body);
+    }
+    const error = response.status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : errorCode;
+    writeStructuredOrHuman(options, input.json, {
+      ok: false,
+      error,
+      status: response.status,
+      reason: body?.reason ?? body?.error,
+      slipwayUrl,
+      sessionFile
+    }, `Error (${error}): Liskov could not issue a self-custody signer pairing token.`);
+    return 1;
+  }
+
+  const controlPlaneUrl = signerControlPlaneUrl(slipwayUrl);
+  const websocketUrl = signerWebsocketUrl(slipwayUrl, body.websocketPath, pairingToken);
+  const signerCommand = `liskov-self-custody-signer --control-plane-url ${shellQuote(controlPlaneUrl)} --pairing-token ${shellQuote(pairingToken)}`;
+  const lines = [
+    `Issued self-custody signer pairing token for ${stringValue(body.applicationId) ?? input.applicationRef}.`,
+    `Control plane: ${controlPlaneUrl}`,
+    `Expires at: ${isoFromEpochMs(body.expiresAtMs) ?? "unknown"}`,
+    `Run signer: ${signerCommand}`
+  ];
+  const boundAddress = stringValue(body.boundAddress);
+  if (errorCode === APPLICATION_SIGNER_PAIR_FAILED && boundAddress !== undefined) {
+    lines.push(`This replaces the paired signer ${boundAddress}. Jobs it registered still settle through it: keep it available, or run it again, until they finish.`);
+  }
+  writeStructuredOrHuman(options, input.json, { ...body, controlPlaneUrl, websocketUrl, signerCommand }, lines.join("\n"));
+  return 0;
+}
+
+export async function runSlipwayApplicationSignerUnpair(input: SlipwayApplicationSignerUnpairInput, options: SlipwayCliOptions = {}): Promise<number> {
+  if (!input.yes) {
+    return writeConfirmationRequired(options, input.json, "LISKOV_APPLICATION_SIGNER_UNPAIR_CONFIRMATION_REQUIRED",
+      "Removing a self-custody signer");
+  }
+
+  const request = {
+    config: input.config,
+    slipwayUrl: input.slipwayUrl,
+    json: input.json,
+    path: applicationSignerPath(input.applicationRef),
+    requestErrorCode: APPLICATION_SIGNER_UNPAIR_FAILED,
+    notFoundMessage: SESSION_NOT_FOUND,
+    protectSessionToken: true,
+    wordsOwnRefusals: true
+  };
+  const read = await authenticatedSlipwayRequest<SlipwayApplicationSignerResponse>({
+    ...request,
+    fetchFailedMessage: "could not read the application's self-custody signer"
+  }, options);
+  if (!read.ok) return read.exitCode;
+  if (!read.response.ok) {
+    return writeSignerMutationFailure(input, options, APPLICATION_SIGNER_UNPAIR_FAILED, read.response.status, read.body);
+  }
+  const readback = applicationSignerReadback(read.body);
+  const boundAddress = readback?.boundSignerAddress;
+  if (read.body?.ok !== true || readback === undefined
+    || (boundAddress != null && typeof boundAddress !== "string")) {
+    return writeSignerMutationFailure(input, options, APPLICATION_SIGNER_UNPAIR_FAILED, read.response.status,
+      { error: "signer_readback_missing" });
+  }
+
+  // Both DELETE outcomes are 204. The address comes from the preceding read.
+  const removed = await authenticatedSlipwayJsonRequest<SignerMutationRefusal>({
+    ...request,
+    method: "DELETE",
+    body: undefined,
+    fetchFailedMessage: "could not remove the application's self-custody signer"
+  }, options);
+  if (!removed.ok) return removed.exitCode;
+  const { status } = removed.response;
+  if (status !== 204) {
+    return writeSignerMutationFailure(input, options, APPLICATION_SIGNER_UNPAIR_FAILED, status, removed.body);
+  }
+
+  const applicationRef = input.applicationRef;
+  const removedAddress = boundAddress ?? null;
+  writeStructuredOrHuman(options, input.json, { ok: true, applicationRef, removedAddress, status },
+    removedAddress === null
+      ? `No self-custody signer was paired to ${applicationRef}; nothing changed.`
+      : `Removed the self-custody signer ${removedAddress} from ${applicationRef}.`);
+  return 0;
+}
+
+function writeSignerMutationFailure(
+  input: SlipwayApplicationSignerInput,
+  options: SlipwayCliOptions,
+  errorCode: string,
+  status: number,
+  body: SignerMutationRefusal | undefined
+): number {
+  const { applicationRef } = input;
+  const authority = liskovAuthorityRefusal(status, body, applicationRef);
+  const error = status === 401 ? "SLIPWAY_SESSION_UNAUTHORIZED" : authority?.error ?? errorCode;
+  const reason = stringValue(body?.error);
+  const requestIds = status === 409 && reason === SIGN_REQUEST_OPEN && Array.isArray(body?.requestIds)
+    ? body.requestIds.filter((id) => typeof id === "string")
+    : undefined;
+  let message = reason ?? "Liskov returned an unexpected signer response.";
+  if (status === 403 && reason === PLAN_REQUIRED) {
+    message = `This organisation's plan does not include self-custody signing (${PLAN_REQUIRED}).`;
+  } else if (requestIds !== undefined && requestIds.length > 0) {
+    message = `${applicationRef} has open sign requests: ${requestIds.join(", ")}. Run unpair again when they finish.`;
+  }
+  const recovery = status === 401 ? sessionUnauthorizedHuman(error, "") : authority?.human;
+  const human = recovery === undefined
+    ? `Error (${error}): ${message}`
+    : recovery + (reason === undefined ? "" : ` (${reason})`);
+  writeStructuredOrHuman(options, input.json, {
+    ok: false, error, status, reason, applicationRef, requestIds,
+    reasonCode: stringValue(body?.reasonCode),
+    capability: stringValue(body?.capability)
+  }, human);
+  return 1;
+}
 
 /**
  * `application_custody_signer_v1` (`liskov-rs` `application_custody_signer.rs`):
@@ -147,4 +352,26 @@ function applicationSignerStanding(
   const pending = numberValue(counts.pending) ?? 0;
   if (pending > 0) return `${pending} request(s) waiting ${numberValue(lag.oldestUnclaimedAgeMs) ?? "-"} ms for a signer`;
   return "online";
+}
+
+function signerControlPlaneUrl(slipwayUrl: string): string {
+  return websocketUrl(new URL("/api/custody/signer", slipwayUrl));
+}
+
+function signerWebsocketUrl(slipwayUrl: string, websocketPath: string | undefined, pairingToken: string): string {
+  const path = stringValue(websocketPath) ?? "/api/custody/signer";
+  const url = new URL(path, slipwayUrl);
+  if (!url.searchParams.has("pairingToken")) url.searchParams.set("pairingToken", pairingToken);
+  return websocketUrl(url);
+}
+
+function websocketUrl(url: URL): string {
+  if (url.protocol === "https:") url.protocol = "wss:";
+  else if (url.protocol === "http:") url.protocol = "ws:";
+  else throw new Error("Liskov URL must use http or https");
+  return url.toString();
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/gu, "'\\''")}'`;
 }
