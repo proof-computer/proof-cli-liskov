@@ -100,8 +100,8 @@ test("missing fields, unsupported schema or semantics, bad counts and invalid re
   assert.equal((await read(vectors.seed, false, 200, true)).code, 1);
 });
 
-test("command stays hidden and encodes both required identities independently", () => {
-  assert.equal(Command.hidden, true);
+test("command is listed in help and encodes both required identities independently", () => {
+  assert.notEqual(Command.hidden, true);
   assert.equal(Command.args.application_id.required, true);
   assert.equal(Command.args.occurrence_authority_digest.required, true);
   assert.equal(placementPlanPath("a/b", "c/d"), "/api/applications/a%2Fb/placement/plans/c%2Fd");

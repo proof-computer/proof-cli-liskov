@@ -332,6 +332,48 @@ ref, manifest path and generated caller workflow identity, such as
 The structured success key `policyWorkflowRefHint` retains that caller identity
 hint for existing consumers.
 
+## Self-custody signer (V6)
+
+With the V6 release and the self-custody signer entitlement, you can connect
+your own signer to an application. Use the application's UID, name, or legacy
+ID for `APP`.
+
+1. Issue a pairing token.
+
+   ```sh
+   proof liskov application signer pair APP
+   ```
+
+   Run the printed `liskov-self-custody-signer` command on the machine that will
+   run your signer. Keep the printed pairing token private.
+
+2. Read the current pairing and signer status.
+
+   ```sh
+   proof liskov application signer APP
+   ```
+
+   The **Observed funding** lines show admissions, open reserves, settled ACU,
+   the count of closed jobs with unknown amounts, and unresolved holds. If the
+   server cannot report funding, the output shows the reason.
+
+3. Remove the pairing with explicit confirmation.
+
+   ```sh
+   proof liskov application signer unpair APP --yes
+   ```
+
+   Unpairing is refused while sign requests are open. You can re-pair at any
+   time by running the pair command again. Jobs registered by a replaced
+   signer still settle through that signer.
+
+Other commands for reading V6 applications and their placement:
+
+- `proof liskov placement manager-fleet` reports the fleet counts a V6 application can use for a manager placement rule.
+- `proof liskov application placement-plan` reads a V6 application's initial feasibility plan for a specific occurrence.
+- `proof liskov application placement-refusals` reads a V6 application's recorded placement refusals in an hourly window.
+- `proof liskov runtime-ssh attachment endpoints` reads a V6 application's private endpoints and their observed states.
+
 ## Operator-only commands
 
 The `proof liskov custody` namespace is internal Liskov operator tooling for

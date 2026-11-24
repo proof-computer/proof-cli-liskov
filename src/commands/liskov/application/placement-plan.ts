@@ -7,8 +7,6 @@ export default class LiskovApplicationPlacementPlan extends OrganizationScopedCo
     application_id: Args.string({ description: "Liskov Application identity.", required: true }),
     occurrence_authority_digest: Args.string({ description: "Exact occurrence authority digest.", required: true })
   };
-  // BKLG-20260907-ie6x alone promotes V6 availability.
-  static hidden = true;
   static summary = "Read an immutable initial placement feasibility snapshot.";
   static description = "Read the initial whole-application spread plan for an explicit occurrence. Counts describe the original plan and carry no current fulfillment guarantee.";
   static flags: Interfaces.FlagInput = {
