@@ -295,9 +295,14 @@ same `policyVersion.policyDiagnostics` records unchanged.
 sections as the typed-spine run: the selected occurrence and attempt, the stage
 rail, the deploy and custody-settlement effects with their persisted receipts
 and job id, the reserve/settlement lineage, the first persisted blocker with the
-server's next action, and the decision trace. `--json` prints the verbatim
-server envelope. `--watch` re-reads it every `--poll-ms` (default 2000, minimum
-500) for up to `--timeout-seconds` (default 900, maximum 1800) and prints one
+server's next action, and the decision trace. A one-shot read also fetches the
+first page of job provenance (`view=executions&latest=job`) and shows the
+processor, published keys, chain coordinates, and placement verdict when
+available. One-shot `--json` returns the existing `explanation` and `schedule`
+fields plus `executions`, which holds the served page as-is or `null` when the
+read is unavailable. `--watch` re-reads the explanation every `--poll-ms`
+(default 2000, minimum 500) for up to `--timeout-seconds` (default 900, maximum
+1800) and prints one
 line per semantic change (`--json` emits one NDJSON record per change with the
 `changedPaths`); it exits 0 when the occurrence completes, 1 on a failed
 terminal, a persisted blocker (unless `--until-terminal`) or the timeout, 2 on

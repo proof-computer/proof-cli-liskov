@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
@@ -30,6 +30,7 @@ import { POLICY_EXPLANATION_SCHEMA, parsePolicyExplanation, policyExplanationPat
 import { runSlipwayApplicationExecutionShow, runSlipwayApplicationStatus, saveSlipwaySession } from "../src/index.js";
 
 const TOKEN = "session-token-that-must-not-be-printed";
+const EXECUTIONS_PATH = "/api/applications/app_1/policy?view=executions&latest=job";
 
 interface EffectOverrides {
   state?: string;
@@ -523,11 +524,25 @@ describe("application execution show", () => {
       assert.equal(code, 0);
       assert.deepEqual(requests, [
         `https://liskov.test${policyExplanationPath("app_1")}`,
-        `https://liskov.test${applicationCoveragePath("app_1")}`
+        `https://liskov.test${applicationCoveragePath("app_1")}`,
+        `https://liskov.test${EXECUTIONS_PATH}`
       ]);
       const printed = JSON.parse(out.text) as { explanation: unknown; schedule: unknown };
       assert.deepEqual(printed.explanation, body, "existing explanation fields stay on --json");
       assert.equal(printed.schedule, null, "an unreadable Coverage read is a null schedule, not a failure");
+      assert.equal(out.text.includes(TOKEN), false);
+    });
+  });
+
+  it("keeps the session token out of a one-shot explanation error", async () => {
+    await withSession(async (sessionFile) => {
+      const out = writer();
+      const code = await runSlipwayApplicationExecutionShow({ applicationId: "app_1", config: sessionFile, json: true }, {
+        fetchImpl: async () => { throw new Error(TOKEN); },
+        stdout: out.write
+      });
+      assert.equal(code, 1);
+      assert.equal(JSON.parse(out.text).error, "SLIPWAY_APPLICATION_EXECUTION_SHOW_FAILED");
       assert.equal(out.text.includes(TOKEN), false);
     });
   });
@@ -589,7 +604,10 @@ describe("application execution show", () => {
       ];
       let index = 0;
       const code = await runSlipwayApplicationExecutionShow({ applicationId: "app_1", config: sessionFile, json: true, watch: true }, {
-        fetchImpl: async () => Response.json(bodies[Math.min(index++, bodies.length - 1)]),
+        fetchImpl: async (url) => {
+          assert.equal(new URL(url.toString()).search, "?view=explanation");
+          return Response.json(bodies[Math.min(index++, bodies.length - 1)]);
+        },
         sleepMs: async () => {},
         stdout: out.write,
         nowMs: () => 1_000
@@ -711,8 +729,10 @@ describe("shipped execution show command over a real HTTP server", () => {
       assert.deepEqual(requests, [
         policyExplanationPath("app_1"),
         applicationCoveragePath("app_1"),
+        EXECUTIONS_PATH,
         policyExplanationPath("app_1"),
-        applicationCoveragePath("app_1")
+        applicationCoveragePath("app_1"),
+        EXECUTIONS_PATH
       ]);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -879,12 +899,14 @@ describe("pinned interval schedule (BKLG-20260908-xxtj)", () => {
   async function show(
     coverage: unknown,
     app: unknown = application(),
-    json = false
-  ): Promise<{ code: number; text: string; requests: string[] }> {
-    let result = { code: -1, text: "", requests: [] as string[] };
+    json = false,
+    executionsRead = async () => Response.json({ ok: true })
+  ): Promise<{ code: number; text: string; errors: string; requests: string[] }> {
+    let result = { code: -1, text: "", errors: "", requests: [] as string[] };
     await withSession(async (sessionFile) => {
       const requests: string[] = [];
       const out = writer();
+      const errors = writer();
       const code = await runSlipwayApplicationExecutionShow({ applicationId: "app_1", config: sessionFile, json }, {
         fetchImpl: async (url) => {
           const target = String(url);
@@ -893,11 +915,13 @@ describe("pinned interval schedule (BKLG-20260908-xxtj)", () => {
           if (target.endsWith("/coverage")) {
             return coverage instanceof Response ? coverage : Response.json(coverage);
           }
+          if (target.endsWith(EXECUTIONS_PATH)) return executionsRead();
           return app instanceof Response ? app : Response.json(app);
         },
-        stdout: out.write
+        stdout: out.write,
+        stderr: errors.write
       });
-      result = { code, text: out.text, requests };
+      result = { code, text: out.text, errors: errors.text, requests };
     });
     return result;
   }
@@ -994,7 +1018,8 @@ describe("pinned interval schedule (BKLG-20260908-xxtj)", () => {
       assert.deepEqual(result.requests, [
         policyExplanationPath("app_1"),
         applicationCoveragePath("app_1"),
-        "/api/applications/app_1"
+        "/api/applications/app_1",
+        EXECUTIONS_PATH
       ]);
     });
 
@@ -1054,13 +1079,70 @@ describe("pinned interval schedule (BKLG-20260908-xxtj)", () => {
       const result = await show(coverageRead({ schedule: block }), application(), true);
       assert.equal(result.code, 0);
       const printed = JSON.parse(result.text) as Record<string, unknown>;
-      assert.deepEqual(Object.keys(printed).sort(), ["explanation", "schedule"]);
+      assert.deepEqual(Object.keys(printed).sort(), ["executions", "explanation", "schedule"]);
       assert.deepEqual(printed.explanation, typedSpineEnvelope());
       assert.deepEqual(printed.schedule, block);
       assert.equal(result.text.includes(TOKEN), false);
 
       const absent = JSON.parse((await show(coverageRead(), application(), true)).text) as Record<string, unknown>;
       assert.equal(absent.schedule, null);
+      assert.equal(absent.executions, null);
+    });
+
+    it("appends job provenance after the golden and carries the page verbatim in JSON", async () => {
+      const fixture = new URL("./fixtures/job-provenance.json", import.meta.url);
+      const { response } = JSON.parse(await readFile(fixture, "utf8"));
+      const golden = await readFile(new URL("./fixtures/execution-show-without-provenance.golden.txt", import.meta.url), "utf8");
+      const block = { mode: "interval", overlap: null, nextDueAtMs: READ_AT + HOUR, gridOriginAtMs: 0 };
+      const snapshot = coverageRead({ schedule: block });
+      const read = (body: unknown) => async () => Response.json(body);
+      const withoutProvenance = { attempts: [{ effects: [{ effectKind: "provider_deploy" }] }] };
+      const refused = { refusal: { code: "execution_page_unreadable" } };
+
+      for (const executionsRead of [
+        read({ ok: true, executions: withoutProvenance }),
+        read({ ok: true, executions: refused }),
+        read({ ok: true }),
+        async () => Response.json(response, { status: 503 }),
+        async () => { throw new Error(TOKEN); },
+        read({ ...response, executions: { ...response.executions, echoedToken: TOKEN } })
+      ]) {
+        const quiet = await show(snapshot, application(), false, executionsRead);
+        assert.equal(quiet.code, 0);
+        assert.equal(quiet.text, golden);
+        assert.equal(quiet.errors, "");
+      }
+
+      const human = await show(snapshot, application(), false, read(response));
+      assert.equal(human.code, 0);
+      assert.notEqual(human.text, golden);
+      assert.ok(human.text.startsWith(golden + "\nJob provenance:"));
+      assert.doesNotMatch(human.text, /hardware-backed|unique|new key/i);
+      assert.equal(human.text.includes(TOKEN), false);
+
+      const withCursor = await show(snapshot, application(), false, read({
+        ...response, executions: { ...response.executions, nextCursor: "opaque-cursor" }
+      }));
+      assert.ok(withCursor.text.endsWith("more jobs exist than this page shows; read them with --json and the executions view\n"));
+
+      const json = await show(snapshot, application(), true, read(response));
+      assert.deepEqual(JSON.parse(json.text), {
+        explanation: typedSpineEnvelope(),
+        schedule: block,
+        executions: response.executions
+      });
+      assert.equal(json.text.includes(TOKEN), false);
+
+      const refusal = await show(snapshot, application(), true, read({ ok: true, executions: refused }));
+      assert.deepEqual(JSON.parse(refusal.text).executions, refused);
+      for (const executionsRead of [
+        async () => Response.json(response, { status: 503 }),
+        read({ ...response, executions: { ...response.executions, echoedToken: TOKEN } })
+      ]) {
+        const failure = await show(snapshot, application(), true, executionsRead);
+        assert.equal(JSON.parse(failure.text).executions, null);
+        assert.equal(failure.text.includes(TOKEN), false);
+      }
     });
 
     it("says nothing and reads no lifecycle for a continuous schedule", async () => {
