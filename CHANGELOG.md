@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.19.1
+
+- `proof liskov application execution show APP_ID` now also prints each V5
+  job's provenance record: the job, its processor, every key that processor
+  published (in full), the acknowledgement's chain coordinates with Acurast
+  Hub links, the Liskov placement verdict at the acknowledgement, and how the
+  job key is held. Hand these to a customer who wants to check a job's signing
+  key without Liskov. The read is optional: when it is unavailable, human
+  output is as before. One-shot `--json` keeps `explanation` and `schedule`
+  and adds `executions` (the served page, or `null`). `--watch` is unchanged
+  (BKLG-20261121-76ub).
+- The hidden `application placement-refusals` read also prints processor
+  criteria and manager reasons beside country, spread and inbound
+  (BKLG-20261122-w4uw).
+
 ## 0.19.0
 
 - The package now declares the SPDX identifier `FSL-1.1-ALv2` for the same
