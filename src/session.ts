@@ -60,8 +60,6 @@ import {
 } from "./policy-explanation.js";
 import {
   applicationCoveragePath,
-  applicationStoppedFrom,
-  coverageScheduleFrom,
   coverageSummaryFrom,
   executionChanges,
   executionDigest,
@@ -70,10 +68,9 @@ import {
   formatCoverageStatusLine,
   formatExecutionChange,
   formatExecutionExplanation,
-  formatExecutionStatusLine,
-  formatIntervalSchedule,
-  readIntervalSchedule
+  formatExecutionStatusLine
 } from "./execution-explanation.js";
+import { readExecutionSnapshot } from "./execution-show.js";
 import {
   APPLICATION_LOGS_HEADER,
   eventGlobMatcher,
@@ -2004,7 +2001,8 @@ export async function runSlipwayApplicationExecutionShow(
     requestErrorCode: "SLIPWAY_APPLICATION_EXECUTION_SHOW_FAILED",
     notFoundMessage: "No Liskov CLI session is stored locally.",
     fetchFailedMessage: "could not read Liskov Application execution explanation",
-    optional: quiet
+    optional: quiet,
+    protectSessionToken: input.watch !== true
   }, options);
 
   const first = await read(false);
@@ -2022,57 +2020,27 @@ export async function runSlipwayApplicationExecutionShow(
     return 1;
   }
   if (input.watch !== true) {
-    // The pinned interval schedule is Coverage's (`BKLG-20260908-xxtj`). A
-    // failed, absent or legacy read is the quiet absent reading and never
-    // fails the command; only an interval schedule asks whether the operator
-    // stopped the application, because only it would otherwise promise a run.
-    const coverageRequest = await authenticatedSlipwayRequest<unknown>({
-      config: input.config,
-      slipwayUrl: input.slipwayUrl,
-      json: input.json,
-      path: applicationCoveragePath(input.applicationId),
-      requestErrorCode: "SLIPWAY_APPLICATION_COVERAGE_FAILED",
-      notFoundMessage: "No Liskov CLI session is stored locally.",
-      fetchFailedMessage: "could not read Liskov Application coverage",
-      optional: true
-    }, options);
-    const coverage = coverageRequest.ok ? coverageScheduleFrom(coverageRequest.body) : undefined;
-    let stopped: boolean | undefined;
-    if (coverage?.schedule?.mode === "interval") {
-      const applicationRequest = await authenticatedSlipwayRequest<unknown>({
-        config: input.config,
-        slipwayUrl: input.slipwayUrl,
-        json: input.json,
-        path: `/api/applications/${encodeURIComponent(input.applicationId)}`,
-        requestErrorCode: "SLIPWAY_APPLICATION_STATUS_FAILED",
-        notFoundMessage: "No Liskov CLI session is stored locally.",
-        fetchFailedMessage: "could not read Liskov Application status",
-        optional: true
-      }, options);
-      stopped = applicationRequest.ok ? applicationStoppedFrom(applicationRequest.body) : undefined;
-    }
-    const scheduleLine = coverage === undefined
-      ? undefined
-      : formatIntervalSchedule(
-        readIntervalSchedule(coverage.schedule, { readAtMs: coverage.readAtMs, stopped: stopped === true, serving: coverage.serving }),
-        { typed: coverage.typed, stoppedKnown: stopped !== undefined }
-      );
-    // `--json` keeps the explanation envelope's existing fields and adds the
-    // decoded schedule block without dropping IDs. Old servers decode as a
-    // null schedule, never as invented quiet.
-    writeStructuredOrHuman(
-      options,
-      input.json,
-      input.json
-        ? {
-          explanation: first.body,
-          schedule: coverage?.schedule ?? null
-        }
-        : first.body,
-      [formatExecutionExplanation(parsed.explanation), scheduleLine]
-        .filter((line): line is string => line !== undefined)
-        .join("\n")
-    );
+    const snapshot = await readExecutionSnapshot(input.applicationId, parsed.explanation, async (path) => {
+      try {
+        const page = await authenticatedSlipwayRequest<unknown>({
+          config: input.config,
+          slipwayUrl: input.slipwayUrl,
+          path,
+          requestErrorCode: "SLIPWAY_APPLICATION_EXECUTION_SHOW_FAILED",
+          notFoundMessage: "No Liskov CLI session is stored locally.",
+          fetchFailedMessage: "could not read optional Liskov Application execution details",
+          optional: true,
+          protectSessionToken: true
+        }, { ...options, stdout: () => {}, stderr: () => {} });
+        return page.ok && page.response.ok ? page.body : undefined;
+      } catch {
+        // An optional response body can also fail while it is being read.
+        return undefined;
+      }
+    });
+    writeStructuredOrHuman(options, input.json, input.json
+      ? { explanation: first.body, schedule: snapshot.schedule, executions: snapshot.executions }
+      : first.body, input.json ? "" : snapshot.human());
     return 0;
   }
 

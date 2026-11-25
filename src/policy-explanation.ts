@@ -77,6 +77,10 @@ export function policyExplanationPath(applicationId: string): string {
   return `/api/applications/${encodeURIComponent(applicationId)}/policy?view=explanation`;
 }
 
+export function policyExecutionsPath(applicationId: string): string {
+  return `/api/applications/${encodeURIComponent(applicationId)}/policy?view=executions&latest=job`;
+}
+
 export function parsePolicyExplanation(body: unknown): PolicyExplanationParse {
   const record = asObject(body);
   if (!record) {
@@ -273,7 +277,7 @@ function emptySection(outcome: ExplanationOutcome): ExplanationSection {
   };
 }
 
-function asObject(value: unknown): Record<string, unknown> | undefined {
+export function asObject(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : undefined;
