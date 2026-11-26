@@ -48,6 +48,8 @@ export abstract class AnalyticsCommand extends Command {
     })
   };
 
+  protected readonly reportInvocationAnalytics: boolean = true;
+
   private analyticsDisabled = false;
   private analyticsSavedSession: AnalyticsSession | undefined;
   private analyticsSessionFile = "";
@@ -62,7 +64,7 @@ export abstract class AnalyticsCommand extends Command {
       strict: this.ctor.strict
     });
     const flags = parsed.flags as Record<string, unknown>;
-    this.analyticsDisabled = flags["no-analytics"] === true;
+    this.analyticsDisabled = !this.reportInvocationAnalytics || flags["no-analytics"] === true;
     const pluginVersion = this.ctor.plugin?.version ?? this.config.version ?? "unknown";
     this.analyticsUserAgent = `proof-cli-liskov/${pluginVersion}`;
     try {
