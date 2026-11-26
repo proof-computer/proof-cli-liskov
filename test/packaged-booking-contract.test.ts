@@ -22,7 +22,6 @@ interface CorpusSample {
 // liskov-rs policy-client bundle with the V5 and V6 publication pairs (BKLG-20261119-ziff).
 // Each base is that version's own corpus document. A V6 document redeclared
 // as V4 is refused at /release/mode with or without booking.
-const OWNER_COMMIT = "bf93a1f675f3adbf5ff1abefc62fb3b24bb33d7c";
 const BOOKING = { mode: "ahead_of_time", horizon: "1h" };
 const BASES: ReadonlyArray<readonly [string, number]> = [
   ["v4/golden", 4],
@@ -48,10 +47,13 @@ test("the npm tarball refuses an authored booking block in every vendored versio
     const directory = path.join(scratch, "package/dist/policy-client-bundle");
     const json = (file: string) => JSON.parse(readFileSync(file, "utf8")) as unknown;
     const digest = (file: string) => `sha256:${createHash("sha256").update(readFileSync(file)).digest("hex")}`;
-    const source = json(path.join(directory, "source.json")) as {
-      commit: string; files: Record<string, { source: string; sha256: string }>;
-    };
-    assert.equal(source.commit, OWNER_COMMIT);
+    const sourceFile = path.join(directory, "source.json");
+    assert.equal(
+      digest(sourceFile),
+      digest("src/policy-client-bundle/source.json"),
+      "packaged source.json must match the checkout"
+    );
+    const source = json(sourceFile) as { files: Record<string, { source: string; sha256: string }> };
     assert.equal(Object.keys(source.files).some((file) => file.includes("booking-v6")), false);
     for (const [file, record] of Object.entries(source.files)) {
       const packaged = file.startsWith("test/") ? file : path.join(directory, file);

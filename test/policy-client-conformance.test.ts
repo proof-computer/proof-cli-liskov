@@ -17,6 +17,8 @@ const contract = loadPolicyContract(bundleDirectory);
 const corpus = JSON.parse(readFileSync(path.join(bundleDirectory, "policy-client-conformance.json"), "utf8")) as {
   valid: Array<{ name: string; request: Record<string, unknown>; expected: Record<string, unknown> }>;
   invalid: Array<{ name: string; request: Record<string, unknown>; expectedCode: string; expectedPointer: string }>;
+  refused: Array<{ name: string; request: Record<string, unknown> }>;
+  unknown: { request: Record<string, unknown> };
 };
 
 test("vendored policy contract matches the complete shared corpus", () => {
@@ -29,29 +31,50 @@ test("vendored policy contract matches the complete shared corpus", () => {
     }
   }
   for (const sample of corpus.invalid) {
-    const result = contract.evaluate(sample.request) as { valid: boolean; errors: Array<{ code: string; pointer: string }> };
+    const result = contract.evaluate(sample.request);
     assert.equal(result.valid, false, sample.name);
     assert.equal(result.errors[0]?.code, sample.expectedCode, sample.name);
     assert.equal(result.errors[0]?.pointer || "/", sample.expectedPointer, sample.name);
   }
+  for (const sample of corpus.refused) {
+    const result = contract.evaluate(sample.request);
+    assert.equal(result.disposition, "invalid", sample.name);
+    assert.equal(result.valid, false, sample.name);
+    assert.ok(result.errors.length > 0, sample.name);
+    assert.equal(result.effective, undefined, sample.name);
+  }
+  const unknown = contract.evaluate(corpus.unknown.request);
+  assert.equal(unknown.disposition, "unknown_opaque");
+  assert.equal(unknown.valid, false);
+  assert.equal(unknown.errors[0]?.code, "unknown_policy_schema");
 });
 
 test("vendored artifacts match the complete merged producer bundle", () => {
-  // BKLG-20261123-ab14, liskov-rs PR #2177 (BKLG-20261119-ziff).
+  // BKLG-20261126-xyny, liskov-rs PR #2319 (BKLG-20261126-yb8r).
   // Pin the manifest so a coherent but different bundle cannot silently
   // replace the owner's bytes.
-  const source = JSON.parse(readFileSync(path.join(bundleDirectory, "source.json"), "utf8")) as { commit: string };
-  assert.equal(source.commit, "bf93a1f675f3adbf5ff1abefc62fb3b24bb33d7c");
-  const manifestBytes = readFileSync(path.join(bundleDirectory, "policy-client-bundle.json"));
+  const manifestFile = "policy-client-bundle.json";
+  const source = JSON.parse(readFileSync(path.join(bundleDirectory, "source.json"), "utf8")) as {
+    commit: string;
+    sourceDigest: string;
+    files: Record<string, { sha256: string }>;
+  };
+  assert.equal(source.commit, "bbb0dbe79178a0bf74f048c664c52b5e91697697");
+  const manifestBytes = readFileSync(path.join(bundleDirectory, manifestFile));
   const digest = (bytes: Uint8Array) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
-  assert.equal(digest(manifestBytes), "sha256:d081e6de316015b58e2be8eb9bddd63cbc3a345955be13eb85e87a33637d7e9a");
+  const manifestDigest = digest(manifestBytes);
+  assert.equal(manifestDigest, "sha256:d2e4460aa9af497e0e0f638e470fa623bb8d50efce976fab9f721b4b7b513590");
+  assert.equal(source.files[manifestFile]?.sha256, manifestDigest);
   const manifest = JSON.parse(manifestBytes.toString("utf8")) as {
+    sourceDigest: string;
     artifact: { file: string; sha256: string; uncompressedSha256: string };
     adapter: { file: string; sha256: string };
     types: { file: string; sha256: string };
     conformance: { file: string; sha256: string };
     publicationPairs: Array<{ schema: string; schemaVersion: number; releaseMode: string }>;
   };
+  assert.equal(manifest.sourceDigest, "sha256:4f5cba9d543ac34938f52d388f0ccbb5b8e1d457536386c6f0459ffd4c65249b");
+  assert.equal(source.sourceDigest, manifest.sourceDigest);
   for (const entry of [manifest.artifact, manifest.adapter, manifest.types, manifest.conformance]) {
     assert.equal(digest(readFileSync(path.join(bundleDirectory, entry.file))), entry.sha256, entry.file);
   }

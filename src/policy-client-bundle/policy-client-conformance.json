@@ -6410,7 +6410,7 @@
         "schema": "proof.liskov.policy-client-request.v1",
         "operation": "validate",
         "encoding": "yaml",
-        "document": "# EXPECT: unknown field `protection`, expected `name` or `provider`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/http/0/endpoints/0/protection\n# On a private provider protection derives to `network_gated` \u2014 reach implies\n# the gate (ADR-0060). Authoring it would be the ADR-0057 \u00a72 contradiction\n# trap, a second statement of a fact the platform already knows, so a V6\n# endpoint has no `protection` field at all.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-endpoint-protection-authored\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {tailscale: int_0123456789abcdef0123456789abcdef}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints: [{name: private, provider: {kind: tailscale}, protection: application_managed}]\nstate: {mode: off}\n"
+        "document": "# EXPECT: unknown field `protection`, expected `name` or `provider`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/http/0/endpoints/0/protection\n# On a private provider protection derives to `network_gated` \u2014 reach implies\n# the gate (ADR-0060). Authoring it would be the ADR-0057 \u00a72 contradiction\n# trap, a second statement of a fact the platform already knows, so a V6\n# endpoint has no `protection` field at all.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-endpoint-protection-authored\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {tailscale: int_0123456789abcdef0123456789abcdef}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      health: {ready: {tcp: 8080}}\n      endpoints: [{name: private, provider: {kind: tailscale}, protection: application_managed}]\nstate: {mode: off}\n"
       },
       "expectedCode": "unknown_field",
       "expectedPointer": "/ingress/http/0/endpoints/0/protection"
@@ -6421,7 +6421,7 @@
         "schema": "proof.liskov.policy-client-request.v1",
         "operation": "validate",
         "encoding": "yaml",
-        "document": "# EXPECT: unknown variant `acurast_tunnel`, expected `tailscale`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/http/0/endpoints/0/provider/kind\n# V6 authors one endpoint provider, the private one. The public providers\n# (`acurast_tunnel`, `cloudflare_tunnel`), their protection matrix and the\n# tunnel-connection budget return with public ingress (EPIC-20260907-ir5d),\n# and a document naming one is refused at the provider's own pointer rather\n# than reinterpreted as private.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-endpoint-provider-deferred\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {tailscale: int_0123456789abcdef0123456789abcdef}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints: [{name: public, provider: {kind: acurast_tunnel}}]\nstate: {mode: off}\n"
+        "document": "# EXPECT: unknown variant `acurast_tunnel`, expected `tailscale`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/http/0/endpoints/0/provider/kind\n# V6 authors one endpoint provider, the private one. The public providers\n# (`acurast_tunnel`, `cloudflare_tunnel`), their protection matrix and the\n# tunnel-connection budget return with public ingress (EPIC-20260907-ir5d),\n# and a document naming one is refused at the provider's own pointer rather\n# than reinterpreted as private.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-endpoint-provider-deferred\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {tailscale: int_0123456789abcdef0123456789abcdef}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      health: {ready: {tcp: 8080}}\n      endpoints: [{name: public, provider: {kind: acurast_tunnel}}]\nstate: {mode: off}\n"
       },
       "expectedCode": "invalid_manifest",
       "expectedPointer": "/ingress/http/0/endpoints/0/provider/kind"
@@ -6436,6 +6436,17 @@
       },
       "expectedCode": "invalid_manifest",
       "expectedPointer": "/configuration"
+    },
+    {
+      "name": "v6/invalid/exec-probe-is-refused",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: V6 does not support exec probes\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/api/health/ready\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-exec-probe-is-refused\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {tailscale: int_0123456789abcdef0123456789abcdef}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      health: {ready: {exec: [/bin/check]}}\n      endpoints: [{name: private, provider: {kind: tailscale}}]\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/api/health/ready"
     },
     {
       "name": "v6/invalid/execution-until-is-not-an-arm",
@@ -6469,6 +6480,17 @@
       },
       "expectedCode": "invalid_manifest",
       "expectedPointer": "/deployment/placement/allow/0/by"
+    },
+    {
+      "name": "v6/invalid/health-is-required-on-a-service",
+      "request": {
+        "schema": "proof.liskov.policy-client-request.v1",
+        "operation": "validate",
+        "encoding": "yaml",
+        "document": "# EXPECT: a native_image ingress service must declare health\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/api/health\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-health-is-required-on-a-service\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {tailscale: int_0123456789abcdef0123456789abcdef}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints: [{name: private, provider: {kind: tailscale}}]\nstate: {mode: off}\n"
+      },
+      "expectedCode": "invalid_manifest",
+      "expectedPointer": "/ingress/api/health"
     },
     {
       "name": "v6/invalid/health-on-javascript",
@@ -6520,7 +6542,7 @@
         "schema": "proof.liskov.policy-client-request.v1",
         "operation": "validate",
         "encoding": "yaml",
-        "document": "# EXPECT: unknown field `tcp`, expected `http`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/tcp\n# A raw stream cannot be multiplexed behind one attachment the way HTTP can,\n# and its provider matrix is public ingress's. V6 publishes HTTP services only;\n# `ingress.tcp` returns with EPIC-20260907-ir5d.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-ingress-tcp-deferred\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {tailscale: int_0123456789abcdef0123456789abcdef}\ningress:\n  tcp:\n    - name: wire\n      localPort: 9000\n      endpoints: [{name: private, provider: {kind: tailscale}}]\nstate: {mode: off}\n"
+        "document": "# EXPECT: unknown field `tcp`, expected `http`\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/tcp\n# A raw stream cannot be multiplexed behind one attachment the way HTTP can,\n# and its provider matrix is public ingress's. V6 publishes HTTP services only;\n# `ingress.tcp` returns with EPIC-20260907-ir5d.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-ingress-tcp-deferred\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\nintegrations: {tailscale: int_0123456789abcdef0123456789abcdef}\ningress:\n  tcp:\n    - name: wire\n      localPort: 9000\n      health: {ready: {tcp: 9000}}\n      endpoints: [{name: private, provider: {kind: tailscale}}]\nstate: {mode: off}\n"
       },
       "expectedCode": "unknown_field",
       "expectedPointer": "/ingress/tcp"
@@ -6773,7 +6795,7 @@
         "schema": "proof.liskov.policy-client-request.v1",
         "operation": "validate",
         "encoding": "yaml",
-        "document": "# EXPECT: names provider `tailscale` but no `integrations.tailscale` is declared and no integrationId overrides it\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/api/private/provider\n# Every site that names a provider must resolve to an integration: declared\n# once under `integrations` and referenced by kind, or overridden at the site.\n# Stating the id at every site is the \"stated twice\" trap; stating it nowhere\n# is an endpoint with no tailnet to join.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-undeclared-integration\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      endpoints: [{name: private, provider: {kind: tailscale}}]\nstate: {mode: off}\n"
+        "document": "# EXPECT: names provider `tailscale` but no `integrations.tailscale` is declared and no integrationId overrides it\n# EXPECT-CODE: invalid_manifest\n# EXPECT-POINTER: /ingress/api/private/provider\n# Every site that names a provider must resolve to an integration: declared\n# once under `integrations` and referenced by kind, or overridden at the site.\n# Stating the id at every site is the \"stated twice\" trap; stating it nowhere\n# is an endpoint with no tailnet to join.\nschema: proof.liskov.application-manifest\nschemaVersion: 6\napplicationId: bad-undeclared-integration\nrelease: {mode: source}\nruntime: {kind: native_image, image: {name: debian-trixie, version: \"0.1\"}, entrypoint: {executable: /bin/sh}}\nexecution: {mode: once}\ndeployment:\n  schedule: {duration: 30m}\n  spend: {unit: service_credit_micros, perJob: \"1000000\"}\ningress:\n  http:\n    - name: api\n      localPort: 8080\n      health: {ready: {tcp: 8080}}\n      endpoints: [{name: private, provider: {kind: tailscale}}]\nstate: {mode: off}\n"
       },
       "expectedCode": "invalid_manifest",
       "expectedPointer": "/ingress/api/private/provider"
