@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  evaluateApplicationManifest,
   evaluateApplicationManifestText,
   isRegisteredPublicationPair,
   isRegisteredSourcePublicationPair,
@@ -50,6 +51,36 @@ function evaluate(sample: { request: CorpusRequest }) {
 }
 
 describe("V6 application-manifest validation through the vendored contract", () => {
+  for (const { name, health, pointer } of [
+    { name: "missing health", health: undefined, pointer: "/ingress/http/health" },
+    { name: "an exec probe", health: { ready: { exec: ["/bin/check"] } }, pointer: "/ingress/http/health/ready" }
+  ]) {
+    it(`refuses ${name} for native image ingress and accepts a TCP probe`, () => {
+      const parsed = evaluate(corpusCase("v6/clickhouse"));
+      assert.equal(parsed.valid, true);
+      const manifest = structuredClone(parsed.document) as {
+        ingress: { http: Array<{ name: string; localPort: number; health?: unknown }> };
+      };
+      const service = manifest.ingress.http[0];
+      assert.equal(service.name, "http");
+      service.health = { ready: { tcp: service.localPort } };
+      const control = evaluateApplicationManifest(manifest);
+      assert.equal(control.valid, true);
+      assert.deepEqual(control.errors, []);
+      assert.equal(isRegisteredSourcePublicationPair(control), true);
+
+      if (health === undefined) {
+        delete service.health;
+      } else {
+        service.health = health;
+      }
+      const refused = evaluateApplicationManifest(manifest);
+      assert.equal(refused.valid, false);
+      assert.equal(refused.errors[0]?.code, "invalid_manifest");
+      assert.equal(refused.errors[0]?.pointer, pointer);
+    });
+  }
+
   const processorChoices = [
     {
       name: "Android floors, an exact excluded build, and either JavaScript type",
