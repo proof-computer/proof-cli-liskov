@@ -248,6 +248,7 @@ export function formatApplicationSigner(requestedApplicationRef: string, body: S
     ...(replacedSigners.length === 0
       ? []
       : ["Replaced signers (connected to settle jobs they registered):", ...replacedSigners.map(formatSignerRow)]),
+    formatSignerVersionPolicy(readback.signerVersionPolicy),
     ...(requests.length === 0
       ? ["No open sign requests."]
       : ["Open requests:", ...requests.map((request) => [
@@ -276,13 +277,27 @@ function ms(served: unknown): string {
 }
 
 function formatSignerRow(signer: Record<string, unknown>): string {
+  const version = typeof signer.signerVersion === "string" ? signer.signerVersion : "-";
+  const standing = signer.versionStanding;
+  const advisory = standing === "update_recommended" || standing === "update_required" || standing === "unknown"
+    ? ` (${standing.replaceAll("_", " ")})`
+    : "";
   return [
     stringValue(signer.signerAddress) ?? "-",
     signer.online === true ? "online" : "offline",
     signer.connected === true ? "connected" : "disconnected",
     `heartbeat ${ms(signer.heartbeatAgeMs)}`,
-    `protocol ${value(signer.protocolVersion)}`
+    `protocol ${value(signer.protocolVersion)}`,
+    `version ${version}${advisory}`
   ].join("\t");
+}
+
+function formatSignerVersionPolicy(served: unknown): string | undefined {
+  const { recommendedMinimum, requiredFromMs } = objectRecord(served);
+  if (typeof recommendedMinimum !== "string") return undefined;
+
+  const requiredFrom = isoFromEpochMs(requiredFromMs);
+  return `Signer version: minimum ${recommendedMinimum}${requiredFrom === undefined ? "" : `, required from ${requiredFrom}`}`;
 }
 
 function formatObservedFunding(funding: Record<string, unknown>): string[] {

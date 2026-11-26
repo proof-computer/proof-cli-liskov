@@ -28,7 +28,11 @@
         "oldestClaimedAgeMs": null,
         "lastSuccessAgeMs": null
       },
-      "lastSuccessAtMs": null
+      "lastSuccessAtMs": null,
+      "signerVersionPolicy": {
+        "recommendedMinimum": "0.2.0",
+        "requiredFromMs": null
+      }
     },
     "executedFunding": {
       "available": false,
@@ -64,7 +68,11 @@
         "oldestClaimedAgeMs": null,
         "lastSuccessAgeMs": null
       },
-      "lastSuccessAtMs": null
+      "lastSuccessAtMs": null,
+      "signerVersionPolicy": {
+        "recommendedMinimum": "0.2.0",
+        "requiredFromMs": null
+      }
     },
     "executedFunding": {
       "available": false,
@@ -85,7 +93,9 @@
           "connected": true,
           "online": true,
           "heartbeatAgeMs": 0,
-          "protocolVersion": 2
+          "protocolVersion": 2,
+          "signerVersion": "0.3.0",
+          "versionStanding": "current"
         }
       ],
       "signersTruncated": false,
@@ -108,7 +118,11 @@
         "oldestClaimedAgeMs": null,
         "lastSuccessAgeMs": 60000
       },
-      "lastSuccessAtMs": 1757999940000
+      "lastSuccessAtMs": 1757999940000,
+      "signerVersionPolicy": {
+        "recommendedMinimum": "0.2.0",
+        "requiredFromMs": null
+      }
     },
     "executedFunding": {
       "available": false,
@@ -129,7 +143,9 @@
           "connected": true,
           "online": false,
           "heartbeatAgeMs": 95000,
-          "protocolVersion": 2
+          "protocolVersion": 2,
+          "signerVersion": null,
+          "versionStanding": "unknown"
         }
       ],
       "signersTruncated": false,
@@ -152,7 +168,11 @@
         "oldestClaimedAgeMs": null,
         "lastSuccessAgeMs": null
       },
-      "lastSuccessAtMs": null
+      "lastSuccessAtMs": null,
+      "signerVersionPolicy": {
+        "recommendedMinimum": "0.2.0",
+        "requiredFromMs": null
+      }
     },
     "executedFunding": {
       "available": false,
@@ -173,7 +193,9 @@
           "connected": true,
           "online": true,
           "heartbeatAgeMs": 1000,
-          "protocolVersion": 1
+          "protocolVersion": 1,
+          "signerVersion": "0.1.0",
+          "versionStanding": "update_recommended"
         }
       ],
       "signersTruncated": false,
@@ -196,7 +218,11 @@
         "oldestClaimedAgeMs": null,
         "lastSuccessAgeMs": null
       },
-      "lastSuccessAtMs": null
+      "lastSuccessAtMs": null,
+      "signerVersionPolicy": {
+        "recommendedMinimum": "0.2.0",
+        "requiredFromMs": null
+      }
     },
     "executedFunding": {
       "available": false,
@@ -217,7 +243,9 @@
           "connected": true,
           "online": true,
           "heartbeatAgeMs": 1500,
-          "protocolVersion": 2
+          "protocolVersion": 2,
+          "signerVersion": null,
+          "versionStanding": "unknown"
         }
       ],
       "signersTruncated": false,
@@ -250,7 +278,11 @@
         "oldestClaimedAgeMs": null,
         "lastSuccessAgeMs": null
       },
-      "lastSuccessAtMs": null
+      "lastSuccessAtMs": null,
+      "signerVersionPolicy": {
+        "recommendedMinimum": "0.2.0",
+        "requiredFromMs": null
+      }
     },
     "executedFunding": {
       "available": false,
@@ -271,7 +303,9 @@
           "connected": true,
           "online": true,
           "heartbeatAgeMs": 1500,
-          "protocolVersion": 2
+          "protocolVersion": 2,
+          "signerVersion": null,
+          "versionStanding": "unknown"
         }
       ],
       "signersTruncated": false,
@@ -304,7 +338,11 @@
         "oldestClaimedAgeMs": 4000,
         "lastSuccessAgeMs": null
       },
-      "lastSuccessAtMs": null
+      "lastSuccessAtMs": null,
+      "signerVersionPolicy": {
+        "recommendedMinimum": "0.2.0",
+        "requiredFromMs": null
+      }
     },
     "executedFunding": {
       "available": false,
@@ -325,7 +363,9 @@
           "connected": true,
           "online": true,
           "heartbeatAgeMs": 1500,
-          "protocolVersion": 2
+          "protocolVersion": 2,
+          "signerVersion": null,
+          "versionStanding": "unknown"
         }
       ],
       "signersTruncated": false,
@@ -358,7 +398,11 @@
         "oldestClaimedAgeMs": 4000,
         "lastSuccessAgeMs": null
       },
-      "lastSuccessAtMs": null
+      "lastSuccessAtMs": null,
+      "signerVersionPolicy": {
+        "recommendedMinimum": "0.2.0",
+        "requiredFromMs": null
+      }
     },
     "executedFunding": {
       "available": false,
@@ -379,7 +423,9 @@
           "connected": true,
           "online": true,
           "heartbeatAgeMs": 2000,
-          "protocolVersion": 2
+          "protocolVersion": 2,
+          "signerVersion": null,
+          "versionStanding": "unknown"
         }
       ],
       "signersTruncated": false,
@@ -402,7 +448,11 @@
         "oldestClaimedAgeMs": null,
         "lastSuccessAgeMs": null
       },
-      "lastSuccessAtMs": null
+      "lastSuccessAtMs": null,
+      "signerVersionPolicy": {
+        "recommendedMinimum": "0.2.0",
+        "requiredFromMs": null
+      }
     },
     "executedFunding": {
       "available": false,
@@ -423,7 +473,9 @@
           "connected": true,
           "online": true,
           "heartbeatAgeMs": 1000,
-          "protocolVersion": 2
+          "protocolVersion": 2,
+          "signerVersion": null,
+          "versionStanding": "unknown"
         }
       ],
       "signersTruncated": false,
@@ -446,7 +498,11 @@
         "oldestClaimedAgeMs": null,
         "lastSuccessAgeMs": null
       },
-      "lastSuccessAtMs": null
+      "lastSuccessAtMs": null,
+      "signerVersionPolicy": {
+        "recommendedMinimum": "0.2.0",
+        "requiredFromMs": null
+      }
     },
     "executedFunding": {
       "available": true,
@@ -476,7 +532,9 @@
           "connected": true,
           "online": true,
           "heartbeatAgeMs": 1000,
-          "protocolVersion": 2
+          "protocolVersion": 2,
+          "signerVersion": null,
+          "versionStanding": "unknown"
         }
       ],
       "signersTruncated": false,
@@ -499,7 +557,11 @@
         "oldestClaimedAgeMs": null,
         "lastSuccessAgeMs": null
       },
-      "lastSuccessAtMs": null
+      "lastSuccessAtMs": null,
+      "signerVersionPolicy": {
+        "recommendedMinimum": "0.2.0",
+        "requiredFromMs": null
+      }
     },
     "executedFunding": {
       "available": true,
@@ -529,7 +591,9 @@
           "connected": true,
           "online": true,
           "heartbeatAgeMs": 1000,
-          "protocolVersion": 2
+          "protocolVersion": 2,
+          "signerVersion": null,
+          "versionStanding": "unknown"
         }
       ],
       "signersTruncated": false,
@@ -552,7 +616,11 @@
         "oldestClaimedAgeMs": null,
         "lastSuccessAgeMs": null
       },
-      "lastSuccessAtMs": null
+      "lastSuccessAtMs": null,
+      "signerVersionPolicy": {
+        "recommendedMinimum": "0.2.0",
+        "requiredFromMs": null
+      }
     },
     "executedFunding": {
       "available": true,
@@ -594,7 +662,9 @@
           "connected": true,
           "online": true,
           "heartbeatAgeMs": 1000,
-          "protocolVersion": 2
+          "protocolVersion": 2,
+          "signerVersion": null,
+          "versionStanding": "unknown"
         }
       ],
       "signersTruncated": false,
@@ -617,7 +687,11 @@
         "oldestClaimedAgeMs": null,
         "lastSuccessAgeMs": null
       },
-      "lastSuccessAtMs": null
+      "lastSuccessAtMs": null,
+      "signerVersionPolicy": {
+        "recommendedMinimum": "0.2.0",
+        "requiredFromMs": null
+      }
     },
     "executedFunding": {
       "available": true,

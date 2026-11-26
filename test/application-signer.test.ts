@@ -40,7 +40,7 @@ type Vector = Record<
 >;
 
 /** The owner's vector, copied byte for byte from `liskov-rs` main at
- *  `66c3f67fc5b6f3054cef8e093ec6f1df2dcae28e`,
+ *  `8d4aa3d9fcca593668deaacdeb59ad5dbcd66a69` (BKLG-20261123-0lqb),
  *  `crates/liskov-control-plane-api/vectors/application_custody_signer.json`. */
 const vector = async (): Promise<Vector> =>
   JSON.parse(await readFile(new URL("./fixtures/application_custody_signer.json", import.meta.url), "utf8"));
@@ -88,13 +88,32 @@ test("application signer reads a live signer from the application-scoped route",
       "Policy: sha256:5d41402abc4b2a76b9719d911017c592ae2f1c9e5d8b3a7c6e4f2a1b0c9d8e7f",
       "Standing: online",
       "Signers:",
-      `${address}\tonline\tconnected\theartbeat 0 ms\tprotocol 2`,
+      `${address}\tonline\tconnected\theartbeat 0 ms\tprotocol 2\tversion 0.3.0`,
+      "Signer version: minimum 0.2.0",
       "No open sign requests.",
       "Counts: bound 1, online 1, open 0, pending 0, claimed 0, completed 3, signed 2, refused 1, expired 0, ambiguous 0",
       "Dispatch lag: oldest unclaimed -, oldest claimed -, last success 60000 ms ago",
       "Last signature: 2025-09-16T05:19:00.000Z",
       "Observed funding: not reported (no_customer_funded_execution)."
     ]);
+  });
+});
+
+test("application signer omits the version policy line for an older response", async () => {
+  const { live } = await vector();
+  const body: SignerBody = {
+    ...live,
+    signerReadback: {
+      ...live.signerReadback,
+      signers: [{ signerAddress: address, online: true, connected: true, heartbeatAgeMs: 0, protocolVersion: 2 }]
+    }
+  };
+  delete body.signerReadback.signerVersionPolicy;
+  await withSession(async (sessionFile) => {
+    const out = await readSigner(sessionFile, {}, () => Response.json(body));
+    assert.equal(out.code, 0);
+    assert.ok(out.lines.includes(`${address}\tonline\tconnected\theartbeat 0 ms\tprotocol 2\tversion -`));
+    assert.ok(out.lines.every((line) => !line.startsWith("Signer version:")));
   });
 });
 
@@ -144,7 +163,7 @@ test("application signer takes liveness from the served online flag, not from co
       standing(out.lines),
       "Standing: offline (connected, heartbeat 95000 ms ago; online after 90000 ms of silence is not assumed)"
     );
-    assert.ok(out.lines.includes(`${address}\toffline\tconnected\theartbeat 95000 ms\tprotocol 2`));
+    assert.ok(out.lines.includes(`${address}\toffline\tconnected\theartbeat 95000 ms\tprotocol 2\tversion - (unknown)`));
   });
 });
 
@@ -154,6 +173,7 @@ test("application signer flags a signer below protocol 2", async () => {
     const out = await readSigner(sessionFile, {}, () => Response.json(oldProtocol));
     assert.equal(out.code, 0);
     assert.equal(standing(out.lines), "Standing: signer protocol 1 is below 2");
+    assert.ok(out.lines.includes(`${address}\tonline\tconnected\theartbeat 1000 ms\tprotocol 1\tversion 0.1.0 (update recommended)`));
   });
 });
 
@@ -375,7 +395,11 @@ test("application signer shows the bound address and any replaced signer rows", 
     signerReadback: {
       ...live.signerReadback,
       boundSignerAddress: address,
-      replacedSigners: [{ signerAddress: replacedAddress, online: false, connected: true, heartbeatAgeMs: 95000, protocolVersion: 2 }]
+      replacedSigners: [{
+        signerAddress: replacedAddress, online: false, connected: true, heartbeatAgeMs: 95000,
+        protocolVersion: 2, signerVersion: "0.1.0", versionStanding: "update_required"
+      }],
+      signerVersionPolicy: { recommendedMinimum: "0.2.0", requiredFromMs: 0 }
     }
   };
   await withSession(async (sessionFile) => {
@@ -386,13 +410,14 @@ test("application signer shows the bound address and any replaced signer rows", 
     assert.ok(original.lines.every((line) => !line.startsWith("Bound address:") && !line.startsWith("Replaced signers")));
     const at = out.lines.indexOf("Standing: online");
     assert.ok(at > 0);
-    assert.deepEqual(out.lines.slice(at, at + 7), [
+    assert.deepEqual(out.lines.slice(at, at + 8), [
       "Standing: online",
       `Bound address: ${address}`,
       "Signers:",
-      `${address}\tonline\tconnected\theartbeat 0 ms\tprotocol 2`,
+      `${address}\tonline\tconnected\theartbeat 0 ms\tprotocol 2\tversion 0.3.0`,
       "Replaced signers (connected to settle jobs they registered):",
-      `${replacedAddress}\toffline\tconnected\theartbeat 95000 ms\tprotocol 2`,
+      `${replacedAddress}\toffline\tconnected\theartbeat 95000 ms\tprotocol 2\tversion 0.1.0 (update required)`,
+      "Signer version: minimum 0.2.0, required from 1970-01-01T00:00:00.000Z",
       "No open sign requests."
     ]);
   });
