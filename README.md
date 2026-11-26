@@ -337,6 +337,27 @@ ref, manifest path and generated caller workflow identity, such as
 The structured success key `policyWorkflowRefHint` retains that caller identity
 hint for existing consumers.
 
+## Public application verification
+
+```sh
+proof liskov application verification show APP_REF
+proof liskov application verification publish APP_REF --label "Acme"
+proof liskov application verification publish APP_REF --label "Acme" --yes
+proof liskov application verification unpublish APP_REF --yes
+```
+
+`show` reports publication status and prints the handle and public URL for a
+published record. Anyone with that URL can read the application's jobs, job
+keys, processor addresses, attestation facts, and chain coordinates without
+logging in.
+
+Publishing and unpublishing require an organization admin. Both commands
+preview the change by default and write only when you pass `--yes`. Use
+`--label` to set the publisher's label, `--clear-label` to remove it, or omit
+both flags to keep the current label. Editing the label keeps the handle and
+link. Unpublishing disables the current link. Publishing again creates a new
+handle and link.
+
 ## Self-custody signer (V6)
 
 With the V6 release and the self-custody signer entitlement, you can connect

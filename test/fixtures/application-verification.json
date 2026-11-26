@@ -1,0 +1,54 @@
+{
+  "source": {
+    "repository": "proof-computer/liskov-rs",
+    "commit": "8952c4f9ca5e219cfad40ed914bba7c5900d6f55",
+    "vector": "crates/liskov-control-plane-api/vectors/public_verification.json",
+    "ownerTest": "crates/liskov-api-runtime/tests/pg_application_scope/public_verification.rs",
+    "note": "The no-label state follows the owner test that clears the label on the active publication."
+  },
+  "published": {
+    "publicVerification": {
+      "published": true,
+      "handle": "lpv_abcdefghijklmnopqrstuvwxyz",
+      "publicPath": "/api/public/v1/job-verification/lpv_abcdefghijklmnopqrstuvwxyz/jobs",
+      "publisherLabel": "pocket-confidential",
+      "publishedAtMs": 125
+    }
+  },
+  "withoutLabel": {
+    "publicVerification": {
+      "published": true,
+      "handle": "lpv_abcdefghijklmnopqrstuvwxyz",
+      "publicPath": "/api/public/v1/job-verification/lpv_abcdefghijklmnopqrstuvwxyz/jobs",
+      "publisherLabel": null,
+      "publishedAtMs": 125
+    }
+  },
+  "unpublished": {
+    "publicVerification": {
+      "published": false,
+      "handle": null,
+      "publicPath": null,
+      "publisherLabel": null,
+      "publishedAtMs": null
+    }
+  },
+  "forbidden": {
+    "status": 403,
+    "body": {
+      "error": "forbidden"
+    }
+  },
+  "invalidLabel": {
+    "status": 400,
+    "body": {
+      "error": "publisher_label_invalid"
+    }
+  },
+  "foreignApplication": {
+    "status": 404,
+    "body": {
+      "error": "application_not_found"
+    }
+  }
+}
