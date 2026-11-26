@@ -591,7 +591,7 @@ test("managed print-command is redacted and never mints a ticket", async () => {
     assert.equal(code, 0);
     assert.equal(requests, 1);
     assert.match(output[0], /one-time ticket not minted/u);
-    assert.doesNotMatch(output[0], /-L|-D|ExitOnForwardFailure/u);
+    assert.equal((await import("./support/ssh-forward-options.js")).hasSshForwardOptions(output[0]), false, output[0]);
   });
 });
 
