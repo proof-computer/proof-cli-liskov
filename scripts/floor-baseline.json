@@ -4,7 +4,7 @@
   "reason": "BKLG-20261108-fwlp: lint findings that predate the lint step; counted, not converted (ADR-0284 decision 5)",
   "held_reason": "BKLG-20261108-fwlp: over 2,000 lines before the size hold; held, not split (ADR-0284 D24)",
   "held_files": {
-    "src/session.ts": 9592,
+    "src/session.ts": 9520,
     "test/runtime-ssh.test.ts": 2115,
     "test/slipway.test.ts": 6984
   }
