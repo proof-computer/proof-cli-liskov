@@ -1,6 +1,7 @@
 import { isApplicationPlacementPlan, formatPlacementPlan, placementPlanPath } from "./placement-plan.js";
 import { isApplicationPlacementRefusals, formatPlacementRefusals, parsePlacementRefusalsQuery, placementRefusalsPath } from "./placement-refusals.js";
 import { openBrowser } from "./browser-open.js";
+import { formatApplicationRun } from "./application-run-output.js";
 import { applicationSignerPath, applicationSignerReadback, formatApplicationSigner, type SlipwayApplicationSignerResponse } from "./application-signer.js";
 import { createHash, randomBytes } from "node:crypto";
 import { access, mkdir, readFile, rm, writeFile, chmod } from "node:fs/promises";
@@ -33,8 +34,7 @@ import {
   formatOrganizationList,
   formatOrganizationServiceCredits,
   formatOrganizationTransactions,
-  formatOrganizationUse,
-  usd
+  formatOrganizationUse
 } from "./organization-output.js";
 import {
   canonicalOrganizationId,
@@ -1216,7 +1216,8 @@ interface SlipwayApplicationHoldReleaseResponse {
  * HTTP 200 — a refusal is `ok: false` with a `refusal` object, never a 4xx — so
  * this client reads the body, not the status. The already-requested replay is
  * the one exception: a three-key `{ok, noop, reason}` body that omits every
- * other field, returned for a preview as well as a confirm.
+ * other field, returned for a preview as well as a confirm. An optional
+ * `expectedCost` object may sit beside those keys; an older server omits it.
  */
 interface SlipwayApplicationRunResponse {
   ok?: boolean;
@@ -1229,6 +1230,8 @@ interface SlipwayApplicationRunResponse {
   /** An exact decimal string, not a number: one delivered job's total exposure. */
   perJobServiceCreditMicros?: string | null;
   availableServiceCreditMicros?: number | null;
+  /** Server-owned estimate. `--json` emits this object unchanged. */
+  expectedCost?: unknown;
   refusal?: { code?: string; detail?: string } | null;
   error?: string;
   reason?: string;
@@ -9337,81 +9340,6 @@ function formatApplicationRunNoop(applicationRef: string): string {
     `${applicationRef} already has a run authorized and not yet spent.`,
     "Pressing Run again does not queue a second run."
   ].join("\n");
-}
-
-/**
- * The preview and the accepted confirm share one body, so they share one
- * formatter; `authorized` is the only field whose meaning differs.
- *
- * Nothing here promises a launch. The route records intent and opens no
- * reserve — the executor's admission checks remain the authority — so the
- * wording is always that a reserve *would* or *will* be opened.
- */
-function formatApplicationRun(applicationRef: string, body: SlipwayApplicationRunResponse): string {
-  const authorized = body.authorized === true;
-  const generation = typeof body.settledGeneration === "number"
-    ? ` after settled generation ${body.settledGeneration}`
-    : "";
-  const lines = [authorized
-    ? `Authorized one more run of ${applicationRef}${generation}.`
-    : `Dry run: ${applicationRef} would run again${generation}.`];
-
-  const shape = formatApplicationRunShape(body, authorized);
-  if (shape !== undefined) lines.push(shape);
-  if (typeof body.availableServiceCreditMicros === "number") {
-    lines.push(`Available Service Credit: ${usd(body.availableServiceCreditMicros / 1_000_000)}.`);
-  }
-
-  lines.push(authorized
-    ? `Track it with \`proof liskov application execution show ${applicationRef} --watch\`.`
-    : "This authorizes one more occurrence; it does not promise a launch. Add --yes to authorize the run.");
-  return lines.join("\n");
-}
-
-/**
- * The jobs/window/reserve sentence, built only from figures the body actually
- * carries. A policy compiled to `independent_caps` has no per-job amount, so
- * the reserve clause is dropped rather than guessed at.
- */
-function formatApplicationRunShape(body: SlipwayApplicationRunResponse, authorized: boolean): string | undefined {
-  const parts: string[] = [];
-  const jobs = typeof body.jobs === "number" ? body.jobs : undefined;
-  if (jobs !== undefined) {
-    const window = typeof body.jobWindowMs === "number" ? ` over a ${formatJobWindowMs(body.jobWindowMs)} window` : "";
-    parts.push(`${jobs} job${jobs === 1 ? "" : "s"}${window}`);
-  }
-  const reserveUsd = applicationRunReserveUsd(body.perJobServiceCreditMicros, jobs);
-  if (reserveUsd !== undefined) {
-    parts.push(`a reserve of up to ${usd(reserveUsd)} Service Credit ${authorized ? "will" : "would"} be opened`);
-  }
-  return parts.length === 0 ? undefined : `${parts.join("; ")}.`;
-}
-
-/**
- * `perJobServiceCreditMicros` is an exact decimal string, not a number, so the
- * multiplication is done in `BigInt`. Anything that is not a plain micro count
- * — a null, a non-integer, a total past exact float range — returns undefined,
- * and the caller omits the clause rather than printing `NaN`.
- */
-function applicationRunReserveUsd(perJob: string | null | undefined, jobs: number | undefined): number | undefined {
-  if (typeof perJob !== "string" || !/^\d+$/u.test(perJob)) return undefined;
-  if (jobs === undefined || !Number.isSafeInteger(jobs) || jobs < 0) return undefined;
-  const micros = BigInt(perJob) * BigInt(jobs);
-  if (micros > BigInt(Number.MAX_SAFE_INTEGER)) return undefined;
-  return Number(micros) / 1_000_000;
-}
-
-/**
- * A paid job window reads in the largest whole unit that divides it (`45s`,
- * `6h`); anything that divides evenly into none of them stays in milliseconds
- * rather than being rounded into a figure the policy does not say.
- */
-function formatJobWindowMs(ms: number): string {
-  if (!Number.isSafeInteger(ms) || ms < 0) return `${ms} ms`;
-  for (const [unit, size] of [["d", 86_400_000], ["h", 3_600_000], ["m", 60_000], ["s", 1_000]] as const) {
-    if (ms >= size && ms % size === 0) return `${ms / size}${unit}`;
-  }
-  return `${ms} ms`;
 }
 
 function formatApplicationSetRepository(applicationRef: string, body: SlipwayApplicationSetRepositoryResponse): string {
